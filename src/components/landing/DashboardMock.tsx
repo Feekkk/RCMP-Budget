@@ -33,7 +33,7 @@ export function DashboardMock() {
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-sm text-foreground/60">Q3 Operating Budget</p>
-                <h3 className="font-display text-4xl">Rp 1.24B remaining</h3>
+                <h3 className="font-display text-4xl">RM 1.24M remaining</h3>
               </div>
               <div className="rounded-full bg-lime px-4 py-1.5 text-xs font-medium text-lime-foreground">
                 On track
@@ -46,8 +46,8 @@ export function DashboardMock() {
                 <div className="h-full w-[62%] rounded-full bg-foreground" />
               </div>
               <div className="mt-2 flex justify-between text-xs text-foreground/60">
-                <span>Spent Rp 760M</span>
-                <span>Budget Rp 2.0B</span>
+                <span>Spent RM 760K</span>
+                <span>Budget RM 2.0M</span>
               </div>
             </div>
 
@@ -61,21 +61,21 @@ export function DashboardMock() {
                 {[
                   {
                     title: "Office supplies — Marketing",
-                    amount: "Rp 4,250,000",
+                    amount: "RM 4,250",
                     status: "Approved",
                     tone: "bg-lime text-lime-foreground",
                     Icon: CheckCircle2,
                   },
                   {
                     title: "Vendor payment — CV Bina",
-                    amount: "Rp 18,900,000",
+                    amount: "RM 18,900",
                     status: "Pending L2",
                     tone: "bg-foreground/10 text-foreground",
                     Icon: Clock,
                   },
                   {
                     title: "Software license renewal",
-                    amount: "Rp 32,400,000",
+                    amount: "RM 32,400",
                     status: "Draft PRF",
                     tone: "bg-background text-foreground border border-border",
                     Icon: FileText,

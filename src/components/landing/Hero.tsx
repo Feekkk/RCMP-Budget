@@ -6,7 +6,7 @@ export function Hero() {
   return (
     <section className="mx-auto max-w-7xl px-6 pt-16 pb-10 text-center md:pt-28 md:pb-16">
       <h1 className="mx-auto max-w-5xl font-display text-6xl leading-[1.02] tracking-tight text-foreground md:text-8xl">
-        Track every rupiah,
+        Track every ringgit,
         <br />
         approve in
         <span className="relative mx-3 inline-block">
