@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { type ReactNode } from "react";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
@@ -16,17 +17,25 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="font-display text-7xl text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
+        <DotLottieReact
+          src="/Lonely%20404.json"
+          loop
+          autoplay
+          className="mx-auto h-64 w-full"
+        />
+        <h2 className="mt-4 font-display text-3xl text-foreground">
+          Oh no! Page not found
+        </h2>
         <p className="mt-2 text-sm text-muted-foreground">
           The page you're looking for doesn't exist or has been moved.
+          Please check the URL or go back to the home page.
         </p>
         <div className="mt-6">
           <Link
             to="/"
             className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Go home
+            Back to Home
           </Link>
         </div>
       </div>
@@ -74,14 +83,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Ledgerly — Department Budget Tracker" },
+      { title: "Budgetly — Department Budget Tracker" },
       {
         name: "description",
         content:
-          "Ledgerly is a department budget tracker for requisitions, PRF generation, layered approvals, and real-time budget visibility.",
+          "Budgetly is a department budget tracker for requisitions, PRF generation, layered approvals, and real-time budget visibility.",
       },
-      { name: "author", content: "Ledgerly" },
-      { property: "og:title", content: "Ledgerly — Department Budget Tracker" },
+      { name: "author", content: "Budgetly" },
+      { property: "og:title", content: "Budgetly — Department Budget Tracker" },
       {
         property: "og:description",
         content:
