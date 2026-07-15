@@ -64,7 +64,7 @@ export default defineConfig(({ command, mode }) => {
           },
         },
       }),
-      ...(command === "build" ? [nitro({ defaultPreset: "cloudflare-module" })] : []),
+      ...(command === "build" ? [nitro()] : []),
       viteReact(),
     ],
   };

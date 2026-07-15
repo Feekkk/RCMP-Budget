@@ -6,7 +6,7 @@ export function CtaBand() {
     <section className="mx-auto max-w-7xl px-6 pb-24">
       <div className="rounded-[2.5rem] bg-foreground px-8 py-20 text-center text-background md:py-28">
         <h2 className="mx-auto max-w-3xl font-display text-5xl leading-tight md:text-7xl">
-          Ready to take control <span className="italic">of your budget?</span>
+          Ready to take control of your budget?
         </h2>
         <div className="mt-10 flex justify-center">
           <Link

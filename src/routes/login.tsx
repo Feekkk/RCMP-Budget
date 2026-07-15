@@ -1,13 +1,14 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Wordmark } from "@/components/landing/Nav";
 import { Underline } from "@/components/landing/Underline";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+
+const roles = ["User", "HOD", "Finance", "CEO"] as const;
+
+type Role = (typeof roles)[number];
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -23,15 +24,19 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const [loadingRole, setLoadingRole] = useState<Role | null>(null);
 
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const loginAs = (role: Role) => {
+    setLoadingRole(role);
     setTimeout(() => {
-      setLoading(false);
+      setLoadingRole(null);
+      if (role === "User") {
+        navigate({ to: "/user" });
+        return;
+      }
       toast("Auth isn't wired up yet", {
-        description: "Sign-in will be available once authentication is connected.",
+        description: `Signing in as ${role} will be available once authentication is connected.`,
       });
     }, 500);
   };
@@ -47,7 +52,7 @@ function LoginPage() {
             <h1 className="font-display text-6xl leading-[1.02] md:text-7xl">
               Welcome
               <span className="relative ml-3 inline-block">
-                <span className="italic">back.</span>
+                <span>back.</span>
                 <Underline className="absolute -bottom-3 left-0 h-4 w-full" />
               </span>
             </h1>
@@ -63,59 +68,28 @@ function LoginPage() {
 
         {/* Right form panel */}
         <div className="flex items-center justify-center bg-ivory p-6 md:p-12">
-          <form
-            onSubmit={onSubmit}
-            className="w-full max-w-md rounded-[2rem] bg-background p-8 shadow-card md:p-10"
-          >
+          <div className="w-full max-w-md rounded-[2rem] bg-background p-8 shadow-card md:p-10">
             <h2 className="font-display text-3xl">Sign in to Ledgerly</h2>
             <p className="mt-1 text-sm text-foreground/60">
-              Use your work email to continue.
+              Choose a role to continue.
             </p>
 
-            <div className="mt-8 space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email">Work email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  required
-                  className="h-12 rounded-xl"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <a href="#" className="text-xs text-foreground/60 hover:text-foreground">
-                    Forgot?
-                  </a>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  className="h-12 rounded-xl"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox id="remember" />
-                <Label htmlFor="remember" className="text-sm font-normal text-foreground/70">
-                  Remember me on this device
-                </Label>
-              </div>
+            <div className="mt-8 space-y-3">
+              {roles.map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => loginAs(role)}
+                  disabled={loadingRole !== null}
+                  className="group inline-flex w-full items-center justify-center gap-3 rounded-full bg-lime py-4 text-base font-medium text-lime-foreground transition hover:brightness-95 disabled:opacity-60"
+                >
+                  {loadingRole === role ? "Signing in…" : `Login as ${role}`}
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background">
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </span>
+                </button>
+              ))}
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="group mt-8 inline-flex w-full items-center justify-center gap-3 rounded-full bg-lime py-4 text-base font-medium text-lime-foreground transition hover:brightness-95 disabled:opacity-60"
-            >
-              {loading ? "Signing in…" : "Sign in"}
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background">
-                <ArrowRight className="h-3.5 w-3.5" />
-              </span>
-            </button>
 
             <p className="mt-6 text-center text-sm text-foreground/60">
               Don't have an account?{" "}
@@ -129,7 +103,7 @@ function LoginPage() {
                 ← Back to home
               </Link>
             </p>
-          </form>
+          </div>
         </div>
       </div>
     </div>

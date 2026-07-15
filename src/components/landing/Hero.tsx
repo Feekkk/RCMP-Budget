@@ -10,7 +10,7 @@ export function Hero() {
         <br />
         approve in
         <span className="relative mx-3 inline-block">
-          <span className="italic">seconds</span>
+          <span>seconds</span>
           <Underline className="absolute -bottom-3 left-0 h-4 w-full md:-bottom-4 md:h-5" />
         </span>
       </h1>
