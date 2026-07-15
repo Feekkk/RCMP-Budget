@@ -30,7 +30,7 @@ export function Hero() {
         </Link>
       </div>
       <p className="mt-6 text-sm text-foreground/60">
-        Trusted by finance teams across 20+ departments
+        Created by Information Technology Department of UniKL Royal College Of Medicine
       </p>
     </section>
   );

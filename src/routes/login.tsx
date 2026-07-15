@@ -31,7 +31,7 @@ function LoginPage() {
     setTimeout(() => {
       setLoading(false);
       toast("Auth isn't wired up yet", {
-        description: "Enable Lovable Cloud to turn this into a real sign-in.",
+        description: "Sign-in will be available once authentication is connected.",
       });
     }, 500);
   };
