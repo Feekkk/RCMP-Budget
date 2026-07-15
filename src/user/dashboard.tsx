@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Plus,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils";
+import { useAutoHideReveal } from "@/lib/use-auto-hide";
 
 const stats = [
   {
@@ -68,7 +68,7 @@ const requisitions = [
 ];
 
 export function UserDashboard() {
-  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const { revealed, toggle } = useAutoHideReveal();
 
   return (
     <div className="flex h-screen overflow-hidden bg-ivory text-foreground">
@@ -134,9 +134,7 @@ export function UserDashboard() {
                     {masked && (
                       <button
                         type="button"
-                        onClick={() =>
-                          setRevealed((prev) => ({ ...prev, [label]: !prev[label] }))
-                        }
+                        onClick={() => toggle(label)}
                         aria-label={isRevealed ? `Hide ${label}` : `Show ${label}`}
                         className={cn(
                           "relative flex h-9 w-9 items-center justify-center rounded-full transition",

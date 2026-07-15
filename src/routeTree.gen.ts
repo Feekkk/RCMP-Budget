@@ -20,6 +20,7 @@ import { Route as UserCalendarRouteImport } from './routes/user/calendar'
 import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
 import { Route as HodApprovalRouteImport } from './routes/hod/approval'
 import { Route as FinanceRequestRouteImport } from './routes/finance/request'
+import { Route as FinanceRequestIdRouteImport } from './routes/finance/request_.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -76,6 +77,11 @@ const FinanceRequestRoute = FinanceRequestRouteImport.update({
   path: '/finance/request',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FinanceRequestIdRoute = FinanceRequestIdRouteImport.update({
+  id: '/finance/request_/$id',
+  path: '/finance/request/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
+  '/finance/request/$id': typeof FinanceRequestIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/finance': typeof FinanceIndexRoute
   '/hod': typeof HodIndexRoute
   '/user': typeof UserIndexRoute
+  '/finance/request/$id': typeof FinanceRequestIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
+  '/finance/request_/$id': typeof FinanceRequestIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/finance/'
     | '/hod/'
     | '/user/'
+    | '/finance/request/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/finance'
     | '/hod'
     | '/user'
+    | '/finance/request/$id'
   id:
     | '__root__'
     | '/'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/finance/'
     | '/hod/'
     | '/user/'
+    | '/finance/request_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -171,6 +183,7 @@ export interface RootRouteChildren {
   FinanceIndexRoute: typeof FinanceIndexRoute
   HodIndexRoute: typeof HodIndexRoute
   UserIndexRoute: typeof UserIndexRoute
+  FinanceRequestIdRoute: typeof FinanceRequestIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -252,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinanceRequestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/finance/request_/$id': {
+      id: '/finance/request_/$id'
+      path: '/finance/request/$id'
+      fullPath: '/finance/request/$id'
+      preLoaderRoute: typeof FinanceRequestIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -267,6 +287,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceIndexRoute: FinanceIndexRoute,
   HodIndexRoute: HodIndexRoute,
   UserIndexRoute: UserIndexRoute,
+  FinanceRequestIdRoute: FinanceRequestIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
