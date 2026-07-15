@@ -4,7 +4,6 @@ import { ArrowRight } from "lucide-react";
 import { Wordmark } from "@/components/landing/Nav";
 import { Underline } from "@/components/landing/Underline";
 import { toast } from "sonner";
-import { Toaster } from "@/components/ui/sonner";
 
 const roles = ["User", "HOD", "Finance", "CEO"] as const;
 
@@ -43,7 +42,6 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Toaster />
       <div className="grid min-h-screen lg:grid-cols-2">
         {/* Left brand panel */}
         <div className="flex flex-col justify-between p-8 md:p-12">

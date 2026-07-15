@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { UserDashboard } from "@/user/dashboard";
 
-export const Route = createFileRoute("/user")({
+export const Route = createFileRoute("/user/")({
   head: () => ({
     meta: [
       { title: "Dashboard — Ledgerly" },

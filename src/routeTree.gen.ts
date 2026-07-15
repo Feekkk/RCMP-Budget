@@ -9,15 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UserRouteImport } from './routes/user'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as UserIndexRouteImport } from './routes/user/index'
+import { Route as UserQuotationRouteImport } from './routes/user/quotation'
+import { Route as UserHistoryRouteImport } from './routes/user/history'
+import { Route as UserCalendarRouteImport } from './routes/user/calendar'
 
-const UserRoute = UserRouteImport.update({
-  id: '/user',
-  path: '/user',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -28,46 +26,90 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UserIndexRoute = UserIndexRouteImport.update({
+  id: '/user/',
+  path: '/user/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserQuotationRoute = UserQuotationRouteImport.update({
+  id: '/user/quotation',
+  path: '/user/quotation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserHistoryRoute = UserHistoryRouteImport.update({
+  id: '/user/history',
+  path: '/user/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserCalendarRoute = UserCalendarRouteImport.update({
+  id: '/user/calendar',
+  path: '/user/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/user': typeof UserRoute
+  '/user/calendar': typeof UserCalendarRoute
+  '/user/history': typeof UserHistoryRoute
+  '/user/quotation': typeof UserQuotationRoute
+  '/user/': typeof UserIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/user': typeof UserRoute
+  '/user/calendar': typeof UserCalendarRoute
+  '/user/history': typeof UserHistoryRoute
+  '/user/quotation': typeof UserQuotationRoute
+  '/user': typeof UserIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/user': typeof UserRoute
+  '/user/calendar': typeof UserCalendarRoute
+  '/user/history': typeof UserHistoryRoute
+  '/user/quotation': typeof UserQuotationRoute
+  '/user/': typeof UserIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/user'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/user/calendar'
+    | '/user/history'
+    | '/user/quotation'
+    | '/user/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/user'
-  id: '__root__' | '/' | '/login' | '/user'
+  to:
+    | '/'
+    | '/login'
+    | '/user/calendar'
+    | '/user/history'
+    | '/user/quotation'
+    | '/user'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/user/calendar'
+    | '/user/history'
+    | '/user/quotation'
+    | '/user/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
-  UserRoute: typeof UserRoute
+  UserCalendarRoute: typeof UserCalendarRoute
+  UserHistoryRoute: typeof UserHistoryRoute
+  UserQuotationRoute: typeof UserQuotationRoute
+  UserIndexRoute: typeof UserIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/user': {
-      id: '/user'
-      path: '/user'
-      fullPath: '/user'
-      preLoaderRoute: typeof UserRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -82,13 +124,44 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/user/': {
+      id: '/user/'
+      path: '/user'
+      fullPath: '/user/'
+      preLoaderRoute: typeof UserIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user/quotation': {
+      id: '/user/quotation'
+      path: '/user/quotation'
+      fullPath: '/user/quotation'
+      preLoaderRoute: typeof UserQuotationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user/history': {
+      id: '/user/history'
+      path: '/user/history'
+      fullPath: '/user/history'
+      preLoaderRoute: typeof UserHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user/calendar': {
+      id: '/user/calendar'
+      path: '/user/calendar'
+      fullPath: '/user/calendar'
+      preLoaderRoute: typeof UserCalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
-  UserRoute: UserRoute,
+  UserCalendarRoute: UserCalendarRoute,
+  UserHistoryRoute: UserHistoryRoute,
+  UserQuotationRoute: UserQuotationRoute,
+  UserIndexRoute: UserIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
