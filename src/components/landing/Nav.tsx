@@ -2,11 +2,12 @@ import { Link } from "@tanstack/react-router";
 
 export function Wordmark({ className = "" }: { className?: string }) {
   return (
-    <Link to="/" className={`inline-flex items-baseline gap-1 ${className}`}>
-      <span className="font-display text-3xl leading-none tracking-tight text-foreground">
-        Budgetly
-      </span>
-      <span className="h-1.5 w-1.5 rounded-full bg-lime" aria-hidden />
+    <Link to="/" className={`inline-flex items-center ${className}`}>
+      <img
+        src="/budget-logo.png"
+        alt="Budget Tracker — UniKL Royal College Of Medicine Perak"
+        className="h-12 w-auto"
+      />
     </Link>
   );
 }

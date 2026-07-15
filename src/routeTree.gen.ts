@@ -13,11 +13,13 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UserIndexRouteImport } from './routes/user/index'
 import { Route as HodIndexRouteImport } from './routes/hod/index'
+import { Route as FinanceIndexRouteImport } from './routes/finance/index'
 import { Route as UserQuotationRouteImport } from './routes/user/quotation'
 import { Route as UserHistoryRouteImport } from './routes/user/history'
 import { Route as UserCalendarRouteImport } from './routes/user/calendar'
 import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
 import { Route as HodApprovalRouteImport } from './routes/hod/approval'
+import { Route as FinanceRequestRouteImport } from './routes/finance/request'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -37,6 +39,11 @@ const UserIndexRoute = UserIndexRouteImport.update({
 const HodIndexRoute = HodIndexRouteImport.update({
   id: '/hod/',
   path: '/hod/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceIndexRoute = FinanceIndexRouteImport.update({
+  id: '/finance/',
+  path: '/finance/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserQuotationRoute = UserQuotationRouteImport.update({
@@ -64,26 +71,35 @@ const HodApprovalRoute = HodApprovalRouteImport.update({
   path: '/hod/approval',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FinanceRequestRoute = FinanceRequestRouteImport.update({
+  id: '/finance/request',
+  path: '/finance/request',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/finance/request': typeof FinanceRequestRoute
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/finance/request': typeof FinanceRequestRoute
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/finance': typeof FinanceIndexRoute
   '/hod': typeof HodIndexRoute
   '/user': typeof UserIndexRoute
 }
@@ -91,11 +107,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/finance/request': typeof FinanceRequestRoute
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
 }
@@ -104,33 +122,39 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/finance/request'
     | '/hod/approval'
     | '/hod/calendar'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
+    | '/finance/'
     | '/hod/'
     | '/user/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/finance/request'
     | '/hod/approval'
     | '/hod/calendar'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
+    | '/finance'
     | '/hod'
     | '/user'
   id:
     | '__root__'
     | '/'
     | '/login'
+    | '/finance/request'
     | '/hod/approval'
     | '/hod/calendar'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
+    | '/finance/'
     | '/hod/'
     | '/user/'
   fileRoutesById: FileRoutesById
@@ -138,11 +162,13 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  FinanceRequestRoute: typeof FinanceRequestRoute
   HodApprovalRoute: typeof HodApprovalRoute
   HodCalendarRoute: typeof HodCalendarRoute
   UserCalendarRoute: typeof UserCalendarRoute
   UserHistoryRoute: typeof UserHistoryRoute
   UserQuotationRoute: typeof UserQuotationRoute
+  FinanceIndexRoute: typeof FinanceIndexRoute
   HodIndexRoute: typeof HodIndexRoute
   UserIndexRoute: typeof UserIndexRoute
 }
@@ -175,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/hod'
       fullPath: '/hod/'
       preLoaderRoute: typeof HodIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance/': {
+      id: '/finance/'
+      path: '/finance'
+      fullPath: '/finance/'
+      preLoaderRoute: typeof FinanceIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/user/quotation': {
@@ -212,17 +245,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HodApprovalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/finance/request': {
+      id: '/finance/request'
+      path: '/finance/request'
+      fullPath: '/finance/request'
+      preLoaderRoute: typeof FinanceRequestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  FinanceRequestRoute: FinanceRequestRoute,
   HodApprovalRoute: HodApprovalRoute,
   HodCalendarRoute: HodCalendarRoute,
   UserCalendarRoute: UserCalendarRoute,
   UserHistoryRoute: UserHistoryRoute,
   UserQuotationRoute: UserQuotationRoute,
+  FinanceIndexRoute: FinanceIndexRoute,
   HodIndexRoute: HodIndexRoute,
   UserIndexRoute: UserIndexRoute,
 }
