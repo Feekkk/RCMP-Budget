@@ -34,6 +34,10 @@ function LoginPage() {
         navigate({ to: "/user" });
         return;
       }
+      if (role === "HOD") {
+        navigate({ to: "/hod" });
+        return;
+      }
       toast("Auth isn't wired up yet", {
         description: `Signing in as ${role} will be available once authentication is connected.`,
       });

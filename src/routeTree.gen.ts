@@ -12,9 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UserIndexRouteImport } from './routes/user/index'
+import { Route as HodIndexRouteImport } from './routes/hod/index'
 import { Route as UserQuotationRouteImport } from './routes/user/quotation'
 import { Route as UserHistoryRouteImport } from './routes/user/history'
 import { Route as UserCalendarRouteImport } from './routes/user/calendar'
+import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
+import { Route as HodApprovalRouteImport } from './routes/hod/approval'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -29,6 +32,11 @@ const IndexRoute = IndexRouteImport.update({
 const UserIndexRoute = UserIndexRouteImport.update({
   id: '/user/',
   path: '/user/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HodIndexRoute = HodIndexRouteImport.update({
+  id: '/hod/',
+  path: '/hod/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserQuotationRoute = UserQuotationRouteImport.update({
@@ -46,30 +54,49 @@ const UserCalendarRoute = UserCalendarRouteImport.update({
   path: '/user/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HodCalendarRoute = HodCalendarRouteImport.update({
+  id: '/hod/calendar',
+  path: '/hod/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HodApprovalRoute = HodApprovalRouteImport.update({
+  id: '/hod/approval',
+  path: '/hod/approval',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/hod/approval': typeof HodApprovalRoute
+  '/hod/calendar': typeof HodCalendarRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/hod/approval': typeof HodApprovalRoute
+  '/hod/calendar': typeof HodCalendarRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/hod': typeof HodIndexRoute
   '/user': typeof UserIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/hod/approval': typeof HodApprovalRoute
+  '/hod/calendar': typeof HodCalendarRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
 }
 export interface FileRouteTypes {
@@ -77,34 +104,46 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/hod/approval'
+    | '/hod/calendar'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
+    | '/hod/'
     | '/user/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/hod/approval'
+    | '/hod/calendar'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
+    | '/hod'
     | '/user'
   id:
     | '__root__'
     | '/'
     | '/login'
+    | '/hod/approval'
+    | '/hod/calendar'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
+    | '/hod/'
     | '/user/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  HodApprovalRoute: typeof HodApprovalRoute
+  HodCalendarRoute: typeof HodCalendarRoute
   UserCalendarRoute: typeof UserCalendarRoute
   UserHistoryRoute: typeof UserHistoryRoute
   UserQuotationRoute: typeof UserQuotationRoute
+  HodIndexRoute: typeof HodIndexRoute
   UserIndexRoute: typeof UserIndexRoute
 }
 
@@ -131,6 +170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hod/': {
+      id: '/hod/'
+      path: '/hod'
+      fullPath: '/hod/'
+      preLoaderRoute: typeof HodIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/user/quotation': {
       id: '/user/quotation'
       path: '/user/quotation'
@@ -152,15 +198,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserCalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hod/calendar': {
+      id: '/hod/calendar'
+      path: '/hod/calendar'
+      fullPath: '/hod/calendar'
+      preLoaderRoute: typeof HodCalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hod/approval': {
+      id: '/hod/approval'
+      path: '/hod/approval'
+      fullPath: '/hod/approval'
+      preLoaderRoute: typeof HodApprovalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  HodApprovalRoute: HodApprovalRoute,
+  HodCalendarRoute: HodCalendarRoute,
   UserCalendarRoute: UserCalendarRoute,
   UserHistoryRoute: UserHistoryRoute,
   UserQuotationRoute: UserQuotationRoute,
+  HodIndexRoute: HodIndexRoute,
   UserIndexRoute: UserIndexRoute,
 }
 export const routeTree = rootRouteImport

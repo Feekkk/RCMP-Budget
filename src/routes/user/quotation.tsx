@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { QuotationPage } from "@/user/quotation";
+import { QuotationPage } from "@/routes/quotation";
 
 export const Route = createFileRoute("/user/quotation")({
   head: () => ({

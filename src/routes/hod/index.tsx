@@ -1,0 +1,15 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { HodDashboard } from "@/hod/dashboard";
+
+export const Route = createFileRoute("/hod/")({
+  head: () => ({
+    meta: [
+      { title: "HOD Dashboard — Ledgerly" },
+      {
+        name: "description",
+        content: "Review pending requisitions and monitor your department's budget.",
+      },
+    ],
+  }),
+  component: HodDashboard,
+});

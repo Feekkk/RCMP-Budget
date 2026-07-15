@@ -4,7 +4,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
   return (
     <Link to="/" className={`inline-flex items-baseline gap-1 ${className}`}>
       <span className="font-display text-3xl leading-none tracking-tight text-foreground">
-        ledgerly
+        Budgetly
       </span>
       <span className="h-1.5 w-1.5 rounded-full bg-lime" aria-hidden />
     </Link>

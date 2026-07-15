@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Plus, Minus, Trash2, ShoppingCart, Send } from "lucide-react";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { toast } from "sonner";
-import { Sidebar } from "./sidebar";
+import { Sidebar } from "../user/sidebar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -17,6 +18,7 @@ export function QuotationPage() {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const addItem = (e: FormEvent) => {
     e.preventDefault();
@@ -55,10 +57,13 @@ export function QuotationPage() {
 
   const submit = () => {
     const count = cart.reduce((sum, item) => sum + item.quantity, 0);
-    toast("Quotation request submitted", {
-      description: `${cart.length} item${cart.length > 1 ? "s" : ""} (${count} units) sent for HOD review.`,
-    });
-    navigate({ to: "/user" });
+    setSubmitting(true);
+    setTimeout(() => {
+      toast("Quotation request submitted", {
+        description: `${cart.length} item${cart.length > 1 ? "s" : ""} sent for HOD review.`,
+      });
+      navigate({ to: "/user" });
+    }, 2000);
   };
 
   return (
@@ -198,15 +203,30 @@ export function QuotationPage() {
             <button
               type="button"
               onClick={submit}
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || submitting}
               className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-lime py-4 text-base font-medium text-lime-foreground transition hover:brightness-95 disabled:opacity-40"
             >
-              Submit for approval
+              {submitting ? "Submitting…" : "Submit for approval"}
               <Send className="h-4 w-4" />
             </button>
           </div>
         </div>
       </main>
+
+      {submitting && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-ivory/90 backdrop-blur-sm">
+          <DotLottieReact
+            src="/receipt.json"
+            loop
+            autoplay
+            className="h-52 w-52"
+          />
+          <p className="font-display text-2xl">Submitting your request</p>
+          <p className="mt-2 text-sm text-foreground/60">
+            Sending your quotation for HOD review…
+          </p>
+        </div>
+      )}
     </div>
   );
 }
