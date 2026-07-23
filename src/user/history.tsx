@@ -9,6 +9,8 @@ import {
   Search,
   FileText,
   ClipboardPen,
+  FileSpreadsheet,
+  ChevronDown,
   Paperclip,
   X,
   type LucideIcon,
@@ -23,6 +25,36 @@ import {
   type QuotationDetail,
   type QuotationListItem,
 } from "@/lib/quotation-fns";
+import {
+  generatePurchaseRequisition,
+  type PurchaseRequisitionFormat,
+} from "@/lib/purchase-requisition-fns";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+function downloadPurchaseRequisitionFile(result: {
+  fileName: string;
+  data: string;
+}) {
+  const bytes = Uint8Array.from(atob(result.data), (char) =>
+    char.charCodeAt(0),
+  );
+  const blob = new Blob([bytes], {
+    type: result.fileName.endsWith(".pdf")
+      ? "application/pdf"
+      : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = result.fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 type Status = "Pending" | "Approved" | "Rejected";
 
@@ -49,6 +81,7 @@ export function HistoryPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<QuotationDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [generatingPrfId, setGeneratingPrfId] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -112,10 +145,26 @@ export function HistoryPage() {
     });
   };
 
-  const generatePrf = (id: number) => {
-    toast("Generate PRF", {
-      description: `PRF for QT-${id} will be available once document generation is connected.`,
-    });
+  const generatePrf = async (id: number, format: PurchaseRequisitionFormat) => {
+    if (generatingPrfId != null) return;
+    setGeneratingPrfId(id);
+    const toastId = toast.loading(`Generating PRF for QT-${id}…`);
+    try {
+      const result = await generatePurchaseRequisition({
+        data: { quotationId: id, format },
+      });
+      downloadPurchaseRequisitionFile(result);
+      toast.success(`PRF for QT-${id} downloaded.`, { id: toastId });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Failed to generate PRF for QT-${id}.`,
+        { id: toastId },
+      );
+    } finally {
+      setGeneratingPrfId(null);
+    }
   };
 
   const closeDetail = () => {
@@ -222,30 +271,6 @@ export function HistoryPage() {
                           <Icon className="h-3.5 w-3.5" />
                           {status}
                         </span>
-                        <div
-                          className="flex items-center gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => generateRfq(id)}
-                            title="Generate RFQ"
-                            aria-label={`Generate RFQ for QT-${id}`}
-                            className="flex h-9 w-9 items-center justify-center rounded-full border border-foreground/10 text-foreground/60 transition hover:bg-background hover:text-foreground"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => generatePrf(id)}
-                            title="Generate PRF"
-                            aria-label={`Generate PRF for QT-${id}`}
-                            className="flex h-9 w-9 items-center justify-center rounded-full border border-foreground/10 text-foreground/60 transition hover:bg-background hover:text-foreground"
-                          >
-                            <ClipboardPen className="h-4 w-4" />
-                          </button>
-                        </div>
                       </div>
                     </div>
                   </li>
@@ -278,7 +303,8 @@ export function HistoryPage() {
                   detail={detail}
                   onClose={closeDetail}
                   onGenerateRfq={() => generateRfq(detail.id)}
-                  onGeneratePrf={() => generatePrf(detail.id)}
+                  onGeneratePrf={(format) => void generatePrf(detail.id, format)}
+                  generatingPrf={generatingPrfId === detail.id}
                 />
               )}
             </div>
@@ -294,11 +320,13 @@ function QuotationDetailCard({
   onClose,
   onGenerateRfq,
   onGeneratePrf,
+  generatingPrf,
 }: {
   detail: QuotationDetail;
   onClose: () => void;
   onGenerateRfq: () => void;
-  onGeneratePrf: () => void;
+  onGeneratePrf: (format: PurchaseRequisitionFormat) => void;
+  generatingPrf: boolean;
 }) {
   const { icon: StatusIcon, tone } = statusConfig[detail.status];
 
@@ -421,14 +449,29 @@ function QuotationDetailCard({
           <FileText className="h-4 w-4" />
           Generate RFQ
         </button>
-        <button
-          type="button"
-          onClick={onGeneratePrf}
-          className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory"
-        >
-          <ClipboardPen className="h-4 w-4" />
-          Generate PRF
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              disabled={generatingPrf}
+              className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ClipboardPen className="h-4 w-4" />
+              {generatingPrf ? "Generating…" : "Generate PRF"}
+              <ChevronDown className="h-4 w-4 text-foreground/50" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="z-[110]">
+            <DropdownMenuItem onClick={() => onGeneratePrf("pdf")}>
+              <FileText className="h-4 w-4" />
+              PDF (.pdf)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onGeneratePrf("xlsx")}>
+              <FileSpreadsheet className="h-4 w-4" />
+              Excel (.xlsx)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
