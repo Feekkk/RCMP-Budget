@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Plus,
@@ -11,10 +12,16 @@ import {
   Hourglass,
   Eye,
   EyeOff,
+  type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils";
 import { useAutoHideReveal } from "@/lib/use-auto-hide";
+import {
+  listMyQuotations,
+  type QuotationListItem,
+} from "@/lib/quotation-fns";
 
 const stats = [
   {
@@ -68,35 +75,47 @@ const flows = [
   },
 ];
 
-const requisitions = [
-  {
-    id: "REQ-1042",
-    title: "Office chairs (x6)",
-    amount: "RM 4,200",
-    status: "Pending",
-    icon: Clock,
-    tone: "text-amber-600 bg-amber-100",
-  },
-  {
-    id: "REQ-1039",
-    title: "Team laptop refresh",
-    amount: "RM 18,500",
-    status: "Approved",
-    icon: CheckCircle2,
-    tone: "text-emerald-700 bg-emerald-100",
-  },
-  {
-    id: "REQ-1035",
-    title: "Marketing print run",
-    amount: "RM 2,750",
-    status: "Rejected",
-    icon: XCircle,
-    tone: "text-red-600 bg-red-100",
-  },
-];
+type Status = QuotationListItem["status"];
+
+const statusConfig: Record<Status, { icon: LucideIcon; tone: string }> = {
+  Pending: { icon: Clock, tone: "text-amber-600 bg-amber-100" },
+  Approved: { icon: CheckCircle2, tone: "text-emerald-700 bg-emerald-100" },
+  Rejected: { icon: XCircle, tone: "text-red-600 bg-red-100" },
+};
+
+function formatRm(value: number) {
+  return `RM ${value.toLocaleString("en-MY", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 export function UserDashboard() {
   const { revealed, toggle } = useAutoHideReveal();
+  const [requisitions, setRequisitions] = useState<QuotationListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    listMyQuotations()
+      .then((rows) => {
+        if (active) setRequisitions(rows.slice(0, 3));
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to load recent requisitions.",
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-ivory text-foreground">
@@ -255,25 +274,43 @@ export function UserDashboard() {
             </Link>
           </div>
 
-          <ul className="mt-6 divide-y divide-foreground/10">
-            {requisitions.map(({ id, title, amount, status, icon: Icon, tone }) => (
-              <li key={id} className="flex items-center justify-between gap-4 py-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{title}</p>
-                  <p className="text-xs text-foreground/50">{id}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium">{amount}</span>
-                  <span
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+          {loading ? (
+            <p className="mt-6 text-sm text-foreground/50">
+              Loading recent requisitions…
+            </p>
+          ) : requisitions.length === 0 ? (
+            <p className="mt-6 text-sm text-foreground/50">
+              No requisitions yet.
+            </p>
+          ) : (
+            <ul className="mt-6 divide-y divide-foreground/10">
+              {requisitions.map((req) => {
+                const { icon: Icon, tone } = statusConfig[req.status];
+                return (
+                  <li
+                    key={req.id}
+                    className="flex items-center justify-between gap-4 py-4"
                   >
-                    <Icon className="h-3.5 w-3.5" />
-                    {status}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{req.title}</p>
+                      <p className="text-xs text-foreground/50">QT-{req.id}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-medium">
+                        {formatRm(req.amount)}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {req.status}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </main>
     </div>

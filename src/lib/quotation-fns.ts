@@ -113,6 +113,7 @@ export type QuotationListItem = {
   amount: number;
   itemCount: number;
   date: string;
+  createdAt: string;
   status: "Pending" | "Approved" | "Rejected";
   statusName: string;
 };
@@ -191,6 +192,7 @@ export const listMyQuotations = createServerFn({ method: "GET" }).handler(
           month: "short",
           year: "numeric",
         }),
+        createdAt: created.toISOString(),
         status: mapStatus(row.status_name),
         statusName: row.status_name,
       };

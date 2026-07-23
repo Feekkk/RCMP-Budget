@@ -28,7 +28,7 @@ import {
 import {
   generatePurchaseRequisition,
   type PurchaseRequisitionFormat,
-} from "@/lib/purchase-requisition-fns";
+} from "@/lib/prf-generator";
 import {
   DropdownMenu,
   DropdownMenuContent,
