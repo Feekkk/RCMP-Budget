@@ -5,10 +5,14 @@ import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
 
 export default defineConfig(({ command, mode }) => {
+  const allEnv = loadEnv(mode, process.cwd(), "");
+  Object.assign(process.env, allEnv);
+
   const envDefine: Record<string, string> = {};
-  const loadedEnv = loadEnv(mode, process.cwd(), "VITE_");
-  for (const [key, value] of Object.entries(loadedEnv)) {
-    envDefine[`import.meta.env.${key}`] = JSON.stringify(value);
+  for (const [key, value] of Object.entries(allEnv)) {
+    if (key.startsWith("VITE_")) {
+      envDefine[`import.meta.env.${key}`] = JSON.stringify(value);
+    }
   }
 
   const isDevBuild = command === "build" && mode === "development";
