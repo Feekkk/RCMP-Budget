@@ -29,6 +29,7 @@ import {
   generatePurchaseRequisition,
   type PurchaseRequisitionFormat,
 } from "@/lib/prf-generator";
+import { generateRequestForQuotation } from "@/lib/rfq-generator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -139,10 +140,22 @@ export function HistoryPage() {
         .includes(query.toLowerCase().trim()),
   );
 
-  const generateRfq = (id: number) => {
-    toast("Generate RFQ", {
-      description: `RFQ for QT-${id} will be available once document generation is connected. Please try again later.`,
-    });
+  const generateRfq = async (id: number) => {
+    const toastId = toast.loading(`Generating RFQ for QT-${id}…`);
+    try {
+      const result = await generateRequestForQuotation({
+        data: { quotationId: id },
+      });
+      downloadPurchaseRequisitionFile(result);
+      toast.success(`RFQ for QT-${id} downloaded.`, { id: toastId });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Failed to generate RFQ for QT-${id}. Please try again later.`,
+        { id: toastId },
+      );
+    }
   };
 
   const generatePrf = async (id: number, format: PurchaseRequisitionFormat) => {
@@ -302,7 +315,7 @@ export function HistoryPage() {
                 <QuotationDetailCard
                   detail={detail}
                   onClose={closeDetail}
-                  onGenerateRfq={() => generateRfq(detail.id)}
+                  onGenerateRfq={() => void generateRfq(detail.id)}
                   onGeneratePrf={(format) => void generatePrf(detail.id, format)}
                   generatingPrf={generatingPrfId === detail.id}
                 />
@@ -440,39 +453,43 @@ function QuotationDetailCard({
         </div>
       )}
 
-      <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
-        <button
-          type="button"
-          onClick={onGenerateRfq}
-          className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory"
-        >
-          <FileText className="h-4 w-4" />
-          Generate RFQ
-        </button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              disabled={generatingPrf}
-              className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <ClipboardPen className="h-4 w-4" />
-              {generatingPrf ? "Generating…" : "Generate PRF"}
-              <ChevronDown className="h-4 w-4 text-foreground/50" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="z-[110]">
-            <DropdownMenuItem onClick={() => onGeneratePrf("pdf")}>
-              <FileText className="h-4 w-4" />
-              PDF (.pdf)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onGeneratePrf("xlsx")}>
-              <FileSpreadsheet className="h-4 w-4" />
-              Excel (.xlsx)
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {(detail.statusName === "approved_hod" ||
+        detail.statusName === "approved_ceo" ||
+        detail.statusName === "completed") && (
+        <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
+          <button
+            type="button"
+            onClick={onGenerateRfq}
+            className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory"
+          >
+            <FileText className="h-4 w-4" />
+            Generate RFQ
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={generatingPrf}
+                className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ClipboardPen className="h-4 w-4" />
+                {generatingPrf ? "Generating…" : "Generate PRF"}
+                <ChevronDown className="h-4 w-4 text-foreground/50" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="z-[110]">
+              <DropdownMenuItem onClick={() => onGeneratePrf("pdf")}>
+                <FileText className="h-4 w-4" />
+                PDF (.pdf)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onGeneratePrf("xlsx")}>
+                <FileSpreadsheet className="h-4 w-4" />
+                Excel (.xlsx)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
     </div>
   );
 }
