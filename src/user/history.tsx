@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
 import {
-  Plus,
   Clock,
   CheckCircle2,
   XCircle,
@@ -9,6 +7,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Sidebar } from "./sidebar";
+import { RequestMenu } from "./request-menu";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -102,13 +101,7 @@ export function HistoryPage() {
               Every request you've submitted, and where it stands.
             </p>
           </div>
-          <Link
-            to="/user/quotation"
-            className="inline-flex items-center gap-2 rounded-full bg-lime px-6 py-3 text-sm font-medium text-lime-foreground transition hover:brightness-95"
-          >
-            <Plus className="h-4 w-4" />
-            Request Quotation
-          </Link>
+          <RequestMenu />
         </div>
 
         <div className="mt-8 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">

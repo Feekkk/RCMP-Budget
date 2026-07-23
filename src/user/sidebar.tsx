@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   FileText,
   Calendar,
-  Settings,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -14,7 +13,6 @@ const items: { label: string; icon: LucideIcon; to?: LinkProps["to"] }[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/user" },
   { label: "My Requisitions", icon: FileText, to: "/user/history" },
   { label: "Calendar", icon: Calendar, to: "/user/calendar" },
-  { label: "Settings", icon: Settings },
 ];
 
 const itemClass =
