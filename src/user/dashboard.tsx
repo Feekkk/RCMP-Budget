@@ -106,7 +106,7 @@ export function UserDashboard() {
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to load recent requisitions.",
+            : "Failed to load recent requisitions. Refresh the page to try again.",
         );
       })
       .finally(() => {

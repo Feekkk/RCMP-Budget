@@ -92,7 +92,7 @@ export function HistoryPage() {
       .catch((error) => {
         if (!active) return;
         toast.error(
-          error instanceof Error ? error.message : "Failed to load quotations.",
+          error instanceof Error ? error.message : "Failed to load quotations. Please try again later.",
         );
       })
       .finally(() => {
@@ -118,7 +118,7 @@ export function HistoryPage() {
       .catch((error) => {
         if (!active) return;
         toast.error(
-          error instanceof Error ? error.message : "Failed to load quotation.",
+          error instanceof Error ? error.message : "Failed to load quotation. Please try again later.",
         );
         setSelectedId(null);
       })
@@ -141,7 +141,7 @@ export function HistoryPage() {
 
   const generateRfq = (id: number) => {
     toast("Generate RFQ", {
-      description: `RFQ for QT-${id} will be available once document generation is connected.`,
+      description: `RFQ for QT-${id} will be available once document generation is connected. Please try again later.`,
     });
   };
 
@@ -159,7 +159,7 @@ export function HistoryPage() {
       toast.error(
         error instanceof Error
           ? error.message
-          : `Failed to generate PRF for QT-${id}.`,
+          : `Failed to generate PRF for QT-${id}. Please try again later.`,
         { id: toastId },
       );
     } finally {
@@ -296,7 +296,7 @@ export function HistoryPage() {
             >
               {detailLoading || !detail ? (
                 <p className="py-12 text-center text-sm text-foreground/50">
-                  Loading quotation details…
+                  Loading quotation details
                 </p>
               ) : (
                 <QuotationDetailCard

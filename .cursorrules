@@ -1,0 +1,7 @@
+# Coding Standards
+- Write clean, readable, and strongly-typed code.
+- always refer database/schema.sql
+- use these 3 rules everytime create error message for user (Keep it short, Avoid technical jargon, Offer a clear solution)
+
+# Output Rules
+- use simpler explanation

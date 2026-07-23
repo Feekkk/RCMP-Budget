@@ -26,7 +26,7 @@ export function ProfilePage() {
       .catch((error) => {
         if (!active) return;
         toast.error(
-          error instanceof Error ? error.message : "Failed to load profile.",
+          error instanceof Error ? error.message : "Failed to load profile. Please try again later.",
         );
       })
       .finally(() => {
@@ -52,7 +52,7 @@ export function ProfilePage() {
       toast.success("Profile updated.");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to update profile.",
+        error instanceof Error ? error.message : "Failed to update profile. Please try again later.",
       );
     } finally {
       setSaving(false);
@@ -87,7 +87,7 @@ export function ProfilePage() {
 
         {loading ? (
           <div className="mt-8 rounded-[1.5rem] border border-dashed border-foreground/15 bg-background py-14 text-center shadow-card">
-            <p className="text-sm text-foreground/50">Loading profile…</p>
+            <p className="text-sm text-foreground/50">Loading profile</p>
           </div>
         ) : !user ? (
           <div className="mt-8 rounded-[1.5rem] border border-dashed border-foreground/15 bg-background py-14 text-center shadow-card">
@@ -213,7 +213,7 @@ export function ProfilePage() {
                   className="inline-flex items-center gap-2 rounded-full bg-lime px-6 py-3 text-sm font-medium text-lime-foreground transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Save className="h-4 w-4" />
-                  {saving ? "Saving…" : "Save changes"}
+                  {saving ? "Saving" : "Save changes"}
                 </button>
               </div>
             </form>

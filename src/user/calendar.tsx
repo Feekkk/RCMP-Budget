@@ -52,7 +52,7 @@ export function CalendarPage() {
       .catch((error) => {
         if (!active) return;
         toast.error(
-          error instanceof Error ? error.message : "Failed to load calendar.",
+          error instanceof Error ? error.message : "Failed to load calendar. Please try again later.",
         );
       })
       .finally(() => {
@@ -86,7 +86,7 @@ export function CalendarPage() {
           <div className="rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
             {loading ? (
               <p className="py-16 text-center text-sm text-foreground/50">
-                Loading calendar…
+                Loading calendar
               </p>
             ) : (
               <Calendar

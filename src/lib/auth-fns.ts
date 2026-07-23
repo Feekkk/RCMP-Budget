@@ -34,7 +34,17 @@ async function getAuthSession() {
 }
 
 export const loginByEmail = createServerFn({ method: "POST" })
-  .validator(z.object({ email: z.string().trim().email() }))
+  .validator((input: unknown) => {
+    const parsed = z
+      .object({
+        email: z.string().trim().email(),
+      })
+      .safeParse(input);
+    if (!parsed.success) {
+      throw new Error("Enter a valid email address. Please try again.");
+    }
+    return parsed.data;
+  })
   .handler(async ({ data }): Promise<AuthUser> => {
     const { query } = await import("@/server/db");
     const email = data.email.toLowerCase();
@@ -49,7 +59,7 @@ export const loginByEmail = createServerFn({ method: "POST" })
 
     const row = rows[0];
     if (!row) {
-      throw new Error("No account found for that email.");
+      throw new Error("No account found for that email. Please try again.");
     }
 
     const user: AuthUser = {
@@ -95,7 +105,7 @@ export const updateMyProfile = createServerFn({ method: "POST" })
     const session = await getAuthSession();
     const current = session.data.user;
     if (!current) {
-      throw new Error("Please sign in to update your profile.");
+      throw new Error("Please sign in to update your profile. Please try again.");
     }
 
     const department = data.department || null;
