@@ -5,7 +5,7 @@ import { Wordmark } from "@/components/landing/Nav";
 import { Underline } from "@/components/landing/Underline";
 import { toast } from "sonner";
 
-const roles = ["User", "HOD", "Finance", "CEO"] as const;
+const roles = ["User", "HOD", "Finance", "Procument", "CEO"] as const;
 
 type Role = (typeof roles)[number];
 
@@ -40,6 +40,10 @@ function LoginPage() {
       }
       if (role === "Finance") {
         navigate({ to: "/finance" });
+        return;
+      }
+      if (role === "Procument") {
+        navigate({ to: "/procument" });
         return;
       }
       toast("Auth isn't wired up yet", {

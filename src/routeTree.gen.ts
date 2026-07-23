@@ -12,11 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UserIndexRouteImport } from './routes/user/index'
+import { Route as ProcumentIndexRouteImport } from './routes/procument/index'
 import { Route as HodIndexRouteImport } from './routes/hod/index'
 import { Route as FinanceIndexRouteImport } from './routes/finance/index'
 import { Route as UserQuotationRouteImport } from './routes/user/quotation'
 import { Route as UserHistoryRouteImport } from './routes/user/history'
 import { Route as UserCalendarRouteImport } from './routes/user/calendar'
+import { Route as UserBudgetRouteImport } from './routes/user/budget'
+import { Route as ProcumentQuotationsRouteImport } from './routes/procument/quotations'
 import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
 import { Route as HodApprovalRouteImport } from './routes/hod/approval'
 import { Route as FinanceRequestRouteImport } from './routes/finance/request'
@@ -35,6 +38,11 @@ const IndexRoute = IndexRouteImport.update({
 const UserIndexRoute = UserIndexRouteImport.update({
   id: '/user/',
   path: '/user/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProcumentIndexRoute = ProcumentIndexRouteImport.update({
+  id: '/procument/',
+  path: '/procument/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HodIndexRoute = HodIndexRouteImport.update({
@@ -60,6 +68,16 @@ const UserHistoryRoute = UserHistoryRouteImport.update({
 const UserCalendarRoute = UserCalendarRouteImport.update({
   id: '/user/calendar',
   path: '/user/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserBudgetRoute = UserBudgetRouteImport.update({
+  id: '/user/budget',
+  path: '/user/budget',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProcumentQuotationsRoute = ProcumentQuotationsRouteImport.update({
+  id: '/procument/quotations',
+  path: '/procument/quotations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HodCalendarRoute = HodCalendarRouteImport.update({
@@ -89,11 +107,14 @@ export interface FileRoutesByFullPath {
   '/finance/request': typeof FinanceRequestRoute
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
+  '/procument/quotations': typeof ProcumentQuotationsRoute
+  '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
   '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
+  '/procument/': typeof ProcumentIndexRoute
   '/user/': typeof UserIndexRoute
   '/finance/request/$id': typeof FinanceRequestIdRoute
 }
@@ -103,11 +124,14 @@ export interface FileRoutesByTo {
   '/finance/request': typeof FinanceRequestRoute
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
+  '/procument/quotations': typeof ProcumentQuotationsRoute
+  '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
   '/finance': typeof FinanceIndexRoute
   '/hod': typeof HodIndexRoute
+  '/procument': typeof ProcumentIndexRoute
   '/user': typeof UserIndexRoute
   '/finance/request/$id': typeof FinanceRequestIdRoute
 }
@@ -118,11 +142,14 @@ export interface FileRoutesById {
   '/finance/request': typeof FinanceRequestRoute
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
+  '/procument/quotations': typeof ProcumentQuotationsRoute
+  '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
   '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
+  '/procument/': typeof ProcumentIndexRoute
   '/user/': typeof UserIndexRoute
   '/finance/request_/$id': typeof FinanceRequestIdRoute
 }
@@ -134,11 +161,14 @@ export interface FileRouteTypes {
     | '/finance/request'
     | '/hod/approval'
     | '/hod/calendar'
+    | '/procument/quotations'
+    | '/user/budget'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
     | '/finance/'
     | '/hod/'
+    | '/procument/'
     | '/user/'
     | '/finance/request/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -148,11 +178,14 @@ export interface FileRouteTypes {
     | '/finance/request'
     | '/hod/approval'
     | '/hod/calendar'
+    | '/procument/quotations'
+    | '/user/budget'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
     | '/finance'
     | '/hod'
+    | '/procument'
     | '/user'
     | '/finance/request/$id'
   id:
@@ -162,11 +195,14 @@ export interface FileRouteTypes {
     | '/finance/request'
     | '/hod/approval'
     | '/hod/calendar'
+    | '/procument/quotations'
+    | '/user/budget'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
     | '/finance/'
     | '/hod/'
+    | '/procument/'
     | '/user/'
     | '/finance/request_/$id'
   fileRoutesById: FileRoutesById
@@ -177,11 +213,14 @@ export interface RootRouteChildren {
   FinanceRequestRoute: typeof FinanceRequestRoute
   HodApprovalRoute: typeof HodApprovalRoute
   HodCalendarRoute: typeof HodCalendarRoute
+  ProcumentQuotationsRoute: typeof ProcumentQuotationsRoute
+  UserBudgetRoute: typeof UserBudgetRoute
   UserCalendarRoute: typeof UserCalendarRoute
   UserHistoryRoute: typeof UserHistoryRoute
   UserQuotationRoute: typeof UserQuotationRoute
   FinanceIndexRoute: typeof FinanceIndexRoute
   HodIndexRoute: typeof HodIndexRoute
+  ProcumentIndexRoute: typeof ProcumentIndexRoute
   UserIndexRoute: typeof UserIndexRoute
   FinanceRequestIdRoute: typeof FinanceRequestIdRoute
 }
@@ -207,6 +246,13 @@ declare module '@tanstack/react-router' {
       path: '/user'
       fullPath: '/user/'
       preLoaderRoute: typeof UserIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/procument/': {
+      id: '/procument/'
+      path: '/procument'
+      fullPath: '/procument/'
+      preLoaderRoute: typeof ProcumentIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hod/': {
@@ -242,6 +288,20 @@ declare module '@tanstack/react-router' {
       path: '/user/calendar'
       fullPath: '/user/calendar'
       preLoaderRoute: typeof UserCalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user/budget': {
+      id: '/user/budget'
+      path: '/user/budget'
+      fullPath: '/user/budget'
+      preLoaderRoute: typeof UserBudgetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/procument/quotations': {
+      id: '/procument/quotations'
+      path: '/procument/quotations'
+      fullPath: '/procument/quotations'
+      preLoaderRoute: typeof ProcumentQuotationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hod/calendar': {
@@ -281,11 +341,14 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceRequestRoute: FinanceRequestRoute,
   HodApprovalRoute: HodApprovalRoute,
   HodCalendarRoute: HodCalendarRoute,
+  ProcumentQuotationsRoute: ProcumentQuotationsRoute,
+  UserBudgetRoute: UserBudgetRoute,
   UserCalendarRoute: UserCalendarRoute,
   UserHistoryRoute: UserHistoryRoute,
   UserQuotationRoute: UserQuotationRoute,
   FinanceIndexRoute: FinanceIndexRoute,
   HodIndexRoute: HodIndexRoute,
+  ProcumentIndexRoute: ProcumentIndexRoute,
   UserIndexRoute: UserIndexRoute,
   FinanceRequestIdRoute: FinanceRequestIdRoute,
 }
