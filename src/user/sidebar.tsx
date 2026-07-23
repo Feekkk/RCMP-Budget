@@ -5,6 +5,7 @@ import {
   Calendar,
   LogOut,
   type LucideIcon,
+  User,
 } from "lucide-react";
 import { Wordmark } from "@/components/landing/Nav";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ const items: { label: string; icon: LucideIcon; to?: LinkProps["to"] }[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/user" },
   { label: "My Requisitions", icon: FileText, to: "/user/history" },
   { label: "Calendar", icon: Calendar, to: "/user/calendar" },
+  { label: "Account", icon: User, to: "/user/profile" },
 ];
 
 const itemClass =

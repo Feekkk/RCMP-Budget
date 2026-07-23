@@ -16,6 +16,7 @@ import { Route as ProcumentIndexRouteImport } from './routes/procument/index'
 import { Route as HodIndexRouteImport } from './routes/hod/index'
 import { Route as FinanceIndexRouteImport } from './routes/finance/index'
 import { Route as UserQuotationRouteImport } from './routes/user/quotation'
+import { Route as UserProfileRouteImport } from './routes/user/profile'
 import { Route as UserHistoryRouteImport } from './routes/user/history'
 import { Route as UserCalendarRouteImport } from './routes/user/calendar'
 import { Route as ProcumentQuotationsRouteImport } from './routes/procument/quotations'
@@ -57,6 +58,11 @@ const FinanceIndexRoute = FinanceIndexRouteImport.update({
 const UserQuotationRoute = UserQuotationRouteImport.update({
   id: '/user/quotation',
   path: '/user/quotation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserProfileRoute = UserProfileRouteImport.update({
+  id: '/user/profile',
+  path: '/user/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserHistoryRoute = UserHistoryRouteImport.update({
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/procument/quotations': typeof ProcumentQuotationsRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
+  '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
   '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByTo {
   '/procument/quotations': typeof ProcumentQuotationsRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
+  '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
   '/finance': typeof FinanceIndexRoute
   '/hod': typeof HodIndexRoute
@@ -137,6 +145,7 @@ export interface FileRoutesById {
   '/procument/quotations': typeof ProcumentQuotationsRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
+  '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
   '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/procument/quotations'
     | '/user/calendar'
     | '/user/history'
+    | '/user/profile'
     | '/user/quotation'
     | '/finance/'
     | '/hod/'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/procument/quotations'
     | '/user/calendar'
     | '/user/history'
+    | '/user/profile'
     | '/user/quotation'
     | '/finance'
     | '/hod'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/procument/quotations'
     | '/user/calendar'
     | '/user/history'
+    | '/user/profile'
     | '/user/quotation'
     | '/finance/'
     | '/hod/'
@@ -204,6 +216,7 @@ export interface RootRouteChildren {
   ProcumentQuotationsRoute: typeof ProcumentQuotationsRoute
   UserCalendarRoute: typeof UserCalendarRoute
   UserHistoryRoute: typeof UserHistoryRoute
+  UserProfileRoute: typeof UserProfileRoute
   UserQuotationRoute: typeof UserQuotationRoute
   FinanceIndexRoute: typeof FinanceIndexRoute
   HodIndexRoute: typeof HodIndexRoute
@@ -261,6 +274,13 @@ declare module '@tanstack/react-router' {
       path: '/user/quotation'
       fullPath: '/user/quotation'
       preLoaderRoute: typeof UserQuotationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user/profile': {
+      id: '/user/profile'
+      path: '/user/profile'
+      fullPath: '/user/profile'
+      preLoaderRoute: typeof UserProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/user/history': {
@@ -324,6 +344,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProcumentQuotationsRoute: ProcumentQuotationsRoute,
   UserCalendarRoute: UserCalendarRoute,
   UserHistoryRoute: UserHistoryRoute,
+  UserProfileRoute: UserProfileRoute,
   UserQuotationRoute: UserQuotationRoute,
   FinanceIndexRoute: FinanceIndexRoute,
   HodIndexRoute: HodIndexRoute,

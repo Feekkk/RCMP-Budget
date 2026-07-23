@@ -83,3 +83,37 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
   await session.clear();
   return { ok: true as const };
 });
+
+export const updateMyProfile = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      department: z.string().trim().max(120),
+      designation: z.string().trim().max(120),
+    }),
+  )
+  .handler(async ({ data }): Promise<AuthUser> => {
+    const session = await getAuthSession();
+    const current = session.data.user;
+    if (!current) {
+      throw new Error("Please sign in to update your profile.");
+    }
+
+    const department = data.department || null;
+    const designation = data.designation || null;
+    const { query } = await import("@/server/db");
+
+    await query(
+      `UPDATE users
+       SET department = ?, designation = ?
+       WHERE user_id = ?`,
+      [department, designation, current.userId],
+    );
+
+    const user: AuthUser = {
+      ...current,
+      department,
+      designation,
+    };
+    await session.update({ user });
+    return user;
+  });
