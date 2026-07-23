@@ -18,7 +18,6 @@ import { Route as FinanceIndexRouteImport } from './routes/finance/index'
 import { Route as UserQuotationRouteImport } from './routes/user/quotation'
 import { Route as UserHistoryRouteImport } from './routes/user/history'
 import { Route as UserCalendarRouteImport } from './routes/user/calendar'
-import { Route as UserBudgetRouteImport } from './routes/user/budget'
 import { Route as ProcumentQuotationsRouteImport } from './routes/procument/quotations'
 import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
 import { Route as HodApprovalRouteImport } from './routes/hod/approval'
@@ -70,11 +69,6 @@ const UserCalendarRoute = UserCalendarRouteImport.update({
   path: '/user/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UserBudgetRoute = UserBudgetRouteImport.update({
-  id: '/user/budget',
-  path: '/user/budget',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ProcumentQuotationsRoute = ProcumentQuotationsRouteImport.update({
   id: '/procument/quotations',
   path: '/procument/quotations',
@@ -108,7 +102,6 @@ export interface FileRoutesByFullPath {
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/procument/quotations': typeof ProcumentQuotationsRoute
-  '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
@@ -125,7 +118,6 @@ export interface FileRoutesByTo {
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/procument/quotations': typeof ProcumentQuotationsRoute
-  '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
@@ -143,7 +135,6 @@ export interface FileRoutesById {
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/procument/quotations': typeof ProcumentQuotationsRoute
-  '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/history': typeof UserHistoryRoute
   '/user/quotation': typeof UserQuotationRoute
@@ -162,7 +153,6 @@ export interface FileRouteTypes {
     | '/hod/approval'
     | '/hod/calendar'
     | '/procument/quotations'
-    | '/user/budget'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
@@ -179,7 +169,6 @@ export interface FileRouteTypes {
     | '/hod/approval'
     | '/hod/calendar'
     | '/procument/quotations'
-    | '/user/budget'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
@@ -196,7 +185,6 @@ export interface FileRouteTypes {
     | '/hod/approval'
     | '/hod/calendar'
     | '/procument/quotations'
-    | '/user/budget'
     | '/user/calendar'
     | '/user/history'
     | '/user/quotation'
@@ -214,7 +202,6 @@ export interface RootRouteChildren {
   HodApprovalRoute: typeof HodApprovalRoute
   HodCalendarRoute: typeof HodCalendarRoute
   ProcumentQuotationsRoute: typeof ProcumentQuotationsRoute
-  UserBudgetRoute: typeof UserBudgetRoute
   UserCalendarRoute: typeof UserCalendarRoute
   UserHistoryRoute: typeof UserHistoryRoute
   UserQuotationRoute: typeof UserQuotationRoute
@@ -290,13 +277,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserCalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/user/budget': {
-      id: '/user/budget'
-      path: '/user/budget'
-      fullPath: '/user/budget'
-      preLoaderRoute: typeof UserBudgetRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/procument/quotations': {
       id: '/procument/quotations'
       path: '/procument/quotations'
@@ -342,7 +322,6 @@ const rootRouteChildren: RootRouteChildren = {
   HodApprovalRoute: HodApprovalRoute,
   HodCalendarRoute: HodCalendarRoute,
   ProcumentQuotationsRoute: ProcumentQuotationsRoute,
-  UserBudgetRoute: UserBudgetRoute,
   UserCalendarRoute: UserCalendarRoute,
   UserHistoryRoute: UserHistoryRoute,
   UserQuotationRoute: UserQuotationRoute,

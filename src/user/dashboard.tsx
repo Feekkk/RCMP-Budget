@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import {
+  Plus,
   ArrowUpRight,
   Clock,
   CheckCircle2,
@@ -11,7 +12,6 @@ import {
   EyeOff,
 } from "lucide-react";
 import { Sidebar } from "./sidebar";
-import { RequestMenu } from "./request-menu";
 import { cn } from "@/lib/utils";
 import { useAutoHideReveal } from "@/lib/use-auto-hide";
 
@@ -82,7 +82,13 @@ export function UserDashboard() {
               Here's what's happening with your requisitions today.
             </p>
           </div>
-          <RequestMenu />
+          <Link
+            to="/user/quotation"
+            className="inline-flex items-center gap-2 rounded-full bg-lime px-6 py-3 text-sm font-medium text-lime-foreground transition hover:brightness-95"
+          >
+            <Plus className="h-4 w-4" />
+            Request Quotation
+          </Link>
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
