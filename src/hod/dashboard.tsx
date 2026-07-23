@@ -6,6 +6,8 @@ import {
   EyeOff,
   Check,
   X,
+  ArrowUpRight,
+  ArrowDownLeft,
 } from "lucide-react";
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils";
@@ -33,6 +35,21 @@ const stats = [
     value: "3",
     hint: "Requisitions pending approval",
     icon: Hourglass,
+  },
+];
+
+const flows = [
+  {
+    label: "CAPEX",
+    hint: "Capital expenditure",
+    incoming: "RM 2,000.00",
+    outgoing: "RM 28,350.00",
+  },
+  {
+    label: "OPEX",
+    hint: "Operating expenditure",
+    incoming: "RM 3,500.00",
+    outgoing: "RM 20,000.00",
   },
 ];
 
@@ -160,6 +177,44 @@ export function HodDashboard() {
               );
             },
           )}
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {flows.map(({ label, hint, incoming, outgoing }) => (
+            <div
+              key={label}
+              className="group relative overflow-hidden rounded-[1.5rem] bg-background p-5 shadow-card transition hover:-translate-y-0.5"
+            >
+              <div>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="text-xs text-foreground/50">{hint}</p>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                      <ArrowDownLeft className="h-3.5 w-3.5" />
+                    </span>
+                    <p className="text-xs text-foreground/50">In</p>
+                  </div>
+                  <p className="mt-2 font-display text-2xl tabular-nums text-emerald-600">
+                    {incoming}
+                  </p>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-red-600">
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </span>
+                    <p className="text-xs text-foreground/50">Out</p>
+                  </div>
+                  <p className="mt-2 font-display text-2xl tabular-nums text-red-600">
+                    {outgoing}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="mt-8 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
