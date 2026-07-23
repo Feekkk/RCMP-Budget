@@ -1,12 +1,23 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import { createPortal, flushSync } from "react-dom";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Plus, Minus, Trash2, ShoppingCart, Send } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Minus,
+  Trash2,
+  ShoppingCart,
+  Send,
+  Paperclip,
+  X,
+} from "lucide-react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { toast } from "sonner";
 import { Sidebar } from "../user/sidebar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { submitQuotation } from "@/lib/quotation-fns";
 
 type CartItem = {
   id: number;
@@ -14,6 +25,7 @@ type CartItem = {
   quantity: number;
   pricePerUnit: number;
   details: string;
+  attachment?: File | null;
 };
 
 function formatRm(value: number) {
@@ -23,12 +35,27 @@ function formatRm(value: number) {
   })}`;
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      const base64 = result.includes(",") ? result.split(",")[1] : result;
+      resolve(base64 ?? "");
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function QuotationPage() {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [pricePerUnit, setPricePerUnit] = useState("");
   const [details, setDetails] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -41,17 +68,24 @@ export function QuotationPage() {
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const canAdd = name.trim() && unitPrice > 0;
 
+  const clearAttachment = () => {
+    setAttachment(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const addItem = (e: FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed || unitPrice <= 0) return;
 
+    const nextAttachment = attachment;
     setCart((prev) => {
       const existing = prev.find(
         (item) =>
           item.name.toLowerCase() === trimmed.toLowerCase() &&
           item.pricePerUnit === unitPrice &&
-          item.details === details.trim(),
+          item.details === details.trim() &&
+          item.attachment?.name === nextAttachment?.name,
       );
       if (existing) {
         return prev.map((item) =>
@@ -68,6 +102,7 @@ export function QuotationPage() {
           quantity,
           pricePerUnit: unitPrice,
           details: details.trim(),
+          attachment: nextAttachment,
         },
       ];
     });
@@ -75,6 +110,7 @@ export function QuotationPage() {
     setQuantity(1);
     setPricePerUnit("");
     setDetails("");
+    clearAttachment();
   };
 
   const updateQuantity = (id: number, delta: number) => {
@@ -91,15 +127,43 @@ export function QuotationPage() {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (cart.length === 0 || submitting) return;
-    setSubmitting(true);
-    setTimeout(() => {
+    flushSync(() => setSubmitting(true));
+    const startedAt = Date.now();
+
+    try {
+      const items = await Promise.all(
+        cart.map(async (item) => ({
+          name: item.name,
+          details: item.details,
+          quantity: item.quantity,
+          pricePerUnit: item.pricePerUnit,
+          attachment: item.attachment
+            ? {
+                name: item.attachment.name,
+                type: item.attachment.type,
+                data: await fileToBase64(item.attachment),
+              }
+            : undefined,
+        })),
+      );
+
+      const { quotationId } = await submitQuotation({ data: { items } });
+
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 1200) {
+        await new Promise((resolve) => setTimeout(resolve, 1200 - elapsed));
+      }
+
       toast("Quotation request submitted", {
-        description: `${cart.length} item${cart.length > 1 ? "s" : ""} · ${formatRm(cartTotal)} sent to procurement.`,
+        description: `QT-${quotationId} · ${cart.length} item${cart.length > 1 ? "s" : ""} · ${formatRm(cartTotal)} sent to procurement.`,
       });
       navigate({ to: "/user" });
-    }, 2000);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to submit quotation.");
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -153,6 +217,43 @@ export function QuotationPage() {
                   placeholder="Specs, colour, preferred brand…"
                   className="min-h-24 rounded-xl"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="attachment">
+                  Attachment{" "}
+                  <span className="font-normal text-foreground/40">(optional)</span>
+                </Label>
+                <input
+                  ref={fileInputRef}
+                  id="attachment"
+                  type="file"
+                  className="sr-only"
+                  onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
+                />
+                {attachment ? (
+                  <div className="flex h-12 items-center gap-3 rounded-xl border border-foreground/10 bg-ivory px-4">
+                    <Paperclip className="h-4 w-4 shrink-0 text-foreground/50" />
+                    <p className="min-w-0 flex-1 truncate text-sm">{attachment.name}</p>
+                    <button
+                      type="button"
+                      onClick={clearAttachment}
+                      aria-label="Remove attachment"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground/40 transition hover:bg-background hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-foreground/15 text-sm text-foreground/60 transition hover:border-foreground/30 hover:bg-ivory hover:text-foreground"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                    Upload file
+                  </button>
+                )}
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
@@ -240,6 +341,12 @@ export function QuotationPage() {
                           {item.details}
                         </p>
                       )}
+                      {item.attachment && (
+                        <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-foreground/50">
+                          <Paperclip className="h-3 w-3 shrink-0" />
+                          {item.attachment.name}
+                        </p>
+                      )}
                       <p className="mt-0.5 text-xs text-foreground/50">
                         {formatRm(item.pricePerUnit)} × {item.quantity}
                       </p>
@@ -301,20 +408,22 @@ export function QuotationPage() {
         </div>
       </main>
 
-      {submitting && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-ivory/90 backdrop-blur-sm">
-          <DotLottieReact
-            src="/receipt.json"
-            loop
-            autoplay
-            className="h-52 w-52"
-          />
-          <p className="font-display text-2xl">Submitting your request</p>
-          <p className="mt-2 text-sm text-foreground/60">
-            Sending your quotation to procurement…
-          </p>
-        </div>
-      )}
+      {submitting &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-ivory/90 backdrop-blur-sm">
+            <DotLottieReact
+              src="/receipt.json"
+              loop
+              autoplay
+              className="h-52 w-52"
+            />
+            <p className="font-display text-2xl">Submitting your request</p>
+            <p className="mt-2 text-sm text-foreground/60">
+              Sending your quotation to procurement…
+            </p>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
