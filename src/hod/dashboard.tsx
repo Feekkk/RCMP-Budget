@@ -1,42 +1,22 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   Wallet,
   Receipt,
   Hourglass,
   Eye,
   EyeOff,
-  Check,
-  X,
   ArrowUpRight,
   ArrowDownLeft,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils";
 import { useAutoHideReveal } from "@/lib/use-auto-hide";
-
-const stats = [
-  {
-    label: "Department budget",
-    value: "RM 120,000",
-    hint: "FY 2026 allocation",
-    icon: Wallet,
-    masked: true,
-    featured: true,
-  },
-  {
-    label: "Spent to date",
-    value: "RM 48,350",
-    hint: "40% of allocation",
-    icon: Receipt,
-    masked: true,
-    progress: 40,
-  },
-  {
-    label: "Awaiting your review",
-    value: "3",
-    hint: "Requisitions pending approval",
-    icon: Hourglass,
-  },
-];
+import {
+  listHodQuotations,
+  type HodQuotationListItem,
+} from "@/lib/hod-quotation-fns";
 
 const flows = [
   {
@@ -53,32 +33,71 @@ const flows = [
   },
 ];
 
-const pendingApprovals = [
-  {
-    id: "REQ-1042",
-    title: "Office chairs (x6)",
-    requester: "Afiq Danial",
-    amount: "RM 4,200",
-    submitted: "Jul 14, 2026",
-  },
-  {
-    id: "REQ-1041",
-    title: "Projector for meeting room",
-    requester: "Mei Ling Tan",
-    amount: "RM 3,100",
-    submitted: "Jul 13, 2026",
-  },
-  {
-    id: "REQ-1040",
-    title: "Quarterly stationery restock",
-    requester: "Hafiz Rahman",
-    amount: "RM 860",
-    submitted: "Jul 12, 2026",
-  },
-];
+function formatRm(value: number) {
+  return `RM ${value.toLocaleString("en-MY", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 export function HodDashboard() {
   const { revealed, toggle } = useAutoHideReveal();
+  const [pending, setPending] = useState<HodQuotationListItem[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    listHodQuotations()
+      .then((rows) => {
+        if (!active) return;
+        const waiting = rows.filter((row) => row.status === "Pending");
+        setPendingCount(waiting.length);
+        setPending(waiting.slice(0, 3));
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to load pending approvals.",
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const stats = useMemo(
+    () => [
+      {
+        label: "Department budget",
+        value: "RM 120,000",
+        hint: "FY 2026 allocation",
+        icon: Wallet,
+        masked: true,
+        featured: true,
+      },
+      {
+        label: "Spent to date",
+        value: "RM 48,350",
+        hint: "40% of allocation",
+        icon: Receipt,
+        masked: true,
+        progress: 40,
+      },
+      {
+        label: "Awaiting your review",
+        value: loading ? "…" : String(pendingCount),
+        hint: "Requisitions pending approval",
+        icon: Hourglass,
+      },
+    ],
+    [loading, pendingCount],
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-ivory text-foreground">
@@ -218,39 +237,52 @@ export function HodDashboard() {
         </div>
 
         <div className="mt-8 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
-          <h2 className="font-display text-2xl">Pending approvals</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-2xl">Pending approvals</h2>
+            <Link
+              to="/hod/approval"
+              className="inline-flex items-center gap-1 text-sm text-foreground/60 transition hover:text-foreground"
+            >
+              View all
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
 
-          <ul className="mt-6 divide-y divide-foreground/10">
-            {pendingApprovals.map(({ id, title, requester, amount, submitted }) => (
-              <li key={id} className="flex items-center justify-between gap-4 py-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{title}</p>
-                  <p className="text-xs text-foreground/50">
-                    {id} · {requester} · {submitted}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium tabular-nums">{amount}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      aria-label={`Approve ${id}`}
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 transition hover:brightness-95"
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Reject ${id}`}
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-red-100 text-red-600 transition hover:brightness-95"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {loading ? (
+            <p className="mt-6 text-sm text-foreground/50">
+              Loading pending approvals…
+            </p>
+          ) : pending.length === 0 ? (
+            <p className="mt-6 text-sm text-foreground/50">
+              No requisitions waiting for your review.
+            </p>
+          ) : (
+            <ul className="mt-6 divide-y divide-foreground/10">
+              {pending.map((req) => (
+                <li key={req.id}>
+                  <Link
+                    to="/hod/approval"
+                    className="flex items-center justify-between gap-4 py-4 transition hover:bg-ivory/60"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{req.title}</p>
+                      <p className="text-xs text-foreground/50">
+                        QT-{req.id} · {req.requester} · {req.date}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-medium tabular-nums">
+                        {formatRm(req.amount)}
+                      </span>
+                      <span className="inline-flex w-28 items-center justify-center gap-1.5 rounded-full bg-ivory px-3 py-1 text-xs font-medium text-foreground/60">
+                        View
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </main>
     </div>
