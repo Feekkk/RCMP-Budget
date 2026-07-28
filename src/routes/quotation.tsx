@@ -167,10 +167,10 @@ export function QuotationPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-ivory text-foreground">
+    <div className="flex h-screen flex-col overflow-hidden bg-ivory text-foreground md:flex-row">
       <Sidebar />
 
-      <main className="flex-1 overflow-y-auto p-8 md:p-12">
+      <main className="flex-1 overflow-y-auto p-6 md:p-12">
         <Link
           to="/user"
           className="inline-flex items-center gap-2 text-sm text-foreground/60 transition hover:text-foreground"
