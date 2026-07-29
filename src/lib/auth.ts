@@ -11,9 +11,22 @@ export type AuthUser = {
   roleName: RoleName;
 };
 
+export const roleHomeById: Partial<Record<number, keyof FileRoutesByTo>> = {
+  1: "/user",
+  2: "/hod",
+  3: "/finance",
+  4: "/procument",
+  5: "/ceo",
+};
+
 export const roleHome: Partial<Record<RoleName, keyof FileRoutesByTo>> = {
   User: "/user",
   HOD: "/hod",
   Finance: "/finance",
   Procument: "/procument",
+  CEO: "/ceo",
 };
+
+export function homeForRole(user: Pick<AuthUser, "roleId" | "roleName">) {
+  return roleHomeById[user.roleId] ?? roleHome[user.roleName];
+}

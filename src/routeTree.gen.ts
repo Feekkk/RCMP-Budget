@@ -15,6 +15,7 @@ import { Route as UserIndexRouteImport } from './routes/user/index'
 import { Route as ProcumentIndexRouteImport } from './routes/procument/index'
 import { Route as HodIndexRouteImport } from './routes/hod/index'
 import { Route as FinanceIndexRouteImport } from './routes/finance/index'
+import { Route as CeoIndexRouteImport } from './routes/ceo/index'
 import { Route as UserQuotationRouteImport } from './routes/user/quotation'
 import { Route as UserProfileRouteImport } from './routes/user/profile'
 import { Route as UserHistoryRouteImport } from './routes/user/history'
@@ -55,6 +56,11 @@ const HodIndexRoute = HodIndexRouteImport.update({
 const FinanceIndexRoute = FinanceIndexRouteImport.update({
   id: '/finance/',
   path: '/finance/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CeoIndexRoute = CeoIndexRouteImport.update({
+  id: '/ceo/',
+  path: '/ceo/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserQuotationRoute = UserQuotationRouteImport.update({
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/ceo/': typeof CeoIndexRoute
   '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
   '/procument/': typeof ProcumentIndexRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/ceo': typeof CeoIndexRoute
   '/finance': typeof FinanceIndexRoute
   '/hod': typeof HodIndexRoute
   '/procument': typeof ProcumentIndexRoute
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/ceo/': typeof CeoIndexRoute
   '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
   '/procument/': typeof ProcumentIndexRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/user/history'
     | '/user/profile'
     | '/user/quotation'
+    | '/ceo/'
     | '/finance/'
     | '/hod/'
     | '/procument/'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
     | '/user/history'
     | '/user/profile'
     | '/user/quotation'
+    | '/ceo'
     | '/finance'
     | '/hod'
     | '/procument'
@@ -224,6 +235,7 @@ export interface FileRouteTypes {
     | '/user/history'
     | '/user/profile'
     | '/user/quotation'
+    | '/ceo/'
     | '/finance/'
     | '/hod/'
     | '/procument/'
@@ -244,6 +256,7 @@ export interface RootRouteChildren {
   UserHistoryRoute: typeof UserHistoryRoute
   UserProfileRoute: typeof UserProfileRoute
   UserQuotationRoute: typeof UserQuotationRoute
+  CeoIndexRoute: typeof CeoIndexRoute
   FinanceIndexRoute: typeof FinanceIndexRoute
   HodIndexRoute: typeof HodIndexRoute
   ProcumentIndexRoute: typeof ProcumentIndexRoute
@@ -293,6 +306,13 @@ declare module '@tanstack/react-router' {
       path: '/finance'
       fullPath: '/finance/'
       preLoaderRoute: typeof FinanceIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ceo/': {
+      id: '/ceo/'
+      path: '/ceo'
+      fullPath: '/ceo/'
+      preLoaderRoute: typeof CeoIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/user/quotation': {
@@ -388,6 +408,7 @@ const rootRouteChildren: RootRouteChildren = {
   UserHistoryRoute: UserHistoryRoute,
   UserProfileRoute: UserProfileRoute,
   UserQuotationRoute: UserQuotationRoute,
+  CeoIndexRoute: CeoIndexRoute,
   FinanceIndexRoute: FinanceIndexRoute,
   HodIndexRoute: HodIndexRoute,
   ProcumentIndexRoute: ProcumentIndexRoute,

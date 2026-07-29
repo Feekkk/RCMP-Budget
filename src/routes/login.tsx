@@ -6,7 +6,7 @@ import { Underline } from "@/components/landing/Underline";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { loginByEmail } from "@/lib/auth-fns";
-import { roleHome } from "@/lib/auth";
+import { homeForRole } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -38,12 +38,12 @@ function LoginPage() {
     setLoading(true);
     try {
       const user = await loginByEmail({ data: { email: trimmed } });
-      const to = roleHome[user.roleName];
+      const to = homeForRole(user);
       if (!to) {
-        toast.error(`No workspace is available for the ${user.roleName} role yet.`);
+        toast.error("Your account role has no workspace yet. Contact support for help.");
         return;
       }
-      navigate({ to });
+      await navigate({ to });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Sign in failed.");
     } finally {
