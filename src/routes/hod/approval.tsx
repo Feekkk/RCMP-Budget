@@ -7,7 +7,8 @@ export const Route = createFileRoute("/hod/approval")({
       { title: "Approvals — Ledgerly" },
       {
         name: "description",
-        content: "Approve or reject requisitions submitted by your department.",
+        content:
+          "Approve or reject quotations and yearly budgets from your department.",
       },
     ],
   }),

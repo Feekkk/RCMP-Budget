@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   Clock,
@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { Sidebar } from "./sidebar";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
   getHodQuotation,
@@ -23,8 +24,15 @@ import {
   type HodQuotationDetail,
   type HodQuotationListItem,
 } from "@/lib/hod-quotation-fns";
+import {
+  getHodBudget,
+  listHodBudgets,
+  reviewHodBudget,
+  type HodBudgetDetail,
+  type HodBudgetListItem,
+} from "@/lib/hod-budget-fns";
 
-type Status = HodQuotationListItem["status"];
+type Status = "Pending" | "Approved" | "Rejected";
 
 const statusConfig: Record<Status, { icon: LucideIcon; tone: string }> = {
   Pending: { icon: Clock, tone: "text-amber-600 bg-amber-100" },
@@ -48,27 +56,36 @@ type AttachmentPreview = {
 };
 
 export function ApprovalPage() {
+  const [tab, setTab] = useState<"quotations" | "budgets">("quotations");
   const [requisitions, setRequisitions] = useState<HodQuotationListItem[]>([]);
+  const [budgets, setBudgets] = useState<HodBudgetListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reviewingId, setReviewingId] = useState<number | null>(null);
+  const [reviewingKey, setReviewingKey] = useState<string | null>(null);
   const [filter, setFilter] = useState<(typeof filters)[number]>("Pending");
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [detail, setDetail] = useState<HodQuotationDetail | null>(null);
+  const [selectedQuotationId, setSelectedQuotationId] = useState<number | null>(
+    null,
+  );
+  const [selectedBudgetId, setSelectedBudgetId] = useState<number | null>(null);
+  const [quotationDetail, setQuotationDetail] =
+    useState<HodQuotationDetail | null>(null);
+  const [budgetDetail, setBudgetDetail] = useState<HodBudgetDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
-    listHodQuotations()
-      .then((rows) => {
-        if (active) setRequisitions(rows);
+    Promise.all([listHodQuotations(), listHodBudgets()])
+      .then(([quotationRows, budgetRows]) => {
+        if (!active) return;
+        setRequisitions(quotationRows);
+        setBudgets(budgetRows);
       })
       .catch((error) => {
         if (!active) return;
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to load requisitions. Try again.",
+            : "Could not load approvals. Refresh and try again.",
         );
       })
       .finally(() => {
@@ -80,25 +97,25 @@ export function ApprovalPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedId == null) {
-      setDetail(null);
+    if (selectedQuotationId == null) {
+      setQuotationDetail(null);
       return;
     }
 
     let active = true;
     setDetailLoading(true);
-    getHodQuotation({ data: { quotationId: selectedId } })
+    getHodQuotation({ data: { quotationId: selectedQuotationId } })
       .then((row) => {
-        if (active) setDetail(row);
+        if (active) setQuotationDetail(row);
       })
       .catch((error) => {
         if (!active) return;
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to load requisition details.",
+            : "Could not open this quotation. Try again.",
         );
-        setSelectedId(null);
+        setSelectedQuotationId(null);
       })
       .finally(() => {
         if (active) setDetailLoading(false);
@@ -107,16 +124,52 @@ export function ApprovalPage() {
     return () => {
       active = false;
     };
-  }, [selectedId]);
+  }, [selectedQuotationId]);
+
+  useEffect(() => {
+    if (selectedBudgetId == null) {
+      setBudgetDetail(null);
+      return;
+    }
+
+    let active = true;
+    setDetailLoading(true);
+    getHodBudget({ data: { budgetId: selectedBudgetId } })
+      .then((row) => {
+        if (active) setBudgetDetail(row);
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not open this budget. Try again.",
+        );
+        setSelectedBudgetId(null);
+      })
+      .finally(() => {
+        if (active) setDetailLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedBudgetId]);
 
   const closeDetail = () => {
-    setSelectedId(null);
-    setDetail(null);
+    setSelectedQuotationId(null);
+    setSelectedBudgetId(null);
+    setQuotationDetail(null);
+    setBudgetDetail(null);
   };
 
-  const review = async (id: number, decision: "Approved" | "Rejected") => {
-    if (reviewingId != null) return;
-    setReviewingId(id);
+  const reviewQuotation = async (
+    id: number,
+    decision: "Approved" | "Rejected",
+  ) => {
+    const key = `qt-${id}`;
+    if (reviewingKey != null) return;
+    setReviewingKey(key);
     const toastId = toast.loading(
       decision === "Approved"
         ? `Approving QT-${id}…`
@@ -129,8 +182,8 @@ export function ApprovalPage() {
       setRequisitions((prev) =>
         prev.map((req) => (req.id === id ? updated : req)),
       );
-      if (detail?.id === id) {
-        setDetail((prev) =>
+      if (quotationDetail?.id === id) {
+        setQuotationDetail((prev) =>
           prev
             ? {
                 ...prev,
@@ -155,19 +208,88 @@ export function ApprovalPage() {
         { id: toastId },
       );
     } finally {
-      setReviewingId(null);
+      setReviewingKey(null);
     }
   };
 
-  const visible = requisitions.filter(
-    (req) =>
-      (filter === "All" || req.status === filter) &&
-      `QT-${req.id} ${req.title} ${req.requester}`
-        .toLowerCase()
-        .includes(query.toLowerCase().trim()),
+  const reviewBudget = async (
+    id: number,
+    decision: "Approved" | "Rejected",
+  ) => {
+    const key = `yb-${id}`;
+    if (reviewingKey != null) return;
+    setReviewingKey(key);
+    const toastId = toast.loading(
+      decision === "Approved"
+        ? `Approving YB-${id}…`
+        : `Rejecting YB-${id}…`,
+    );
+    try {
+      const updated = await reviewHodBudget({
+        data: { budgetId: id, decision },
+      });
+      setBudgets((prev) =>
+        prev.map((row) => (row.id === id ? updated : row)),
+      );
+      if (budgetDetail?.id === id) {
+        setBudgetDetail((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: updated.status,
+                statusName: updated.statusName,
+              }
+            : prev,
+        );
+      }
+      toast.success(`YB-${id} ${decision.toLowerCase()}`, {
+        id: toastId,
+        description:
+          decision === "Approved"
+            ? "This budget line is marked as approved."
+            : "The requester can see this rejection in their history.",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Could not update YB-${id}. Try again.`,
+        { id: toastId },
+      );
+    } finally {
+      setReviewingKey(null);
+    }
+  };
+
+  const visibleQuotations = useMemo(
+    () =>
+      requisitions.filter(
+        (req) =>
+          (filter === "All" || req.status === filter) &&
+          `QT-${req.id} ${req.title} ${req.requester}`
+            .toLowerCase()
+            .includes(query.toLowerCase().trim()),
+      ),
+    [requisitions, filter, query],
   );
 
-  const pendingCount = requisitions.filter((r) => r.status === "Pending").length;
+  const visibleBudgets = useMemo(
+    () =>
+      budgets.filter(
+        (row) =>
+          (filter === "All" || row.status === filter) &&
+          `YB-${row.id} ${row.title} ${row.code} ${row.budgetType} ${row.budgetYear} ${row.requester}`
+            .toLowerCase()
+            .includes(query.toLowerCase().trim()),
+      ),
+    [budgets, filter, query],
+  );
+
+  const pendingQuotations = requisitions.filter(
+    (r) => r.status === "Pending",
+  ).length;
+  const pendingBudgets = budgets.filter((r) => r.status === "Pending").length;
+  const pendingCount = pendingQuotations + pendingBudgets;
 
   return (
     <div className="flex h-screen overflow-hidden bg-ivory text-foreground">
@@ -178,16 +300,64 @@ export function ApprovalPage() {
           <h1 className="font-display text-4xl">List Of Approvals</h1>
           <p className="mt-2 text-sm text-foreground/60">
             {loading
-              ? "Loading requisitions…"
+              ? "Loading approvals…"
               : pendingCount === 0
-                ? "You're all caught up — no budget requests waiting on you."
-                : `${pendingCount} requisition${pendingCount === 1 ? "" : "s"} waiting for your review.`}
+                ? "You're all caught up — nothing waiting on you."
+                : `${pendingCount} item${pendingCount === 1 ? "" : "s"} waiting for your review.`}
           </p>
         </div>
 
         <div className="mt-8 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-1 rounded-full border border-foreground/10 p-1">
+          <Tabs
+            value={tab}
+            onValueChange={(value) => {
+              setTab(value as "quotations" | "budgets");
+              setFilter("Pending");
+              setQuery("");
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <TabsList className="h-auto rounded-full border border-foreground/10 bg-ivory p-1">
+                <TabsTrigger
+                  value="quotations"
+                  className="rounded-full px-4 py-2 data-[state=active]:bg-background"
+                >
+                  Quotations
+                  {pendingQuotations > 0 && (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 tabular-nums">
+                      {pendingQuotations}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="budgets"
+                  className="rounded-full px-4 py-2 data-[state=active]:bg-background"
+                >
+                  Yearly budgets
+                  {pendingBudgets > 0 && (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 tabular-nums">
+                      {pendingBudgets}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-foreground/40" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={
+                    tab === "quotations"
+                      ? "Search quotations"
+                      : "Search budgets"
+                  }
+                  className="h-11 rounded-full pl-11"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex w-fit items-center gap-1 rounded-full border border-foreground/10 p-1">
               {filters.map((option) => (
                 <button
                   key={option}
@@ -205,112 +375,245 @@ export function ApprovalPage() {
               ))}
             </div>
 
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-foreground/40" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search requisitions"
-                className="h-11 rounded-full pl-11"
-              />
-            </div>
-          </div>
+            <TabsContent value="quotations" className="mt-4">
+              {loading ? (
+                <p className="text-sm text-foreground/50">Loading quotations…</p>
+              ) : visibleQuotations.length === 0 ? (
+                <EmptyState message="No quotations match your filters." />
+              ) : (
+                <ul className="divide-y divide-foreground/10">
+                  {visibleQuotations.map((req) => {
+                    const { icon: Icon, tone } = statusConfig[req.status];
+                    return (
+                      <li key={req.id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedQuotationId(req.id)}
+                          className="flex w-full flex-wrap items-center justify-between gap-4 py-4 text-left transition hover:bg-ivory/60"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-full bg-ivory px-2.5 py-0.5 text-[11px] font-medium tracking-wide text-foreground/60 uppercase">
+                                Quotation
+                              </span>
+                              <p className="truncate text-sm font-medium">
+                                {req.title}
+                              </p>
+                            </div>
+                            <p className="mt-1 text-xs text-foreground/50">
+                              QT-{req.id} · {req.requester} · Submitted{" "}
+                              {req.date}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm font-medium tabular-nums">
+                              {formatRm(req.amount)}
+                            </span>
+                            {req.status === "Pending" ? (
+                              <span className="inline-flex w-28 items-center justify-center gap-1.5 rounded-full bg-ivory px-3 py-1 text-xs font-medium text-foreground/60">
+                                View
+                              </span>
+                            ) : (
+                              <span
+                                className={`inline-flex w-28 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+                              >
+                                <Icon className="h-3.5 w-3.5" />
+                                {req.status}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </TabsContent>
 
-          {loading ? (
-            <p className="mt-6 text-sm text-foreground/50">
-              Loading requisitions…
-            </p>
-          ) : visible.length === 0 ? (
-            <div className="mt-6 rounded-xl border border-dashed border-foreground/15 py-14 text-center">
-              <p className="text-sm text-foreground/50">
-                No requisitions match your filters.
-              </p>
-            </div>
-          ) : (
-            <ul className="mt-4 divide-y divide-foreground/10">
-              {visible.map((req) => {
-                const { icon: Icon, tone } = statusConfig[req.status];
-                return (
-                  <li key={req.id}>
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelectedId(req.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setSelectedId(req.id);
-                        }
-                      }}
-                      className="flex w-full cursor-pointer flex-wrap items-center justify-between gap-4 py-4 text-left transition hover:bg-ivory/60"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{req.title}</p>
-                        <p className="mt-0.5 text-xs text-foreground/50">
-                          QT-{req.id} · {req.requester} · Submitted {req.date}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm font-medium tabular-nums">
-                          {formatRm(req.amount)}
-                        </span>
-                        {req.status === "Pending" ? (
-                          <span className="inline-flex w-28 items-center justify-center gap-1.5 rounded-full bg-ivory px-3 py-1 text-xs font-medium text-foreground/60">
-                            View
-                          </span>
-                        ) : (
-                          <span
-                            className={`inline-flex w-28 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
-                          >
-                            <Icon className="h-3.5 w-3.5" />
-                            {req.status}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+            <TabsContent value="budgets" className="mt-4">
+              {loading ? (
+                <p className="text-sm text-foreground/50">
+                  Loading department budgets…
+                </p>
+              ) : visibleBudgets.length === 0 ? (
+                <EmptyState message="No yearly budgets match your filters." />
+              ) : (
+                <ul className="divide-y divide-foreground/10">
+                  {visibleBudgets.map((row) => {
+                    const { icon: Icon, tone } = statusConfig[row.status];
+                    return (
+                      <li key={row.id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBudgetId(row.id)}
+                          className="flex w-full flex-wrap items-center justify-between gap-4 py-4 text-left transition hover:bg-ivory/60"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className={cn(
+                                  "rounded-full px-2.5 py-0.5 text-[11px] font-medium tracking-wide uppercase",
+                                  row.budgetType === "OPEX"
+                                    ? "bg-sky-100 text-sky-800"
+                                    : "bg-amber-100 text-amber-800",
+                                )}
+                              >
+                                {row.budgetType}
+                              </span>
+                              <p className="truncate text-sm font-medium">
+                                {row.title}
+                              </p>
+                            </div>
+                            <p className="mt-1 text-xs text-foreground/50">
+                              YB-{row.id} · FY {row.budgetYear} · {row.code} ·{" "}
+                              {row.requester} · {row.date}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm font-medium tabular-nums">
+                              {formatRm(row.amount)}
+                            </span>
+                            {row.status === "Pending" ? (
+                              <span className="inline-flex w-28 items-center justify-center gap-1.5 rounded-full bg-ivory px-3 py-1 text-xs font-medium text-foreground/60">
+                                View
+                              </span>
+                            ) : (
+                              <span
+                                className={`inline-flex w-28 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+                              >
+                                <Icon className="h-3.5 w-3.5" />
+                                {row.status}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
 
-      {selectedId != null &&
+      {selectedQuotationId != null &&
         createPortal(
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/20 p-4 backdrop-blur-sm"
-            onClick={closeDetail}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="approval-detail-title"
-              className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[1.5rem] bg-background p-6 shadow-card md:p-8"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {detailLoading || !detail ? (
-                <p className="py-12 text-center text-sm text-foreground/50">
-                  Loading requisition details…
-                </p>
-              ) : (
-                <ApprovalDetailCard
-                  detail={detail}
-                  reviewing={reviewingId === detail.id}
-                  onClose={closeDetail}
-                  onApprove={() => void review(detail.id, "Approved")}
-                  onReject={() => void review(detail.id, "Rejected")}
-                />
-              )}
-            </div>
-          </div>,
+          <DetailOverlay onClose={closeDetail}>
+            {detailLoading || !quotationDetail ? (
+              <p className="py-12 text-center text-sm text-foreground/50">
+                Loading requisition details…
+              </p>
+            ) : (
+              <QuotationApprovalCard
+                detail={quotationDetail}
+                reviewing={reviewingKey === `qt-${quotationDetail.id}`}
+                onClose={closeDetail}
+                onApprove={() =>
+                  void reviewQuotation(quotationDetail.id, "Approved")
+                }
+                onReject={() =>
+                  void reviewQuotation(quotationDetail.id, "Rejected")
+                }
+              />
+            )}
+          </DetailOverlay>,
+          document.body,
+        )}
+
+      {selectedBudgetId != null &&
+        createPortal(
+          <DetailOverlay onClose={closeDetail}>
+            {detailLoading || !budgetDetail ? (
+              <p className="py-12 text-center text-sm text-foreground/50">
+                Loading budget details…
+              </p>
+            ) : (
+              <BudgetApprovalCard
+                detail={budgetDetail}
+                reviewing={reviewingKey === `yb-${budgetDetail.id}`}
+                onClose={closeDetail}
+                onApprove={() =>
+                  void reviewBudget(budgetDetail.id, "Approved")
+                }
+                onReject={() =>
+                  void reviewBudget(budgetDetail.id, "Rejected")
+                }
+              />
+            )}
+          </DetailOverlay>,
           document.body,
         )}
     </div>
   );
 }
 
-function ApprovalDetailCard({
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-foreground/15 py-14 text-center">
+      <p className="text-sm text-foreground/50">{message}</p>
+    </div>
+  );
+}
+
+function DetailOverlay({
+  children,
+  onClose,
+}: {
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/20 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[1.5rem] bg-background p-6 shadow-card md:p-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ReviewActions({
+  reviewing,
+  onApprove,
+  onReject,
+}: {
+  reviewing: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  return (
+    <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
+      <button
+        type="button"
+        onClick={onApprove}
+        disabled={reviewing}
+        className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-5 py-2.5 text-sm font-medium text-emerald-700 transition hover:brightness-95 disabled:opacity-50"
+      >
+        <Check className="h-4 w-4" />
+        {reviewing ? "Updating…" : "Approve"}
+      </button>
+      <button
+        type="button"
+        onClick={onReject}
+        disabled={reviewing}
+        className="inline-flex items-center gap-2 rounded-full bg-red-100 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:brightness-95 disabled:opacity-50"
+      >
+        <X className="h-4 w-4" />
+        Reject
+      </button>
+    </div>
+  );
+}
+
+function QuotationApprovalCard({
   detail,
   reviewing,
   onClose,
@@ -382,14 +685,9 @@ function ApprovalDetailCard({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
-            Requisition detail
+            Quotation detail
           </p>
-          <h2
-            id="approval-detail-title"
-            className="mt-1 font-display text-3xl"
-          >
-            QT-{detail.id}
-          </h2>
+          <h2 className="mt-1 font-display text-3xl">QT-{detail.id}</h2>
           <p className="mt-1 text-sm text-foreground/60">
             Submitted {detail.date}
           </p>
@@ -502,26 +800,11 @@ function ApprovalDetailCard({
       )}
 
       {detail.status === "Pending" && (
-        <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
-          <button
-            type="button"
-            onClick={onApprove}
-            disabled={reviewing}
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-5 py-2.5 text-sm font-medium text-emerald-700 transition hover:brightness-95 disabled:opacity-50"
-          >
-            <Check className="h-4 w-4" />
-            {reviewing ? "Updating…" : "Approve"}
-          </button>
-          <button
-            type="button"
-            onClick={onReject}
-            disabled={reviewing}
-            className="inline-flex items-center gap-2 rounded-full bg-red-100 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:brightness-95 disabled:opacity-50"
-          >
-            <X className="h-4 w-4" />
-            Reject
-          </button>
-        </div>
+        <ReviewActions
+          reviewing={reviewing}
+          onApprove={onApprove}
+          onReject={onReject}
+        />
       )}
 
       {preview &&
@@ -571,6 +854,137 @@ function ApprovalDetailCard({
           </div>,
           document.body,
         )}
+    </div>
+  );
+}
+
+function BudgetApprovalCard({
+  detail,
+  reviewing,
+  onClose,
+  onApprove,
+  onReject,
+}: {
+  detail: HodBudgetDetail;
+  reviewing: boolean;
+  onClose: () => void;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const { icon: StatusIcon, tone } = statusConfig[detail.status];
+  const title =
+    detail.budgetType === "CAPEX"
+      ? detail.itemName || "Capital expenditure"
+      : detail.activity || "Operating expenditure";
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+            Yearly budget · {detail.budgetType}
+          </p>
+          <h2 className="mt-1 font-display text-3xl">YB-{detail.id}</h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            FY {detail.budgetYear} · Submitted {detail.date}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+          >
+            <StatusIcon className="h-3.5 w-3.5" />
+            {detail.status}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close details"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/50 transition hover:bg-ivory hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-ivory p-4">
+        <p className="text-xs text-foreground/50">Requester</p>
+        <p className="mt-1 text-sm font-medium">{detail.requester}</p>
+        <p className="mt-0.5 text-xs text-foreground/50">
+          {[detail.designation, detail.department].filter(Boolean).join(" · ") ||
+            "No designation or department set"}
+        </p>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl bg-ivory p-4 sm:col-span-2">
+          <p className="text-xs text-foreground/50">Title</p>
+          <p className="mt-1 text-sm font-medium">{title}</p>
+          <p className="mt-1 text-xs text-foreground/50">{detail.code}</p>
+        </div>
+        <div className="rounded-2xl bg-ivory p-4">
+          <p className="text-xs text-foreground/50">Amount</p>
+          <p className="mt-1 font-display text-2xl tabular-nums">
+            {formatRm(detail.amount)}
+          </p>
+        </div>
+      </div>
+
+      <dl className="mt-6 space-y-4">
+        {detail.targetMonths && (
+          <DetailField label="Target months" value={detail.targetMonths} />
+        )}
+        {detail.objective && (
+          <DetailField label="Objective" value={detail.objective} />
+        )}
+        <DetailField label="Justification" value={detail.justification} />
+        {detail.budgetType === "CAPEX" && (
+          <>
+            {detail.quantity != null && (
+              <DetailField label="Quantity" value={String(detail.quantity)} />
+            )}
+            {detail.costPerUnit != null && (
+              <DetailField
+                label="Cost per unit"
+                value={formatRm(detail.costPerUnit)}
+              />
+            )}
+            {detail.effectIfNotApproved && (
+              <DetailField
+                label="Effect if not approved"
+                value={detail.effectIfNotApproved}
+              />
+            )}
+            {detail.alternative && (
+              <DetailField label="Alternative" value={detail.alternative} />
+            )}
+          </>
+        )}
+        {detail.remarks && (
+          <DetailField label="Remarks" value={detail.remarks} />
+        )}
+      </dl>
+
+      {detail.status === "Pending" && (
+        <ReviewActions
+          reviewing={reviewing}
+          onApprove={onApprove}
+          onReject={onReject}
+        />
+      )}
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+        {label}
+      </dt>
+      <dd className="mt-1 whitespace-pre-wrap text-sm text-foreground/80">
+        {value}
+      </dd>
     </div>
   );
 }

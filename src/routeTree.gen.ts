@@ -21,6 +21,7 @@ import { Route as UserHistoryRouteImport } from './routes/user/history'
 import { Route as UserCalendarRouteImport } from './routes/user/calendar'
 import { Route as UserBudgetRouteImport } from './routes/user/budget'
 import { Route as ProcumentQuotationsRouteImport } from './routes/procument/quotations'
+import { Route as HodReportsRouteImport } from './routes/hod/reports'
 import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
 import { Route as HodApprovalRouteImport } from './routes/hod/approval'
 import { Route as FinanceRequestRouteImport } from './routes/finance/request'
@@ -86,6 +87,11 @@ const ProcumentQuotationsRoute = ProcumentQuotationsRouteImport.update({
   path: '/procument/quotations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HodReportsRoute = HodReportsRouteImport.update({
+  id: '/hod/reports',
+  path: '/hod/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HodCalendarRoute = HodCalendarRouteImport.update({
   id: '/hod/calendar',
   path: '/hod/calendar',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/finance/request': typeof FinanceRequestRoute
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
+  '/hod/reports': typeof HodReportsRoute
   '/procument/quotations': typeof ProcumentQuotationsRoute
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/finance/request': typeof FinanceRequestRoute
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
+  '/hod/reports': typeof HodReportsRoute
   '/procument/quotations': typeof ProcumentQuotationsRoute
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/finance/request': typeof FinanceRequestRoute
   '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
+  '/hod/reports': typeof HodReportsRoute
   '/procument/quotations': typeof ProcumentQuotationsRoute
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/finance/request'
     | '/hod/approval'
     | '/hod/calendar'
+    | '/hod/reports'
     | '/procument/quotations'
     | '/user/budget'
     | '/user/calendar'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/finance/request'
     | '/hod/approval'
     | '/hod/calendar'
+    | '/hod/reports'
     | '/procument/quotations'
     | '/user/budget'
     | '/user/calendar'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/finance/request'
     | '/hod/approval'
     | '/hod/calendar'
+    | '/hod/reports'
     | '/procument/quotations'
     | '/user/budget'
     | '/user/calendar'
@@ -225,6 +237,7 @@ export interface RootRouteChildren {
   FinanceRequestRoute: typeof FinanceRequestRoute
   HodApprovalRoute: typeof HodApprovalRoute
   HodCalendarRoute: typeof HodCalendarRoute
+  HodReportsRoute: typeof HodReportsRoute
   ProcumentQuotationsRoute: typeof ProcumentQuotationsRoute
   UserBudgetRoute: typeof UserBudgetRoute
   UserCalendarRoute: typeof UserCalendarRoute
@@ -324,6 +337,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProcumentQuotationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hod/reports': {
+      id: '/hod/reports'
+      path: '/hod/reports'
+      fullPath: '/hod/reports'
+      preLoaderRoute: typeof HodReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/hod/calendar': {
       id: '/hod/calendar'
       path: '/hod/calendar'
@@ -361,6 +381,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceRequestRoute: FinanceRequestRoute,
   HodApprovalRoute: HodApprovalRoute,
   HodCalendarRoute: HodCalendarRoute,
+  HodReportsRoute: HodReportsRoute,
   ProcumentQuotationsRoute: ProcumentQuotationsRoute,
   UserBudgetRoute: UserBudgetRoute,
   UserCalendarRoute: UserCalendarRoute,

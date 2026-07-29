@@ -4,7 +4,7 @@ export function Wordmark({ className = "" }: { className?: string }) {
   return (
     <Link to="/" className={`inline-flex items-center ${className}`}>
       <img
-        src="/budget-logo.png"
+        src="/unikl-official.png"
         alt="Budget Tracker — UniKL Royal College Of Medicine Perak"
         className="h-12 w-auto"
       />

@@ -5,6 +5,7 @@ import {
   Calendar,
   Settings,
   LogOut,
+  FileChartColumn,
   type LucideIcon,
 } from "lucide-react";
 import { Wordmark } from "@/components/landing/Nav";
@@ -14,6 +15,7 @@ const items: { label: string; icon: LucideIcon; to?: LinkProps["to"] }[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/hod" },
   { label: "Approvals", icon: FileCheck, to: "/hod/approval" },
   { label: "Calendar", icon: Calendar, to: "/hod/calendar" },
+  { label: "Reports", icon: FileChartColumn, to: "/hod/reports" },
   { label: "Settings", icon: Settings },
 ];
 
