@@ -4,10 +4,11 @@ import { HistoryPage } from "@/user/history";
 export const Route = createFileRoute("/user/history")({
   head: () => ({
     meta: [
-      { title: "My Requisitions — Ledgerly" },
+      { title: "History — Ledgerly" },
       {
         name: "description",
-        content: "Review the status and history of every requisition you've submitted.",
+        content:
+          "Review quotations and department yearly budgets in one place.",
       },
     ],
   }),
