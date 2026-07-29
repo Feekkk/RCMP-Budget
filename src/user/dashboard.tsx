@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Plus,
   ArrowUpRight,
@@ -18,6 +18,12 @@ import { toast } from "sonner";
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils";
 import { useAutoHideReveal } from "@/lib/use-auto-hide";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   listMyQuotations,
   type QuotationListItem,
@@ -91,6 +97,7 @@ function formatRm(value: number) {
 }
 
 export function UserDashboard() {
+  const navigate = useNavigate();
   const { revealed, toggle } = useAutoHideReveal();
   const [requisitions, setRequisitions] = useState<QuotationListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,10 +125,10 @@ export function UserDashboard() {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-ivory text-foreground">
+    <div className="flex h-screen flex-col overflow-hidden bg-ivory text-foreground md:flex-row">
       <Sidebar />
 
-      <main className="flex-1 overflow-y-auto p-8 md:p-12">
+      <main className="flex-1 overflow-y-auto p-6 md:p-12">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="font-display text-4xl">Good morning, Afiq</h1>
@@ -129,13 +136,25 @@ export function UserDashboard() {
               Here's what's happening with your requisitions today.
             </p>
           </div>
-          <Link
-            to="/user/quotation"
-            className="inline-flex items-center gap-2 rounded-full bg-lime px-6 py-3 text-sm font-medium text-lime-foreground transition hover:brightness-95"
-          >
-            <Plus className="h-4 w-4" />
-            Request Quotation
-          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full bg-lime px-6 py-3 text-sm font-medium text-lime-foreground transition hover:brightness-95"
+              >
+                <Plus className="h-4 w-4" />
+                Make Request
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => void navigate({ to: "/user/quotation" })}>
+                Request Quotation
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void navigate({ to: "/user/budget" })}>
+                Yearly Budget
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">

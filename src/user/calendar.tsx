@@ -71,10 +71,10 @@ export function CalendarPage() {
   const recentEvents = useMemo(() => events.slice(0, 6), [events]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-ivory text-foreground">
+    <div className="flex h-screen flex-col overflow-hidden bg-ivory text-foreground md:flex-row">
       <Sidebar />
 
-      <main className="flex-1 overflow-y-auto p-8 md:p-12">
+      <main className="flex-1 overflow-y-auto p-6 md:p-12">
         <div>
           <h1 className="font-display text-4xl">Department Calendar</h1>
           <p className="mt-2 text-sm text-foreground/60">
