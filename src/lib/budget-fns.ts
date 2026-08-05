@@ -37,11 +37,13 @@ export type BudgetDetail = {
   effectIfNotApproved: string | null;
   alternative: string | null;
   remarks: string | null;
+  rejectRemarks: string | null;
   date: string;
   status: BudgetStatus;
   statusName: string;
   createdByEmail: string;
   department: string | null;
+  isMine: boolean;
 };
 
 type BudgetRow = {
@@ -60,6 +62,7 @@ type BudgetRow = {
   effect_if_not_approved: string | null;
   alternative: string | null;
   remarks: string | null;
+  reject_remarks: string | null;
   status_name: string;
   created_at: Date | string;
   email: string;
@@ -69,11 +72,7 @@ type BudgetRow = {
 
 function mapBudgetStatus(statusName: string): BudgetStatus {
   if (statusName.includes("rejected")) return "Rejected";
-  if (
-    statusName === "approved_hod" ||
-    statusName === "approved_ceo" ||
-    statusName === "completed"
-  ) {
+  if (statusName.includes("approved") || statusName === "completed") {
     return "Approved";
   }
   return "Pending";
@@ -102,7 +101,7 @@ type SessionUser = {
   user: AuthUser;
 };
 
-const SUBMIT_STATUS_ID = 1;
+const SUBMIT_STATUS_ID = 11;
 
 const sessionPassword = "budget_tracker-dev-session-secret-32";
 
@@ -324,6 +323,7 @@ export const getDepartmentBudget = createServerFn({ method: "GET" })
          yb.effect_if_not_approved,
          yb.alternative,
          yb.remarks,
+         yb.reject_remarks,
          yb.created_at,
          yb.created_by,
          qs.status_name,
@@ -369,10 +369,232 @@ export const getDepartmentBudget = createServerFn({ method: "GET" })
       effectIfNotApproved: row.effect_if_not_approved,
       alternative: row.alternative,
       remarks: row.remarks,
+      rejectRemarks: row.reject_remarks,
       date,
       status: mapBudgetStatus(row.status_name),
       statusName: row.status_name,
       createdByEmail: row.email,
       department: row.department,
+      isMine: row.created_by === user.userId,
+    };
+  });
+
+export const resubmitYearlyBudget = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const schema = z.discriminatedUnion("budgetType", [
+      z.object({
+        budgetId: z.number().int().positive(),
+        budgetType: z.literal("OPEX"),
+        code: z.string().trim().min(1),
+        activity: z.string().trim().min(1),
+        targetMonths: z.string().trim().max(7).optional(),
+        objective: z.string().trim().min(1),
+        justification: z.string().trim().min(1),
+        budgetAmount: z.number().positive(),
+        remarks: z.string().trim().optional(),
+      }),
+      z.object({
+        budgetId: z.number().int().positive(),
+        budgetType: z.literal("CAPEX"),
+        code: z.string().trim().min(1),
+        itemName: z.string().trim().min(1),
+        justification: z.string().trim().min(1),
+        targetMonths: z.string().trim().max(7).optional(),
+        quantity: z.number().int().positive(),
+        costPerUnit: z.number().positive(),
+        budgetAmount: z.number().positive(),
+        effectIfNotApproved: z.string().trim().optional(),
+        alternative: z.string().trim().optional(),
+        remarks: z.string().trim().optional(),
+      }),
+    ]);
+    const parsed = schema.safeParse(input);
+    if (!parsed.success) {
+      const message = parsed.error.issues[0]?.message;
+      throw new Error(
+        message && !message.startsWith("Invalid")
+          ? message
+          : "Some budget details are missing. Check the form and try again.",
+      );
+    }
+    return parsed.data;
+  })
+  .handler(async ({ data }): Promise<BudgetDetail> => {
+    const session = await useSession<SessionUser>(sessionConfig());
+    const user = session.data.user;
+    if (!user) {
+      throw new Error("Please sign in to resubmit your budget.");
+    }
+
+    const { query } = await import("@/server/db");
+    const rows = await query<BudgetRow[]>(
+      `SELECT
+         yb.budget_id,
+         yb.budget_year,
+         yb.budget_type,
+         yb.code,
+         yb.activity,
+         yb.item_name,
+         yb.target_months,
+         yb.objective,
+         yb.justification,
+         yb.quantity,
+         yb.cost_per_unit,
+         yb.budget_amount,
+         yb.effect_if_not_approved,
+         yb.alternative,
+         yb.remarks,
+         yb.reject_remarks,
+         yb.created_at,
+         yb.created_by,
+         qs.status_name,
+         u.email,
+         u.department
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       WHERE yb.budget_id = ?
+         AND yb.created_by = ?
+       LIMIT 1`,
+      [data.budgetId, user.userId],
+    );
+
+    const row = rows[0];
+    if (!row) {
+      throw new Error("Budget not found. Refresh the page and try again.");
+    }
+
+    if (mapBudgetStatus(row.status_name) !== "Rejected") {
+      throw new Error("Only rejected budgets can be edited and resubmitted.");
+    }
+
+    if (
+      (data.budgetType === "OPEX" && row.budget_type !== "OPEX") ||
+      (data.budgetType === "CAPEX" && row.budget_type !== "CAPEX")
+    ) {
+      throw new Error("Budget type cannot be changed. Refresh and try again.");
+    }
+
+    if (data.budgetType === "OPEX") {
+      await query(
+        `UPDATE yearly_budgets
+         SET status_id = ?,
+             code = ?,
+             activity = ?,
+             target_months = ?,
+             objective = ?,
+             justification = ?,
+             budget_amount = ?,
+             remarks = ?,
+             reject_remarks = NULL
+         WHERE budget_id = ? AND created_by = ?`,
+        [
+          SUBMIT_STATUS_ID,
+          data.code,
+          data.activity,
+          data.targetMonths || null,
+          data.objective,
+          data.justification,
+          data.budgetAmount,
+          data.remarks || null,
+          data.budgetId,
+          user.userId,
+        ],
+      );
+    } else {
+      await query(
+        `UPDATE yearly_budgets
+         SET status_id = ?,
+             code = ?,
+             item_name = ?,
+             target_months = ?,
+             justification = ?,
+             quantity = ?,
+             cost_per_unit = ?,
+             budget_amount = ?,
+             effect_if_not_approved = ?,
+             alternative = ?,
+             remarks = ?,
+             reject_remarks = NULL
+         WHERE budget_id = ? AND created_by = ?`,
+        [
+          SUBMIT_STATUS_ID,
+          data.code,
+          data.itemName,
+          data.targetMonths || null,
+          data.justification,
+          data.quantity,
+          data.costPerUnit,
+          data.budgetAmount,
+          data.effectIfNotApproved || null,
+          data.alternative || null,
+          data.remarks || null,
+          data.budgetId,
+          user.userId,
+        ],
+      );
+    }
+
+    const updatedRows = await query<BudgetRow[]>(
+      `SELECT
+         yb.budget_id,
+         yb.budget_year,
+         yb.budget_type,
+         yb.code,
+         yb.activity,
+         yb.item_name,
+         yb.target_months,
+         yb.objective,
+         yb.justification,
+         yb.quantity,
+         yb.cost_per_unit,
+         yb.budget_amount,
+         yb.effect_if_not_approved,
+         yb.alternative,
+         yb.remarks,
+         yb.reject_remarks,
+         yb.created_at,
+         yb.created_by,
+         qs.status_name,
+         u.email,
+         u.department
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       WHERE yb.budget_id = ?
+       LIMIT 1`,
+      [data.budgetId],
+    );
+
+    const updated = updatedRows[0];
+    if (!updated) {
+      throw new Error("Budget was updated, but could not reload. Refresh the page.");
+    }
+
+    const { date } = formatBudgetDate(updated.created_at);
+    return {
+      id: updated.budget_id,
+      budgetYear: Number(updated.budget_year),
+      budgetType: updated.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+      code: updated.code,
+      activity: updated.activity,
+      itemName: updated.item_name,
+      targetMonths: updated.target_months,
+      objective: updated.objective,
+      justification: updated.justification,
+      quantity: updated.quantity == null ? null : Number(updated.quantity),
+      costPerUnit:
+        updated.cost_per_unit == null ? null : Number(updated.cost_per_unit),
+      amount: Number(updated.budget_amount),
+      effectIfNotApproved: updated.effect_if_not_approved,
+      alternative: updated.alternative,
+      remarks: updated.remarks,
+      rejectRemarks: updated.reject_remarks,
+      date,
+      status: mapBudgetStatus(updated.status_name),
+      statusName: updated.status_name,
+      createdByEmail: updated.email,
+      department: updated.department,
+      isMine: updated.created_by === user.userId,
     };
   });

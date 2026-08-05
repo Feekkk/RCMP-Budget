@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { Sidebar } from "./sidebar";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
@@ -215,6 +216,7 @@ export function ApprovalPage() {
   const reviewBudget = async (
     id: number,
     decision: "Approved" | "Rejected",
+    rejectRemarks?: string,
   ) => {
     const key = `yb-${id}`;
     if (reviewingKey != null) return;
@@ -226,7 +228,7 @@ export function ApprovalPage() {
     );
     try {
       const updated = await reviewHodBudget({
-        data: { budgetId: id, decision },
+        data: { budgetId: id, decision, rejectRemarks },
       });
       setBudgets((prev) =>
         prev.map((row) => (row.id === id ? updated : row)),
@@ -238,6 +240,10 @@ export function ApprovalPage() {
                 ...prev,
                 status: updated.status,
                 statusName: updated.statusName,
+                rejectRemarks:
+                  decision === "Rejected"
+                    ? rejectRemarks?.trim() || null
+                    : prev.rejectRemarks,
               }
             : prev,
         );
@@ -409,18 +415,12 @@ export function ApprovalPage() {
                             <span className="text-sm font-medium tabular-nums">
                               {formatRm(req.amount)}
                             </span>
-                            {req.status === "Pending" ? (
-                              <span className="inline-flex w-28 items-center justify-center gap-1.5 rounded-full bg-ivory px-3 py-1 text-xs font-medium text-foreground/60">
-                                View
-                              </span>
-                            ) : (
-                              <span
-                                className={`inline-flex w-28 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
-                              >
-                                <Icon className="h-3.5 w-3.5" />
-                                {req.status}
-                              </span>
-                            )}
+                            <span
+                              className={`inline-flex w-28 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              {req.status}
+                            </span>
                           </div>
                         </button>
                       </li>
@@ -473,18 +473,12 @@ export function ApprovalPage() {
                             <span className="text-sm font-medium tabular-nums">
                               {formatRm(row.amount)}
                             </span>
-                            {row.status === "Pending" ? (
-                              <span className="inline-flex w-28 items-center justify-center gap-1.5 rounded-full bg-ivory px-3 py-1 text-xs font-medium text-foreground/60">
-                                View
-                              </span>
-                            ) : (
-                              <span
-                                className={`inline-flex w-28 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
-                              >
-                                <Icon className="h-3.5 w-3.5" />
-                                {row.status}
-                              </span>
-                            )}
+                            <span
+                              className={`inline-flex w-28 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              {row.status}
+                            </span>
                           </div>
                         </button>
                       </li>
@@ -536,8 +530,8 @@ export function ApprovalPage() {
                 onApprove={() =>
                   void reviewBudget(budgetDetail.id, "Approved")
                 }
-                onReject={() =>
-                  void reviewBudget(budgetDetail.id, "Rejected")
+                onReject={(rejectRemarks) =>
+                  void reviewBudget(budgetDetail.id, "Rejected", rejectRemarks)
                 }
               />
             )}
@@ -869,13 +863,12 @@ function BudgetApprovalCard({
   reviewing: boolean;
   onClose: () => void;
   onApprove: () => void;
-  onReject: () => void;
+  onReject: (rejectRemarks: string) => void;
 }) {
   const { icon: StatusIcon, tone } = statusConfig[detail.status];
-  const title =
-    detail.budgetType === "CAPEX"
-      ? detail.itemName || "Capital expenditure"
-      : detail.activity || "Operating expenditure";
+  const isCapex = detail.budgetType === "CAPEX";
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectRemarks, setRejectRemarks] = useState("");
 
   return (
     <div>
@@ -916,64 +909,206 @@ function BudgetApprovalCard({
         </p>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl bg-ivory p-4 sm:col-span-2">
-          <p className="text-xs text-foreground/50">Title</p>
-          <p className="mt-1 text-sm font-medium">{title}</p>
-          <p className="mt-1 text-xs text-foreground/50">{detail.code}</p>
+      {isCapex ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl bg-ivory p-4 sm:col-span-2">
+            <p className="text-xs text-foreground/50">Item</p>
+            <p className="mt-1 text-sm font-medium">{detail.itemName || "-"}</p>
+          </div>
+          <div className="rounded-2xl bg-ivory p-4">
+            <p className="text-xs text-foreground/50">Estimated price</p>
+            <p className="mt-1 font-display text-2xl tabular-nums">
+              {formatRm(detail.amount)}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-ivory p-4">
+            <p className="text-xs text-foreground/50">Quantity</p>
+            <p className="mt-1 font-display text-2xl tabular-nums">
+              {detail.quantity == null ? "-" : detail.quantity}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-ivory p-4 sm:col-span-2">
+            <p className="text-xs text-foreground/50">Estimated cost per unit</p>
+            <p className="mt-1 font-display text-2xl tabular-nums">
+              {detail.costPerUnit == null ? "-" : formatRm(detail.costPerUnit)}
+            </p>
+          </div>
         </div>
-        <div className="rounded-2xl bg-ivory p-4">
-          <p className="text-xs text-foreground/50">Amount</p>
-          <p className="mt-1 font-display text-2xl tabular-nums">
-            {formatRm(detail.amount)}
-          </p>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl bg-ivory p-4 sm:col-span-2">
+            <p className="text-xs text-foreground/50">
+              Activities / Programme / Event
+            </p>
+            <p className="mt-1 text-sm font-medium">{detail.activity || "-"}</p>
+          </div>
+          <div className="rounded-2xl bg-ivory p-4">
+            <p className="text-xs text-foreground/50">OPEX budget</p>
+            <p className="mt-1 font-display text-2xl tabular-nums">
+              {formatRm(detail.amount)}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       <dl className="mt-6 space-y-4">
-        {detail.targetMonths && (
-          <DetailField label="Target months" value={detail.targetMonths} />
-        )}
-        {detail.objective && (
-          <DetailField label="Objective" value={detail.objective} />
-        )}
-        <DetailField label="Justification" value={detail.justification} />
-        {detail.budgetType === "CAPEX" && (
+        <DetailField
+          label={isCapex ? "Category" : "Code"}
+          value={budgetCodeLabel(detail.code, detail.budgetType)}
+        />
+        {isCapex ? (
           <>
-            {detail.quantity != null && (
-              <DetailField label="Quantity" value={String(detail.quantity)} />
-            )}
-            {detail.costPerUnit != null && (
-              <DetailField
-                label="Cost per unit"
-                value={formatRm(detail.costPerUnit)}
-              />
-            )}
-            {detail.effectIfNotApproved && (
-              <DetailField
-                label="Effect if not approved"
-                value={detail.effectIfNotApproved}
-              />
-            )}
-            {detail.alternative && (
-              <DetailField label="Alternative" value={detail.alternative} />
-            )}
+            <DetailField label="Justification" value={detail.justification} />
+            <DetailField
+              label="Target months"
+              value={formatTargetMonth(detail.targetMonths)}
+            />
+            <DetailField
+              label="Effect if budget not approved"
+              value={detail.effectIfNotApproved || "-"}
+            />
+            <DetailField
+              label="Alternative more cost-effective"
+              value={detail.alternative || "-"}
+            />
+          </>
+        ) : (
+          <>
+            <DetailField
+              label="Target months"
+              value={formatTargetMonth(detail.targetMonths)}
+            />
+            <DetailField
+              label="Objectives"
+              value={detail.objective || "-"}
+            />
+            <DetailField
+              label="Justifications"
+              value={detail.justification}
+            />
           </>
         )}
-        {detail.remarks && (
-          <DetailField label="Remarks" value={detail.remarks} />
+        <DetailField label="Remarks" value={detail.remarks || "-"} />
+        {detail.status === "Rejected" && detail.rejectRemarks && (
+          <DetailField
+            label="Rejection remarks"
+            value={detail.rejectRemarks}
+          />
         )}
       </dl>
 
       {detail.status === "Pending" && (
-        <ReviewActions
-          reviewing={reviewing}
-          onApprove={onApprove}
-          onReject={onReject}
-        />
+        <div className="mt-8 space-y-4 border-t border-foreground/10 pt-6">
+          {rejecting && (
+            <div className="space-y-2">
+              <label
+                htmlFor="budget-reject-remarks"
+                className="text-xs font-medium tracking-wide text-foreground/40 uppercase"
+              >
+                Rejection remarks
+              </label>
+              <Textarea
+                id="budget-reject-remarks"
+                value={rejectRemarks}
+                onChange={(e) => setRejectRemarks(e.target.value.slice(0, 255))}
+                placeholder="Explain why this budget is rejected"
+                maxLength={255}
+                disabled={reviewing}
+                autoFocus
+                className="min-h-24 rounded-xl"
+              />
+              <p className="text-xs text-foreground/40">
+                {rejectRemarks.length}/255
+              </p>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            {rejecting ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const remarks = rejectRemarks.trim();
+                    if (!remarks) {
+                      toast.error(
+                        "Add a short reason before rejecting this budget.",
+                      );
+                      return;
+                    }
+                    onReject(remarks);
+                  }}
+                  disabled={reviewing}
+                  className="inline-flex items-center gap-2 rounded-full bg-red-100 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:brightness-95 disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" />
+                  {reviewing ? "Updating…" : "Confirm reject"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRejecting(false);
+                    setRejectRemarks("");
+                  }}
+                  disabled={reviewing}
+                  className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-foreground/60 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onApprove}
+                  disabled={reviewing}
+                  className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-5 py-2.5 text-sm font-medium text-emerald-700 transition hover:brightness-95 disabled:opacity-50"
+                >
+                  <Check className="h-4 w-4" />
+                  {reviewing ? "Updating…" : "Approve"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRejecting(true)}
+                  disabled={reviewing}
+                  className="inline-flex items-center gap-2 rounded-full bg-red-100 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:brightness-95 disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" />
+                  Reject
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
+}
+
+function formatTargetMonth(value: string | null) {
+  if (!value) return "-";
+  const [year, month] = value.split("-");
+  if (!year || !month) return value;
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+}
+
+function budgetCodeLabel(code: string, budgetType: "OPEX" | "CAPEX") {
+  const labels: Record<string, string> =
+    budgetType === "CAPEX"
+      ? {
+          "200-1100": "200-1100 : Renovation",
+          "200-1000": "200-1000 : Office equipment",
+          "200-0500": "200-0500 : IT & audio visual",
+        }
+      : {
+          "926-0000": "926-0000 Lease line for IT system",
+          "916-0000": "916-0000 Equip. rental",
+          "999-1003": "999-1003 Printing exp-meter reading",
+          "992-0000": "992-0000 IT & audio visual - expenses",
+          "923-0000": "923-0000 IT & audio-repair & maintenance",
+        };
+  return labels[code] ?? code;
 }
 
 function DetailField({ label, value }: { label: string; value: string }) {

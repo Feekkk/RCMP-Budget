@@ -7,8 +7,8 @@ type SessionUser = {
   user: AuthUser;
 };
 
-const APPROVED_HOD_STATUS_ID = 6;
-const REJECTED_HOD_STATUS_ID = 7;
+const APPROVED_BUDGET_STATUS_ID = 12;
+const REJECTED_BUDGET_STATUS_ID = 13;
 
 const sessionPassword = "budget_tracker-dev-session-secret-32";
 
@@ -51,6 +51,7 @@ export type HodBudgetDetail = {
   effectIfNotApproved: string | null;
   alternative: string | null;
   remarks: string | null;
+  rejectRemarks: string | null;
   date: string;
   status: HodBudgetStatus;
   statusName: string;
@@ -75,6 +76,7 @@ type BudgetRow = {
   effect_if_not_approved: string | null;
   alternative: string | null;
   remarks: string | null;
+  reject_remarks: string | null;
   status_name: string;
   created_at: Date | string;
   requester_email: string;
@@ -84,11 +86,7 @@ type BudgetRow = {
 
 function mapStatus(statusName: string): HodBudgetStatus {
   if (statusName.includes("rejected")) return "Rejected";
-  if (
-    statusName === "approved_hod" ||
-    statusName === "approved_ceo" ||
-    statusName === "completed"
-  ) {
+  if (statusName.includes("approved") || statusName === "completed") {
     return "Approved";
   }
   return "Pending";
@@ -152,6 +150,7 @@ function toDetail(row: BudgetRow): HodBudgetDetail {
     effectIfNotApproved: row.effect_if_not_approved,
     alternative: row.alternative,
     remarks: row.remarks,
+    rejectRemarks: row.reject_remarks,
     date: formatDate(row.created_at),
     status: mapStatus(row.status_name),
     statusName: row.status_name,
@@ -232,6 +231,7 @@ export const getHodBudget = createServerFn({ method: "GET" })
          yb.effect_if_not_approved,
          yb.alternative,
          yb.remarks,
+         yb.reject_remarks,
          yb.created_at,
          qs.status_name,
          u.email AS requester_email,
@@ -290,6 +290,7 @@ export const listHodBudgetReport = createServerFn({ method: "GET" })
          yb.effect_if_not_approved,
          yb.alternative,
          yb.remarks,
+         yb.reject_remarks,
          yb.created_at,
          qs.status_name,
          u.email AS requester_email,
@@ -299,6 +300,7 @@ export const listHodBudgetReport = createServerFn({ method: "GET" })
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
        WHERE yb.budget_year = ?
+         AND qs.status_name NOT LIKE '%rejected%'
        ${departmentFilter}
        ORDER BY yb.budget_type ASC, yb.code ASC, yb.budget_id ASC`,
       params,
@@ -309,10 +311,21 @@ export const listHodBudgetReport = createServerFn({ method: "GET" })
 
 export const reviewHodBudget = createServerFn({ method: "POST" })
   .validator(
-    z.object({
-      budgetId: z.number().int().positive(),
-      decision: z.enum(["Approved", "Rejected"]),
-    }),
+    z
+      .object({
+        budgetId: z.number().int().positive(),
+        decision: z.enum(["Approved", "Rejected"]),
+        rejectRemarks: z.string().trim().max(255).optional(),
+      })
+      .superRefine((data, ctx) => {
+        if (data.decision === "Rejected" && !data.rejectRemarks) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["rejectRemarks"],
+            message: "Add a short reason before rejecting this budget.",
+          });
+        }
+      }),
   )
   .handler(async ({ data }): Promise<HodBudgetListItem> => {
     const session = await useSession<SessionUser>(sessionConfig());
@@ -360,18 +373,27 @@ export const reviewHodBudget = createServerFn({ method: "POST" })
 
     const nextStatusId =
       data.decision === "Approved"
-        ? APPROVED_HOD_STATUS_ID
-        : REJECTED_HOD_STATUS_ID;
+        ? APPROVED_BUDGET_STATUS_ID
+        : REJECTED_BUDGET_STATUS_ID;
 
-    await query(`UPDATE yearly_budgets SET status_id = ? WHERE budget_id = ?`, [
-      nextStatusId,
-      data.budgetId,
-    ]);
+    if (data.decision === "Rejected") {
+      await query(
+        `UPDATE yearly_budgets
+         SET status_id = ?, reject_remarks = ?
+         WHERE budget_id = ?`,
+        [nextStatusId, data.rejectRemarks, data.budgetId],
+      );
+    } else {
+      await query(
+        `UPDATE yearly_budgets SET status_id = ? WHERE budget_id = ?`,
+        [nextStatusId, data.budgetId],
+      );
+    }
 
     return {
       ...toListItem(row),
       status: data.decision,
       statusName:
-        data.decision === "Approved" ? "approved_hod" : "rejected_hod",
+        data.decision === "Approved" ? "approved budget" : "rejected budget",
     };
   });

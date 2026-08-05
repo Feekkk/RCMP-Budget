@@ -22,6 +22,15 @@ import {
 import { toast } from "sonner";
 import { Sidebar } from "./sidebar";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
@@ -33,6 +42,7 @@ import {
 import {
   getDepartmentBudget,
   listDepartmentBudgets,
+  resubmitYearlyBudget,
   type BudgetDetail,
   type BudgetListItem,
 } from "@/lib/budget-fns";
@@ -554,7 +564,31 @@ export function HistoryPage() {
                 Loading budget details
               </p>
             ) : (
-              <BudgetDetailCard detail={budgetDetail} onClose={closeDetail} />
+              <BudgetDetailCard
+                key={budgetDetail.id}
+                detail={budgetDetail}
+                onClose={closeDetail}
+                onResubmitted={(updated) => {
+                  setBudgetDetail(updated);
+                  setBudgets((prev) =>
+                    prev.map((row) =>
+                      row.id === updated.id
+                        ? {
+                            ...row,
+                            title:
+                              updated.budgetType === "CAPEX"
+                                ? updated.itemName || row.title
+                                : updated.activity || row.title,
+                            code: updated.code,
+                            amount: updated.amount,
+                            status: updated.status,
+                            statusName: updated.statusName,
+                          }
+                        : row,
+                    ),
+                  );
+                }}
+              />
             )}
           </DetailOverlay>,
           document.body,
@@ -818,15 +852,137 @@ function QuotationDetailCard({
 function BudgetDetailCard({
   detail,
   onClose,
+  onResubmitted,
 }: {
   detail: BudgetDetail;
   onClose: () => void;
+  onResubmitted: (detail: BudgetDetail) => void;
 }) {
   const { icon: StatusIcon, tone } = statusConfig[detail.status];
-  const title =
-    detail.budgetType === "CAPEX"
-      ? detail.itemName || "Capital expenditure"
-      : detail.activity || "Operating expenditure";
+  const isCapex = detail.budgetType === "CAPEX";
+  const canEdit = detail.status === "Rejected" && detail.isMine;
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [code, setCode] = useState(detail.code);
+  const [activity, setActivity] = useState(detail.activity ?? "");
+  const [itemName, setItemName] = useState(detail.itemName ?? "");
+  const [targetMonths, setTargetMonths] = useState(detail.targetMonths ?? "");
+  const [objective, setObjective] = useState(detail.objective ?? "");
+  const [justification, setJustification] = useState(detail.justification);
+  const [quantity, setQuantity] = useState(detail.quantity ?? 1);
+  const [costPerUnit, setCostPerUnit] = useState(
+    detail.costPerUnit == null ? "" : String(detail.costPerUnit),
+  );
+  const [budgetAmount, setBudgetAmount] = useState(String(detail.amount));
+  const [effectIfNotApproved, setEffectIfNotApproved] = useState(
+    detail.effectIfNotApproved ?? "",
+  );
+  const [alternative, setAlternative] = useState(detail.alternative ?? "");
+  const [remarks, setRemarks] = useState(detail.remarks ?? "");
+
+  const unitValue = Number(costPerUnit) || 0;
+  const capexEstimated = unitValue * quantity;
+  const codeOptions = isCapex ? CAPEX_CODES : OPEX_CODES;
+
+  const resetForm = () => {
+    setCode(detail.code);
+    setActivity(detail.activity ?? "");
+    setItemName(detail.itemName ?? "");
+    setTargetMonths(detail.targetMonths ?? "");
+    setObjective(detail.objective ?? "");
+    setJustification(detail.justification);
+    setQuantity(detail.quantity ?? 1);
+    setCostPerUnit(
+      detail.costPerUnit == null ? "" : String(detail.costPerUnit),
+    );
+    setBudgetAmount(String(detail.amount));
+    setEffectIfNotApproved(detail.effectIfNotApproved ?? "");
+    setAlternative(detail.alternative ?? "");
+    setRemarks(detail.remarks ?? "");
+  };
+
+  const startEdit = () => {
+    resetForm();
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    resetForm();
+    setEditing(false);
+  };
+
+  const handleResubmit = async () => {
+    if (saving) return;
+
+    if (isCapex) {
+      if (!code || !itemName.trim() || !justification.trim() || unitValue <= 0) {
+        toast.error("Fill in item, justification, and cost, then try again.");
+        return;
+      }
+    } else {
+      const amount = Number(budgetAmount) || 0;
+      if (
+        !code ||
+        !activity.trim() ||
+        !objective.trim() ||
+        !justification.trim() ||
+        amount <= 0
+      ) {
+        toast.error("Fill in the required fields, then try again.");
+        return;
+      }
+    }
+
+    setSaving(true);
+    const toastId = toast.loading(`Resubmitting YB-${detail.id}…`);
+    try {
+      const updated = isCapex
+        ? await resubmitYearlyBudget({
+            data: {
+              budgetId: detail.id,
+              budgetType: "CAPEX",
+              code,
+              itemName: itemName.trim(),
+              justification: justification.trim(),
+              targetMonths: targetMonths || undefined,
+              quantity,
+              costPerUnit: unitValue,
+              budgetAmount: capexEstimated,
+              effectIfNotApproved: effectIfNotApproved.trim() || undefined,
+              alternative: alternative.trim() || undefined,
+              remarks: remarks.trim() || undefined,
+            },
+          })
+        : await resubmitYearlyBudget({
+            data: {
+              budgetId: detail.id,
+              budgetType: "OPEX",
+              code,
+              activity: activity.trim(),
+              targetMonths: targetMonths || undefined,
+              objective: objective.trim(),
+              justification: justification.trim(),
+              budgetAmount: Number(budgetAmount),
+              remarks: remarks.trim() || undefined,
+            },
+          });
+      onResubmitted(updated);
+      setEditing(false);
+      toast.success(`YB-${detail.id} resubmitted`, {
+        id: toastId,
+        description: "It is pending HOD review again.",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not resubmit this budget. Try again.",
+        { id: toastId },
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div>
@@ -858,60 +1014,373 @@ function BudgetDetailCard({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl bg-ivory p-4 sm:col-span-2">
-          <p className="text-xs text-foreground/50">Title</p>
-          <p className="mt-1 text-sm font-medium">{title}</p>
-          <p className="mt-1 text-xs text-foreground/50">{detail.code}</p>
-        </div>
-        <div className="rounded-2xl bg-ivory p-4">
-          <p className="text-xs text-foreground/50">Amount</p>
-          <p className="mt-1 font-display text-2xl tabular-nums">
-            {formatRm(detail.amount)}
-          </p>
-        </div>
-      </div>
+      {editing ? (
+        <div className="mt-6 space-y-4">
+          <DetailField label="Submitted by" value={detail.createdByEmail} />
+          <DetailField label="Department" value={detail.department || "—"} />
+          {detail.rejectRemarks && (
+            <DetailField
+              label="Rejection remarks"
+              value={detail.rejectRemarks}
+            />
+          )}
 
-      <dl className="mt-6 space-y-4">
-        <DetailField label="Submitted by" value={detail.createdByEmail} />
-        {detail.department && (
-          <DetailField label="Department" value={detail.department} />
-        )}
-        {detail.targetMonths && (
-          <DetailField label="Target months" value={detail.targetMonths} />
-        )}
-        {detail.objective && (
-          <DetailField label="Objective" value={detail.objective} />
-        )}
-        <DetailField label="Justification" value={detail.justification} />
-        {detail.budgetType === "CAPEX" && (
-          <>
-            {detail.quantity != null && (
-              <DetailField label="Quantity" value={String(detail.quantity)} />
+          <div className="space-y-2">
+            <Label>{isCapex ? "Category" : "Code"}</Label>
+            <Select value={code} onValueChange={setCode} disabled={saving}>
+              <SelectTrigger className="h-11 rounded-xl">
+                <SelectValue placeholder="Select code" />
+              </SelectTrigger>
+              <SelectContent>
+                {codeOptions.map((entry) => (
+                  <SelectItem key={entry.value} value={entry.value}>
+                    {entry.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {isCapex ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="edit-item">Item</Label>
+                <Input
+                  id="edit-item"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  disabled={saving}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-justification">Justification</Label>
+                <Textarea
+                  id="edit-justification"
+                  value={justification}
+                  onChange={(e) => setJustification(e.target.value)}
+                  disabled={saving}
+                  className="min-h-20 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-target-months">Target months</Label>
+                <Input
+                  id="edit-target-months"
+                  type="month"
+                  value={targetMonths}
+                  onChange={(e) => setTargetMonths(e.target.value)}
+                  disabled={saving}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-quantity">Quantity</Label>
+                  <Input
+                    id="edit-quantity"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={quantity}
+                    onChange={(e) =>
+                      setQuantity(Math.max(1, Number(e.target.value) || 1))
+                    }
+                    disabled={saving}
+                    className="h-11 rounded-xl tabular-nums"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-unit">Estimated cost per unit (RM)</Label>
+                  <Input
+                    id="edit-unit"
+                    inputMode="decimal"
+                    value={costPerUnit}
+                    onChange={(e) =>
+                      setCostPerUnit(e.target.value.replace(/[^\d.]/g, ""))
+                    }
+                    disabled={saving}
+                    className="h-11 rounded-xl tabular-nums"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Estimated price</Label>
+                <div className="flex h-11 items-center rounded-xl border border-foreground/10 bg-ivory px-4 font-display text-xl tabular-nums">
+                  {formatRm(capexEstimated)}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-effect">
+                  Effect if budget not approved
+                </Label>
+                <Textarea
+                  id="edit-effect"
+                  value={effectIfNotApproved}
+                  onChange={(e) => setEffectIfNotApproved(e.target.value)}
+                  disabled={saving}
+                  className="min-h-20 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-alternative">
+                  Alternative more cost-effective
+                </Label>
+                <Textarea
+                  id="edit-alternative"
+                  value={alternative}
+                  onChange={(e) => setAlternative(e.target.value)}
+                  disabled={saving}
+                  className="min-h-20 rounded-xl"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="edit-activity">
+                  Activities / Programme / Event
+                </Label>
+                <Input
+                  id="edit-activity"
+                  value={activity}
+                  onChange={(e) => setActivity(e.target.value)}
+                  disabled={saving}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-opex-months">Target months</Label>
+                <Input
+                  id="edit-opex-months"
+                  type="month"
+                  value={targetMonths}
+                  onChange={(e) => setTargetMonths(e.target.value)}
+                  disabled={saving}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-objective">Objectives</Label>
+                <Textarea
+                  id="edit-objective"
+                  value={objective}
+                  onChange={(e) => setObjective(e.target.value)}
+                  disabled={saving}
+                  className="min-h-20 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-opex-justification">Justifications</Label>
+                <Textarea
+                  id="edit-opex-justification"
+                  value={justification}
+                  onChange={(e) => setJustification(e.target.value)}
+                  disabled={saving}
+                  className="min-h-20 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-budget">OPEX budget (RM)</Label>
+                <Input
+                  id="edit-budget"
+                  inputMode="decimal"
+                  value={budgetAmount}
+                  onChange={(e) =>
+                    setBudgetAmount(e.target.value.replace(/[^\d.]/g, ""))
+                  }
+                  disabled={saving}
+                  className="h-11 rounded-xl tabular-nums"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-remarks">Remarks</Label>
+            <Input
+              id="edit-remarks"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              disabled={saving}
+              className="h-11 rounded-xl"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
+            <button
+              type="button"
+              onClick={() => void handleResubmit()}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+            >
+              {saving ? "Resubmitting…" : "Resubmit"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-foreground/60 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <dl className="mt-6 space-y-4">
+            <DetailField label="Submitted by" value={detail.createdByEmail} />
+            <DetailField
+              label="Department"
+              value={detail.department || "—"}
+            />
+            <DetailField
+              label={isCapex ? "Category" : "Code"}
+              value={budgetCodeLabel(detail.code, detail.budgetType)}
+            />
+            {isCapex ? (
+              <>
+                <DetailField label="Item" value={detail.itemName || "—"} />
+                <DetailField
+                  label="Justification"
+                  value={detail.justification}
+                />
+                <DetailField
+                  label="Target months"
+                  value={formatTargetMonth(detail.targetMonths)}
+                />
+                <DetailField
+                  label="Quantity"
+                  value={
+                    detail.quantity == null ? "—" : String(detail.quantity)
+                  }
+                />
+                <DetailField
+                  label="Estimated cost per unit"
+                  value={
+                    detail.costPerUnit == null
+                      ? "—"
+                      : formatRm(detail.costPerUnit)
+                  }
+                />
+                <DetailField
+                  label="Estimated price"
+                  value={formatRm(detail.amount)}
+                />
+                <DetailField
+                  label="Effect if budget not approved"
+                  value={detail.effectIfNotApproved || "—"}
+                />
+                <DetailField
+                  label="Alternative more cost-effective"
+                  value={detail.alternative || "—"}
+                />
+              </>
+            ) : (
+              <>
+                <DetailField
+                  label="Activities / Programme / Event"
+                  value={detail.activity || "—"}
+                />
+                <DetailField
+                  label="Target months"
+                  value={formatTargetMonth(detail.targetMonths)}
+                />
+                <DetailField
+                  label="Objectives"
+                  value={detail.objective || "—"}
+                />
+                <DetailField
+                  label="Justifications"
+                  value={detail.justification}
+                />
+                <DetailField
+                  label="OPEX budget"
+                  value={formatRm(detail.amount)}
+                />
+              </>
             )}
-            {detail.costPerUnit != null && (
+            <DetailField label="Remarks" value={detail.remarks || "—"} />
+            {detail.status === "Rejected" && detail.rejectRemarks && (
               <DetailField
-                label="Cost per unit"
-                value={formatRm(detail.costPerUnit)}
+                label="Rejection remarks"
+                value={detail.rejectRemarks}
               />
             )}
-            {detail.effectIfNotApproved && (
-              <DetailField
-                label="Effect if not approved"
-                value={detail.effectIfNotApproved}
-              />
-            )}
-            {detail.alternative && (
-              <DetailField label="Alternative" value={detail.alternative} />
-            )}
-          </>
-        )}
-        {detail.remarks && (
-          <DetailField label="Remarks" value={detail.remarks} />
-        )}
-      </dl>
+          </dl>
+
+          {canEdit && (
+            <div className="mt-8 border-t border-foreground/10 pt-6">
+              <button
+                type="button"
+                onClick={startEdit}
+                className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory"
+              >
+                <ClipboardPen className="h-4 w-4" />
+                Edit form
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
+}
+
+const OPEX_CODES = [
+  {
+    value: "926-0000",
+    label: "926-0000 LEASE LINE FOR IT SYSTEM (926-000/23121)",
+  },
+  {
+    value: "916-0000",
+    label: "916-0000 EQUIP. RENTAL (916-000/24501) - Photocopy machine include SST 8%",
+  },
+  {
+    value: "999-1003",
+    label: "999-1003 PRINTING EXP-METER READING (999-1003/27101)",
+  },
+  {
+    value: "992-0000",
+    label: "992-0000 IT & AUDIO VISUAL - EXPENSES (992-000/27809)",
+  },
+  {
+    value: "923-0000",
+    label: "923-0000 IT & AUDIO-REPAIR & MAINTENANCE (923-000/28503)",
+  },
+] as const;
+
+const CAPEX_CODES = [
+  { value: "200-1100", label: "200-1100 : RENOVATION" },
+  { value: "200-1000", label: "200-1000 : OFFICE EQUIPMENT" },
+  { value: "200-0500", label: "200-0500 : IT & AUDIO VISUAL" },
+] as const;
+
+function formatTargetMonth(value: string | null) {
+  if (!value) return "—";
+  const [year, month] = value.split("-");
+  if (!year || !month) return value;
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+}
+
+function budgetCodeLabel(code: string, budgetType: "OPEX" | "CAPEX") {
+  const labels: Record<string, string> =
+    budgetType === "CAPEX"
+      ? {
+          "200-1100": "200-1100 : Renovation",
+          "200-1000": "200-1000 : Office equipment",
+          "200-0500": "200-0500 : IT & audio visual",
+        }
+      : {
+          "926-0000": "926-0000 Lease line for IT system",
+          "916-0000": "916-0000 Equip. rental",
+          "999-1003": "999-1003 Printing exp-meter reading",
+          "992-0000": "992-0000 IT & audio visual - expenses",
+          "923-0000": "923-0000 IT & audio-repair & maintenance",
+        };
+  return labels[code] ?? code;
 }
 
 function DetailField({ label, value }: { label: string; value: string }) {

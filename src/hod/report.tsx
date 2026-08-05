@@ -111,11 +111,17 @@ export function HodReportPage() {
   }, []);
 
   const opexRows = useMemo(
-    () => budgets.filter((row) => row.budgetType === "OPEX"),
+    () =>
+      budgets.filter(
+        (row) => row.budgetType === "OPEX" && row.status !== "Rejected",
+      ),
     [budgets],
   );
   const capexRows = useMemo(
-    () => budgets.filter((row) => row.budgetType === "CAPEX"),
+    () =>
+      budgets.filter(
+        (row) => row.budgetType === "CAPEX" && row.status !== "Rejected",
+      ),
     [budgets],
   );
 
