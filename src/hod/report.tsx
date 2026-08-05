@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  FileDown,
   Receipt,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { exportCapexExcel, exportOpexExcel } from "@/lib/report-excel";
 import { Sidebar } from "./sidebar";
 import {
   Select,
@@ -125,6 +127,19 @@ export function HodReportPage() {
     [budgets],
   );
 
+  const handleExport = async (type: "opex" | "capex") => {
+    try {
+      if (type === "opex") {
+        await exportOpexExcel(opexRows, Number(budgetYear));
+      } else {
+        await exportCapexExcel(capexRows, Number(budgetYear), CAPEX_CATEGORIES);
+      }
+      toast.success("Excel file downloaded.");
+    } catch {
+      toast.error("Could not export the file. Try again.");
+    }
+  };
+
   const opexTotal = opexRows.reduce((sum, row) => sum + row.amount, 0);
   const capexTotal = capexRows.reduce((sum, row) => sum + row.amount, 0);
   const requisitionTotal = requisitions.reduce(
@@ -190,9 +205,15 @@ export function HodReportPage() {
         <div className="mt-6 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
           {view === "opex" && (
             <>
-              <ReportSectionTitle>
-                Operating Expenditure {budgetYear} (OPEX)
-              </ReportSectionTitle>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <ReportSectionTitle>
+                  Operating Expenditure {budgetYear} (OPEX)
+                </ReportSectionTitle>
+                <ExportButton
+                  disabled={loadingBudgets || opexRows.length === 0}
+                  onClick={() => handleExport("opex")}
+                />
+              </div>
               {loadingBudgets ? (
                 <LoadingState message="Loading OPEX report…" />
               ) : opexRows.length === 0 ? (
@@ -205,9 +226,15 @@ export function HodReportPage() {
 
           {view === "capex" && (
             <>
-              <ReportSectionTitle>
-                Capital Expenditure {budgetYear} (CAPEX)
-              </ReportSectionTitle>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <ReportSectionTitle>
+                  Capital Expenditure {budgetYear} (CAPEX)
+                </ReportSectionTitle>
+                <ExportButton
+                  disabled={loadingBudgets || capexRows.length === 0}
+                  onClick={() => handleExport("capex")}
+                />
+              </div>
               {loadingBudgets ? (
                 <LoadingState message="Loading CAPEX report…" />
               ) : capexRows.length === 0 ? (
@@ -224,7 +251,9 @@ export function HodReportPage() {
 
           {view === "requisitions" && (
             <>
-              <ReportSectionTitle>Quotation Requisitions</ReportSectionTitle>
+              <div className="mb-4">
+                <ReportSectionTitle>Quotation Requisitions</ReportSectionTitle>
+              </div>
               {loadingRequisitions ? (
                 <LoadingState message="Loading requisitions…" />
               ) : requisitions.length === 0 ? (
@@ -305,9 +334,29 @@ function SummaryStat({
   );
 }
 
+function ExportButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-sm font-medium text-lime-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <FileDown className="h-4 w-4" />
+      Export to Excel
+    </button>
+  );
+}
+
 function ReportSectionTitle({ children }: { children: ReactNode }) {
   return (
-    <h2 className="mb-4 text-lg font-semibold tracking-normal text-foreground">
+    <h2 className="text-lg font-semibold tracking-normal text-foreground">
       {children}
     </h2>
   );

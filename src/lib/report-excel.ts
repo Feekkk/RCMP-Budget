@@ -1,0 +1,294 @@
+import ExcelJS from "exceljs";
+import type { HodBudgetDetail } from "@/lib/hod-budget-fns";
+
+const UNIVERSITY = "UNIVERSITI KUALA LUMPUR ROYAL COLLEGE OF MEDICINE PERAK (UniKL RCMP)";
+
+const thinBorder: Partial<ExcelJS.Borders> = {
+  top: { style: "thin" },
+  left: { style: "thin" },
+  bottom: { style: "thin" },
+  right: { style: "thin" },
+};
+
+function fill(color: string): ExcelJS.Fill {
+  return { type: "pattern", pattern: "solid", fgColor: { argb: color } };
+}
+
+function headerCell(cell: ExcelJS.Cell, color: string) {
+  cell.fill = fill(color);
+  cell.font = { bold: true, size: 9 };
+  cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+  cell.border = thinBorder;
+}
+
+function bodyCell(cell: ExcelJS.Cell) {
+  cell.font = { size: 9 };
+  cell.alignment = { vertical: "top", wrapText: true };
+  cell.border = thinBorder;
+}
+
+function formatMonthLabel(value: string | null) {
+  if (!value) return "";
+  const [year, month] = value.split("-");
+  if (!year || !month) return value;
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+}
+
+async function download(workbook: ExcelJS.Workbook, filename: string) {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function exportCapexExcel(
+  rows: HodBudgetDetail[],
+  year: number,
+  categories: Record<string, string>,
+) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("CAPEX", {
+    views: [{ showGridLines: false }],
+  });
+
+  sheet.columns = [
+    { width: 5 },
+    { width: 14 },
+    { width: 30 },
+    { width: 35 },
+    { width: 14 },
+    { width: 10 },
+    { width: 14 },
+    { width: 14 },
+    { width: 24 },
+    { width: 24 },
+    { width: 14 },
+  ];
+
+  sheet.getCell("A1").value = UNIVERSITY;
+  sheet.getCell("A1").font = { bold: true, size: 11 };
+  sheet.getCell("A2").value =
+    `BUDGET PROPOSED FOR CAPITAL EXPENDITURES (CAPEX) FOR YEAR ${year}`;
+  sheet.getCell("A2").font = { bold: true, size: 11 };
+
+  sheet.getCell("A4").value = "Department :";
+  sheet.getCell("A4").font = { bold: true, size: 10 };
+  sheet.getCell("B4").value = rows[0]?.department ?? "";
+  sheet.getCell("B4").font = { size: 10 };
+
+  sheet.mergeCells("F6:H6");
+  const budgetBanner = sheet.getCell("F6");
+  budgetBanner.value = `BUDGET ${year}`;
+  headerCell(budgetBanner, "FFFFC000");
+
+  const headers = [
+    "No",
+    "Code",
+    "Item",
+    "Justification",
+    "TARGET MONTH/S TO SPEND",
+    "Quantity",
+    "Estimated Cost p/unit",
+    "Estimated Price",
+    "Effect if Budget Not Approved",
+    "Alternative more cost effective alternative",
+    "Remarks",
+  ];
+  const headerColors = [
+    "FF92D050",
+    "FF92D050",
+    "FF92D050",
+    "FF92D050",
+    "FF92D050",
+    "FF92D050",
+    "FF92D050",
+    "FF92D050",
+    "FFDDEBF7",
+    "FFE4B5E8",
+    "FFF8CBAD",
+  ];
+  const headerRow = sheet.getRow(7);
+  headers.forEach((title, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = title;
+    headerCell(cell, headerColors[index]);
+  });
+  headerRow.height = 28;
+
+  let rowIndex = 8;
+  rows.forEach((row, index) => {
+    const excelRow = sheet.getRow(rowIndex);
+    const values = [
+      index + 1,
+      categories[row.code] || row.code,
+      row.itemName ?? "",
+      row.justification,
+      formatMonthLabel(row.targetMonths),
+      row.quantity ?? "",
+      row.costPerUnit ?? "",
+      row.amount,
+      row.effectIfNotApproved ?? "",
+      row.alternative ?? "",
+      row.remarks ?? "",
+    ];
+    values.forEach((value, colIndex) => {
+      const cell = excelRow.getCell(colIndex + 1);
+      cell.value = value;
+      bodyCell(cell);
+    });
+    excelRow.getCell(1).alignment = { horizontal: "center", vertical: "top" };
+    excelRow.getCell(6).alignment = { horizontal: "center", vertical: "top" };
+    excelRow.getCell(7).numFmt = "#,##0.00";
+    excelRow.getCell(8).numFmt = "#,##0.00";
+    rowIndex += 1;
+  });
+
+  const totalRow = sheet.getRow(rowIndex);
+  for (let col = 1; col <= 11; col += 1) {
+    totalRow.getCell(col).border = thinBorder;
+  }
+  totalRow.getCell(7).value = "TOTAL";
+  totalRow.getCell(7).font = { bold: true, size: 9 };
+  totalRow.getCell(7).alignment = { horizontal: "center", vertical: "middle" };
+  const totalCell = totalRow.getCell(8);
+  totalCell.value = rows.reduce((sum, row) => sum + row.amount, 0);
+  totalCell.numFmt = "#,##0.00";
+  totalCell.font = { bold: true, size: 9 };
+  totalCell.border = {
+    top: { style: "medium" },
+    left: { style: "medium" },
+    bottom: { style: "medium" },
+    right: { style: "medium" },
+  };
+
+  await download(workbook, `CAPEX_Budget_${year}.xlsx`);
+}
+
+export async function exportOpexExcel(rows: HodBudgetDetail[], year: number) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("OPEX", {
+    views: [{ showGridLines: false }],
+  });
+
+  sheet.columns = [
+    { width: 6 },
+    { width: 14 },
+    { width: 40 },
+    { width: 22 },
+    { width: 26 },
+    { width: 34 },
+    { width: 16 },
+    { width: 16 },
+  ];
+
+  sheet.mergeCells("A1:H1");
+  const titleCell = sheet.getCell("A1");
+  titleCell.value = UNIVERSITY;
+  titleCell.font = { bold: true, size: 11 };
+  titleCell.alignment = { horizontal: "center" };
+
+  sheet.mergeCells("A2:H2");
+  const subtitleCell = sheet.getCell("A2");
+  subtitleCell.value = `BUDGET PROPOSED FOR OPERATING EXPENDITURES (OPEX) FOR YEAR ${year}`;
+  subtitleCell.font = { bold: true, size: 11 };
+  subtitleCell.alignment = { horizontal: "center" };
+
+  sheet.getCell("A4").value = "Department :";
+  sheet.getCell("A4").font = { bold: true, size: 10 };
+  sheet.getCell("B4").value = rows[0]?.department ?? "";
+  sheet.getCell("B4").font = { bold: true, size: 10 };
+  sheet.getCell("B4").border = { bottom: { style: "thin" } };
+
+  const headers = [
+    "NO.",
+    "CODE (AutoCount)",
+    "ACTIVITIES / PROGRAMME / EVENT",
+    "TARGET MONTH/S TO SPEND",
+    "OBJECTIVES",
+    "JUSTIFICATIONS (CALCULATION)",
+    `OPEX BUDGET (RM)`,
+    "REMARKS",
+  ];
+  const headerRow = sheet.getRow(6);
+  headers.forEach((title, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = title;
+    headerCell(cell, "FFFFFFFF");
+  });
+  headerRow.height = 26;
+
+  const grouped = new Map<string, HodBudgetDetail[]>();
+  rows.forEach((row) => {
+    const list = grouped.get(row.code) ?? [];
+    list.push(row);
+    grouped.set(row.code, list);
+  });
+
+  let rowIndex = 7;
+  let itemNumber = 1;
+  grouped.forEach((groupRows, code) => {
+    let groupTotal = 0;
+    groupRows.forEach((row, index) => {
+      const excelRow = sheet.getRow(rowIndex);
+      const values = [
+        itemNumber,
+        index === 0 ? code : "",
+        row.activity ?? "",
+        formatMonthLabel(row.targetMonths),
+        row.objective ?? "",
+        row.justification,
+        row.amount,
+        row.remarks ?? "",
+      ];
+      values.forEach((value, colIndex) => {
+        const cell = excelRow.getCell(colIndex + 1);
+        cell.value = value;
+        bodyCell(cell);
+      });
+      excelRow.getCell(1).alignment = { horizontal: "center", vertical: "top" };
+      excelRow.getCell(7).numFmt = "#,##0.00";
+      groupTotal += row.amount;
+      itemNumber += 1;
+      rowIndex += 1;
+    });
+
+    const totalRow = sheet.getRow(rowIndex);
+    for (let col = 1; col <= 8; col += 1) {
+      const cell = totalRow.getCell(col);
+      cell.fill = fill("FFFFFF00");
+      cell.border = thinBorder;
+    }
+    const totalLabel = totalRow.getCell(6);
+    totalLabel.value = "Total";
+    totalLabel.font = { bold: true, size: 9 };
+    totalLabel.alignment = { horizontal: "right", vertical: "middle" };
+    const totalValue = totalRow.getCell(7);
+    totalValue.value = groupTotal;
+    totalValue.numFmt = "#,##0.00";
+    totalValue.font = { bold: true, size: 9 };
+    rowIndex += 1;
+  });
+
+  const grandRow = sheet.getRow(rowIndex);
+  const grandLabel = grandRow.getCell(6);
+  grandLabel.value = `TOTAL BUDGET PROPOSED (OPEX) FOR YEAR`;
+  grandLabel.font = { bold: true, size: 9 };
+  grandLabel.alignment = { horizontal: "right", vertical: "middle" };
+  const grandValue = grandRow.getCell(7);
+  grandValue.value = rows.reduce((sum, row) => sum + row.amount, 0);
+  grandValue.numFmt = "#,##0.00";
+  grandValue.font = { bold: true, size: 9 };
+  for (let col = 1; col <= 8; col += 1) {
+    grandRow.getCell(col).border = thinBorder;
+  }
+
+  await download(workbook, `OPEX_Budget_${year}.xlsx`);
+}
