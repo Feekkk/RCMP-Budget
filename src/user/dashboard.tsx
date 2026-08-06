@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Plus,
@@ -28,31 +28,10 @@ import {
   type QuotationListItem,
 } from "@/lib/quotation-fns";
 import { isYearlyBudgetFormEnabled } from "@/lib/settings-fns";
-
-const stats = [
-  {
-    label: "Department budget",
-    value: "RM 120,000",
-    hint: "FY 2026 Allocation",
-    icon: Wallet,
-    masked: true,
-    featured: true,
-  },
-  {
-    label: "Spent to date",
-    value: "RM 48,350",
-    hint: "40% of allocation",
-    icon: Receipt,
-    masked: true,
-    progress: 40,
-  },
-  {
-    label: "Pending approvals",
-    value: "3",
-    hint: "Awaiting HOD review",
-    icon: Hourglass,
-  },
-];
+import {
+  getUserDashboardStats,
+  type UserDashboardStats,
+} from "@/lib/user-dashboard-fns";
 
 type Status = QuotationListItem["status"];
 
@@ -90,6 +69,10 @@ export function UserDashboard() {
   const { revealed, toggle } = useAutoHideReveal();
   const [requisitions, setRequisitions] = useState<QuotationListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [dashboardStats, setDashboardStats] = useState<UserDashboardStats | null>(
+    null,
+  );
   const [budgetFormEnabled, setBudgetFormEnabled] = useState(true);
   const greetingLabel = timeGreeting();
   const todayLabel = formatToday();
@@ -118,6 +101,28 @@ export function UserDashboard() {
 
   useEffect(() => {
     let active = true;
+    getUserDashboardStats()
+      .then((data) => {
+        if (active) setDashboardStats(data);
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to load dashboard figures. Refresh the page to try again.",
+        );
+      })
+      .finally(() => {
+        if (active) setStatsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
     isYearlyBudgetFormEnabled()
       .then((enabled) => {
         if (active) setBudgetFormEnabled(enabled);
@@ -129,6 +134,56 @@ export function UserDashboard() {
       active = false;
     };
   }, []);
+
+  const spentPercent =
+    dashboardStats && dashboardStats.allocation > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (dashboardStats.approvedSpent / dashboardStats.allocation) * 100,
+          ),
+        )
+      : 0;
+
+  const stats = useMemo(
+    () => [
+      {
+        label: "Department budget",
+        value: statsLoading
+          ? "…"
+          : formatRm(dashboardStats?.allocation ?? 0),
+        hint: statsLoading
+          ? "Loading…"
+          : `FY ${dashboardStats?.budgetYear ?? new Date().getFullYear()} Allocation`,
+        icon: Wallet,
+        masked: true,
+        featured: true,
+      },
+      {
+        label: "Spent to date",
+        value: statsLoading
+          ? "…"
+          : formatRm(dashboardStats?.approvedSpent ?? 0),
+        hint: statsLoading
+          ? "Loading…"
+          : dashboardStats && dashboardStats.allocation > 0
+            ? `${spentPercent}% of allocation`
+            : "Approved OPEX + CAPEX",
+        icon: Receipt,
+        masked: true,
+        progress: spentPercent,
+      },
+      {
+        label: "Pending approvals",
+        value: statsLoading
+          ? "…"
+          : String(dashboardStats?.pendingCount ?? 0),
+        hint: "Awaiting HOD review",
+        icon: Hourglass,
+      },
+    ],
+    [dashboardStats, spentPercent, statsLoading],
+  );
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-ivory text-foreground md:flex-row">
