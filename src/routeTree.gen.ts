@@ -19,6 +19,7 @@ import { Route as CeoIndexRouteImport } from './routes/ceo/index'
 import { Route as UserQuotationRouteImport } from './routes/user/quotation'
 import { Route as UserProfileRouteImport } from './routes/user/profile'
 import { Route as UserHistoryRouteImport } from './routes/user/history'
+import { Route as UserDepartmentRouteImport } from './routes/user/department'
 import { Route as UserCalendarRouteImport } from './routes/user/calendar'
 import { Route as UserBudgetRouteImport } from './routes/user/budget'
 import { Route as ProcumentSettingsRouteImport } from './routes/procument/settings'
@@ -80,6 +81,11 @@ const UserProfileRoute = UserProfileRouteImport.update({
 const UserHistoryRoute = UserHistoryRouteImport.update({
   id: '/user/history',
   path: '/user/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserDepartmentRoute = UserDepartmentRouteImport.update({
+  id: '/user/department',
+  path: '/user/department',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserCalendarRoute = UserCalendarRouteImport.update({
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/procument/settings': typeof ProcumentSettingsRoute
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
+  '/user/department': typeof UserDepartmentRoute
   '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/procument/settings': typeof ProcumentSettingsRoute
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
+  '/user/department': typeof UserDepartmentRoute
   '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/procument/settings': typeof ProcumentSettingsRoute
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
+  '/user/department': typeof UserDepartmentRoute
   '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/procument/settings'
     | '/user/budget'
     | '/user/calendar'
+    | '/user/department'
     | '/user/history'
     | '/user/profile'
     | '/user/quotation'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/procument/settings'
     | '/user/budget'
     | '/user/calendar'
+    | '/user/department'
     | '/user/history'
     | '/user/profile'
     | '/user/quotation'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/procument/settings'
     | '/user/budget'
     | '/user/calendar'
+    | '/user/department'
     | '/user/history'
     | '/user/profile'
     | '/user/quotation'
@@ -305,6 +317,7 @@ export interface RootRouteChildren {
   ProcumentSettingsRoute: typeof ProcumentSettingsRoute
   UserBudgetRoute: typeof UserBudgetRoute
   UserCalendarRoute: typeof UserCalendarRoute
+  UserDepartmentRoute: typeof UserDepartmentRoute
   UserHistoryRoute: typeof UserHistoryRoute
   UserProfileRoute: typeof UserProfileRoute
   UserQuotationRoute: typeof UserQuotationRoute
@@ -386,6 +399,13 @@ declare module '@tanstack/react-router' {
       path: '/user/history'
       fullPath: '/user/history'
       preLoaderRoute: typeof UserHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user/department': {
+      id: '/user/department'
+      path: '/user/department'
+      fullPath: '/user/department'
+      preLoaderRoute: typeof UserDepartmentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/user/calendar': {
@@ -489,6 +509,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProcumentSettingsRoute: ProcumentSettingsRoute,
   UserBudgetRoute: UserBudgetRoute,
   UserCalendarRoute: UserCalendarRoute,
+  UserDepartmentRoute: UserDepartmentRoute,
   UserHistoryRoute: UserHistoryRoute,
   UserProfileRoute: UserProfileRoute,
   UserQuotationRoute: UserQuotationRoute,

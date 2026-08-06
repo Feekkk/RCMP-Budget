@@ -6,6 +6,7 @@ import {
   Calendar,
   LogOut,
   Menu,
+  Building2,
   type LucideIcon,
   User,
 } from "lucide-react";
@@ -24,8 +25,9 @@ import {
 
 const items: { label: string; icon: LucideIcon; to?: LinkProps["to"] }[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/user" },
-  { label: "History", icon: FileText, to: "/user/history" },
+  { label: "My Department", icon: Building2, to: "/user/department" },
   { label: "Calendar", icon: Calendar, to: "/user/calendar" },
+  { label: "History", icon: FileText, to: "/user/history" },
   { label: "Account", icon: User, to: "/user/profile" },
 ];
 
