@@ -27,15 +27,25 @@ import {
   listMyQuotations,
   type QuotationListItem,
 } from "@/lib/quotation-fns";
+import { listMyBudgets, type BudgetListItem } from "@/lib/budget-fns";
 import { isYearlyBudgetFormEnabled } from "@/lib/settings-fns";
 import {
   getUserDashboardStats,
   type UserDashboardStats,
 } from "@/lib/user-dashboard-fns";
 
-type Status = QuotationListItem["status"];
+type ActivityStatus = "Pending" | "Approved" | "Rejected";
 
-const statusConfig: Record<Status, { icon: LucideIcon; tone: string }> = {
+type RecentActivity = {
+  key: string;
+  title: string;
+  ref: string;
+  amount: number;
+  status: ActivityStatus;
+  createdAt: string;
+};
+
+const statusConfig: Record<ActivityStatus, { icon: LucideIcon; tone: string }> = {
   Pending: { icon: Clock, tone: "text-amber-600 bg-amber-100" },
   Approved: { icon: CheckCircle2, tone: "text-emerald-700 bg-emerald-100" },
   Rejected: { icon: XCircle, tone: "text-red-600 bg-red-100" },
@@ -67,7 +77,7 @@ function formatToday(date = new Date()) {
 export function UserDashboard() {
   const navigate = useNavigate();
   const { revealed, toggle } = useAutoHideReveal();
-  const [requisitions, setRequisitions] = useState<QuotationListItem[]>([]);
+  const [activities, setActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [dashboardStats, setDashboardStats] = useState<UserDashboardStats | null>(
@@ -79,16 +89,40 @@ export function UserDashboard() {
 
   useEffect(() => {
     let active = true;
-    listMyQuotations()
-      .then((rows) => {
-        if (active) setRequisitions(rows.slice(0, 3));
+    Promise.all([listMyQuotations(), listMyBudgets()])
+      .then(([quotations, budgets]: [QuotationListItem[], BudgetListItem[]]) => {
+        if (!active) return;
+        const merged: RecentActivity[] = [
+          ...quotations.map((row) => ({
+            key: `qt-${row.id}`,
+            title: row.title,
+            ref: `QT-${row.id}`,
+            amount: row.amount,
+            status: row.status,
+            createdAt: row.createdAt,
+          })),
+          ...budgets.map((row) => ({
+            key: `yb-${row.id}`,
+            title: row.title,
+            ref: `YB-${row.id} · ${row.budgetType}`,
+            amount: row.amount,
+            status: row.status,
+            createdAt: row.createdAt,
+          })),
+        ]
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          )
+          .slice(0, 3);
+        setActivities(merged);
       })
       .catch((error) => {
         if (!active) return;
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to load recent requisitions. Refresh the page to try again.",
+            : "Failed to load recent activities. Refresh the page to try again.",
         );
       })
       .finally(() => {
@@ -317,7 +351,7 @@ export function UserDashboard() {
 
         <div className="mt-8 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-2xl">Recent requisitions</h2>
+            <h2 className="font-display text-2xl">Recent Activities</h2>
             <Link
               to="/user/history"
               className="inline-flex items-center gap-1 text-sm text-foreground/60 transition hover:text-foreground"
@@ -329,34 +363,34 @@ export function UserDashboard() {
 
           {loading ? (
             <p className="mt-6 text-sm text-foreground/50">
-              Loading recent requisitions…
+              Loading recent activities…
             </p>
-          ) : requisitions.length === 0 ? (
+          ) : activities.length === 0 ? (
             <p className="mt-6 text-sm text-foreground/50">
-              No requisitions yet.
+              No activities yet.
             </p>
           ) : (
             <ul className="mt-6 divide-y divide-foreground/10">
-              {requisitions.map((req) => {
-                const { icon: Icon, tone } = statusConfig[req.status];
+              {activities.map((item) => {
+                const { icon: Icon, tone } = statusConfig[item.status];
                 return (
                   <li
-                    key={req.id}
+                    key={item.key}
                     className="flex items-center justify-between gap-4 py-4"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{req.title}</p>
-                      <p className="text-xs text-foreground/50">QT-{req.id}</p>
+                      <p className="truncate text-sm font-medium">{item.title}</p>
+                      <p className="text-xs text-foreground/50">{item.ref}</p>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-sm font-medium">
-                        {formatRm(req.amount)}
+                        {formatRm(item.amount)}
                       </span>
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
                       >
                         <Icon className="h-3.5 w-3.5" />
-                        {req.status}
+                        {item.status}
                       </span>
                     </div>
                   </li>
