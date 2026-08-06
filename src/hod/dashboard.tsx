@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Wallet,
@@ -17,27 +17,120 @@ import {
   listHodQuotations,
   type HodQuotationListItem,
 } from "@/lib/hod-quotation-fns";
-
-const flows = [
-  {
-    label: "CAPEX",
-    hint: "Capital expenditure",
-    incoming: "RM 2,000.00",
-    outgoing: "RM 28,350.00",
-  },
-  {
-    label: "OPEX",
-    hint: "Operating expenditure",
-    incoming: "RM 3,500.00",
-    outgoing: "RM 20,000.00",
-  },
-];
+import {
+  getHodFinanceOverview,
+  recordFinanceEntry,
+  type AccountType,
+  type FinanceOverview,
+} from "@/lib/finance-account-fns";
 
 function formatRm(value: number) {
   return `RM ${value.toLocaleString("en-MY", {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function timeGreeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function formatToday(date = new Date()) {
+  return date.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function AdjustBudgetToast({
+  toastId,
+  accountType,
+  onSaved,
+}: {
+  toastId: string | number;
+  accountType: AccountType;
+  onSaved: (overview: FinanceOverview) => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (entryType: "IN" | "OUT") => {
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+      toast.error("Enter an amount above zero to continue.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const overview = await recordFinanceEntry({
+        data: { accountType, entryType, amount: value },
+      });
+      onSaved(overview);
+      toast.dismiss(toastId);
+      toast.success(
+        `${formatRm(value)} ${entryType === "IN" ? "credited to" : "debited from"} ${accountType}.`,
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not update the budget. Please try again.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="w-80 rounded-2xl bg-background p-4 shadow-card">
+      <p className="text-sm font-medium">Adjust {accountType} budget</p>
+      <p className="mt-0.5 text-xs text-foreground/50">
+        Credit adds money in, debit records spending.
+      </p>
+      <input
+        autoFocus
+        type="number"
+        min="0.01"
+        step="0.01"
+        inputMode="decimal"
+        placeholder="Amount (RM)"
+        value={amount}
+        onChange={(event) => setAmount(event.target.value)}
+        className="mt-3 w-full rounded-xl border border-foreground/10 bg-ivory px-3 py-2 text-sm tabular-nums outline-none focus:border-foreground/30"
+      />
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => submit("IN")}
+          className="flex-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
+        >
+          Credit
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => submit("OUT")}
+          className="flex-1 rounded-xl bg-red-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+        >
+          Debit
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => toast.dismiss(toastId)}
+          className="rounded-xl px-3 py-2 text-xs text-foreground/60 transition hover:bg-ivory"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function HodDashboard() {
@@ -45,6 +138,9 @@ export function HodDashboard() {
   const [pending, setPending] = useState<HodQuotationListItem[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [overview, setOverview] = useState<FinanceOverview | null>(null);
+  const greetingLabel = timeGreeting();
+  const todayLabel = formatToday();
 
   useEffect(() => {
     let active = true;
@@ -66,28 +162,65 @@ export function HodDashboard() {
       .finally(() => {
         if (active) setLoading(false);
       });
+
+    getHodFinanceOverview()
+      .then((data) => {
+        if (active) setOverview(data);
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to load the department budget.",
+        );
+      });
+
     return () => {
       active = false;
     };
   }, []);
 
+  const openAdjustToast = useCallback((accountType: AccountType) => {
+    toast.custom(
+      (toastId) => (
+        <AdjustBudgetToast
+          toastId={toastId}
+          accountType={accountType}
+          onSaved={setOverview}
+        />
+      ),
+      { duration: Infinity },
+    );
+  }, []);
+
+  const spentPercent =
+    overview && overview.totalAllocation > 0
+      ? Math.min(
+          100,
+          Math.round((overview.totalSpent / overview.totalAllocation) * 100),
+        )
+      : 0;
+
   const stats = useMemo(
     () => [
       {
         label: "Department budget",
-        value: "RM 120,000",
-        hint: "FY 2026 allocation",
+        value: overview ? formatRm(overview.totalBalance) : "…",
+        hint: overview
+          ? `FY ${overview.budgetYear} allocation ${formatRm(overview.totalAllocation)}`
+          : "Loading…",
         icon: Wallet,
         masked: true,
         featured: true,
       },
       {
         label: "Spent to date",
-        value: "RM 48,350",
-        hint: "40% of allocation",
+        value: overview ? formatRm(overview.totalSpent) : "…",
+        hint: `${spentPercent}% of allocation`,
         icon: Receipt,
         masked: true,
-        progress: 40,
+        progress: spentPercent,
       },
       {
         label: "Awaiting your review",
@@ -96,7 +229,26 @@ export function HodDashboard() {
         icon: Hourglass,
       },
     ],
-    [loading, pendingCount],
+    [loading, pendingCount, overview, spentPercent],
+  );
+
+  const flows = useMemo(
+    () =>
+      (["CAPEX", "OPEX"] as const).map((accountType) => {
+        const account = overview?.accounts.find(
+          (item) => item.accountType === accountType,
+        );
+        return {
+          accountType,
+          hint:
+            accountType === "CAPEX"
+              ? "Capital expenditure"
+              : "Operating expenditure",
+          incoming: account ? formatRm(account.credited) : "…",
+          outgoing: account ? formatRm(account.debited) : "…",
+        };
+      }),
+    [overview],
   );
 
   return (
@@ -105,10 +257,8 @@ export function HodDashboard() {
 
       <main className="flex-1 overflow-y-auto p-8 md:p-12">
         <div>
-          <h1 className="font-display text-4xl">Good morning, Tun Hazman</h1>
-          <p className="mt-2 text-sm text-foreground/60">
-            Here's an overview of your department's spending and pending approvals.
-          </p>
+          <h1 className="font-display text-4xl">{greetingLabel}</h1>
+          <p className="mt-2 text-sm text-foreground/60">{todayLabel}</p>
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -154,7 +304,10 @@ export function HodDashboard() {
                     {masked && (
                       <button
                         type="button"
-                        onClick={() => toggle(label)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggle(label);
+                        }}
                         aria-label={isRevealed ? `Hide ${label}` : `Show ${label}`}
                         className={cn(
                           "relative flex h-9 w-9 items-center justify-center rounded-full transition",
@@ -199,14 +352,25 @@ export function HodDashboard() {
         </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {flows.map(({ label, hint, incoming, outgoing }) => (
+          {flows.map(({ accountType, hint, incoming, outgoing }) => (
             <div
-              key={label}
-              className="group relative overflow-hidden rounded-[1.5rem] bg-background p-5 shadow-card transition hover:-translate-y-0.5"
+              key={accountType}
+              role="button"
+              tabIndex={0}
+              onClick={() => openAdjustToast(accountType)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") openAdjustToast(accountType);
+              }}
+              className="group relative cursor-pointer overflow-hidden rounded-[1.5rem] bg-background p-5 shadow-card transition hover:-translate-y-0.5"
             >
-              <div>
-                <p className="text-sm font-medium">{label}</p>
-                <p className="text-xs text-foreground/50">{hint}</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{accountType}</p>
+                  <p className="text-xs text-foreground/50">{hint}</p>
+                </div>
+                <span className="rounded-full bg-ivory px-3 py-1 text-xs text-foreground/50 opacity-0 transition group-hover:opacity-100">
+                  Click to credit / debit
+                </span>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-4">
                 <div>

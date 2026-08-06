@@ -356,7 +356,7 @@ function ExportButton({
 
 function ReportSectionTitle({ children }: { children: ReactNode }) {
   return (
-    <h2 className="text-lg font-semibold tracking-normal text-foreground">
+    <h2 className="font-display text-lg tracking-normal text-foreground">
       {children}
     </h2>
   );

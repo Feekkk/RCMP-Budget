@@ -463,8 +463,11 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
       throw new Error("Budget not found. Refresh the page and try again.");
     }
 
-    if (mapBudgetStatus(row.status_name) !== "Rejected") {
-      throw new Error("Only rejected budgets can be edited and resubmitted.");
+    const status = mapBudgetStatus(row.status_name);
+    if (status !== "Pending" && status !== "Rejected") {
+      throw new Error(
+        "Only pending or rejected budgets can be edited. Refresh and try again.",
+      );
     }
 
     if (

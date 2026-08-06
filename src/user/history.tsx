@@ -889,7 +889,11 @@ function BudgetDetailCard({
 }) {
   const { icon: StatusIcon, tone } = statusConfig[detail.status];
   const isCapex = detail.budgetType === "CAPEX";
-  const canEdit = detail.status === "Rejected" && detail.isMine && formEnabled;
+  const canEdit =
+    (detail.status === "Pending" || detail.status === "Rejected") &&
+    detail.isMine &&
+    formEnabled;
+  const isResubmit = detail.status === "Rejected";
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [code, setCode] = useState(detail.code);
@@ -963,7 +967,11 @@ function BudgetDetailCard({
     }
 
     setSaving(true);
-    const toastId = toast.loading(`Resubmitting YB-${detail.id}…`);
+    const toastId = toast.loading(
+      isResubmit
+        ? `Resubmitting YB-${detail.id}…`
+        : `Saving YB-${detail.id}…`,
+    );
     try {
       const updated = isCapex
         ? await resubmitYearlyBudget({
@@ -997,15 +1005,22 @@ function BudgetDetailCard({
           });
       onResubmitted(updated);
       setEditing(false);
-      toast.success(`YB-${detail.id} resubmitted`, {
-        id: toastId,
-        description: "It is pending HOD review again.",
-      });
+      toast.success(
+        isResubmit
+          ? `YB-${detail.id} resubmitted`
+          : `YB-${detail.id} updated`,
+        {
+          id: toastId,
+          description: isResubmit
+            ? "It is pending HOD review again."
+            : "Still waiting for HOD review.",
+        },
+      );
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Could not resubmit this budget. Try again.",
+          : "Could not save this budget. Try again.",
         { id: toastId },
       );
     } finally {
@@ -1243,7 +1258,13 @@ function BudgetDetailCard({
               disabled={saving}
               className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
             >
-              {saving ? "Resubmitting…" : "Resubmit"}
+              {saving
+                ? isResubmit
+                  ? "Resubmitting…"
+                  : "Saving…"
+                : isResubmit
+                  ? "Resubmit"
+                  : "Save changes"}
             </button>
             <button
               type="button"
@@ -1338,7 +1359,9 @@ function BudgetDetailCard({
             )}
           </dl>
 
-          {detail.status === "Rejected" && detail.isMine && !formEnabled && (
+          {(detail.status === "Pending" || detail.status === "Rejected") &&
+            detail.isMine &&
+            !formEnabled && (
             <div className="mt-8 border-t border-foreground/10 pt-6">
               <p className="text-sm text-foreground/50">
                 Yearly budget submissions are closed. You can edit this again
