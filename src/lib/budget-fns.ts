@@ -239,7 +239,7 @@ export const submitYearlyBudget = createServerFn({ method: "POST" })
     }
   });
 
-export const listDepartmentBudgets = createServerFn({ method: "GET" }).handler(
+export const listMyBudgets = createServerFn({ method: "GET" }).handler(
   async (): Promise<BudgetListItem[]> => {
     const session = await useSession<SessionUser>(sessionConfig());
     const user = session.data.user;
@@ -266,14 +266,8 @@ export const listDepartmentBudgets = createServerFn({ method: "GET" }).handler(
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
        WHERE yb.created_by = ?
-          OR (
-            u.department IS NOT NULL
-            AND u.department = (
-              SELECT department FROM users WHERE user_id = ? LIMIT 1
-            )
-          )
        ORDER BY yb.created_at DESC, yb.budget_id DESC`,
-      [user.userId, user.userId],
+      [user.userId],
     );
 
     return rows.map((row) => {
@@ -290,13 +284,13 @@ export const listDepartmentBudgets = createServerFn({ method: "GET" }).handler(
         status: mapBudgetStatus(row.status_name),
         statusName: row.status_name,
         createdByEmail: row.email,
-        isMine: row.created_by === user.userId,
+        isMine: true,
       };
     });
   },
 );
 
-export const getDepartmentBudget = createServerFn({ method: "GET" })
+export const getMyBudget = createServerFn({ method: "GET" })
   .validator(z.object({ budgetId: z.number().int().positive() }))
   .handler(async ({ data }): Promise<BudgetDetail> => {
     const session = await useSession<SessionUser>(sessionConfig());
@@ -333,17 +327,9 @@ export const getDepartmentBudget = createServerFn({ method: "GET" })
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
        WHERE yb.budget_id = ?
-         AND (
-           yb.created_by = ?
-           OR (
-             u.department IS NOT NULL
-             AND u.department = (
-               SELECT department FROM users WHERE user_id = ? LIMIT 1
-             )
-           )
-         )
+         AND yb.created_by = ?
        LIMIT 1`,
-      [data.budgetId, user.userId, user.userId],
+      [data.budgetId, user.userId],
     );
 
     const row = rows[0];
@@ -375,7 +361,7 @@ export const getDepartmentBudget = createServerFn({ method: "GET" })
       statusName: row.status_name,
       createdByEmail: row.email,
       department: row.department,
-      isMine: row.created_by === user.userId,
+      isMine: true,
     };
   });
 

@@ -4,6 +4,7 @@ export type RoleName = "User" | "HOD" | "Finance" | "Procument" | "CEO";
 
 export type AuthUser = {
   userId: number;
+  staffId: number | null;
   email: string;
   department: string | null;
   designation: string | null;

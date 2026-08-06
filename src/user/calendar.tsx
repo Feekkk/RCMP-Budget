@@ -5,35 +5,30 @@ import { ChevronLeft, ChevronRight, Clock, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Sidebar } from "./sidebar";
 import {
-  listMyQuotations,
-  type QuotationListItem,
-} from "@/lib/quotation-fns";
+  listDepartmentCalendarEvents,
+  type DepartmentCalendarEvent,
+} from "@/lib/calendar-fns";
 
 type CalendarEvent = {
-  id: number;
+  id: string;
   date: Date;
   title: string;
   time: string;
   detail: string;
-  status: QuotationListItem["status"];
+  status: DepartmentCalendarEvent["status"];
+  kind: DepartmentCalendarEvent["kind"];
 };
 
-function formatRm(value: number) {
-  return `RM ${value.toLocaleString("en-MY", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function toEvent(row: QuotationListItem): CalendarEvent {
+function toEvent(row: DepartmentCalendarEvent): CalendarEvent {
   const date = new Date(row.createdAt);
   return {
     id: row.id,
     date,
-    title: `QT-${row.id} · ${row.title}`,
+    title: row.title,
     time: format(date, "h:mm a"),
-    detail: `${row.status} · ${formatRm(row.amount)} · ${row.itemCount} item${row.itemCount === 1 ? "" : "s"}`,
+    detail: row.detail,
     status: row.status,
+    kind: row.kind,
   };
 }
 
@@ -44,7 +39,7 @@ export function CalendarPage() {
 
   useEffect(() => {
     let active = true;
-    listMyQuotations()
+    listDepartmentCalendarEvents()
       .then((rows) => {
         if (!active) return;
         setEvents(rows.map(toEvent));
@@ -52,7 +47,9 @@ export function CalendarPage() {
       .catch((error) => {
         if (!active) return;
         toast.error(
-          error instanceof Error ? error.message : "Failed to load calendar. Please try again later.",
+          error instanceof Error
+            ? error.message
+            : "Could not load the calendar. Refresh and try again.",
         );
       })
       .finally(() => {
@@ -68,7 +65,7 @@ export function CalendarPage() {
     [events, date],
   );
 
-  const recentEvents = useMemo(() => events.slice(0, 6), [events]);
+  const recentEvents = useMemo(() => events.slice(0, 8), [events]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-ivory text-foreground md:flex-row">
@@ -76,9 +73,9 @@ export function CalendarPage() {
 
       <main className="flex-1 overflow-y-auto p-6 md:p-12">
         <div>
-          <h1 className="font-display text-4xl">Department Calendar</h1>
+          <h1 className="font-display text-4xl">Calendar</h1>
           <p className="mt-2 text-sm text-foreground/60">
-            Track quotation submissions and approval status by date made by whole department.
+            Department quotations and yearly budgets by date.
           </p>
         </div>
 
@@ -86,7 +83,7 @@ export function CalendarPage() {
           <div className="rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
             {loading ? (
               <p className="py-16 text-center text-sm text-foreground/50">
-                Loading calendar
+                Loading calendar…
               </p>
             ) : (
               <Calendar
@@ -121,7 +118,7 @@ export function CalendarPage() {
               ) : dayEvents.length === 0 ? (
                 <div className="mt-6 rounded-xl border border-dashed border-foreground/15 py-10 text-center">
                   <p className="text-sm text-foreground/50">
-                    No quotations on this day.
+                    No department activity on this day.
                   </p>
                 </div>
               ) : (
@@ -132,10 +129,15 @@ export function CalendarPage() {
                       <p className="mt-1 text-xs text-foreground/50">
                         {event.detail}
                       </p>
-                      <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-lime px-2.5 py-1 text-xs font-medium text-lime-foreground">
-                        <Clock className="h-3 w-3" />
-                        {event.time}
-                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-lime px-2.5 py-1 text-xs font-medium text-lime-foreground">
+                          <Clock className="h-3 w-3" />
+                          {event.time}
+                        </span>
+                        <span className="rounded-full bg-foreground/5 px-2.5 py-1 text-xs font-medium text-foreground/60">
+                          {event.kind === "quotation" ? "Quotation" : "Budget"}
+                        </span>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -153,7 +155,7 @@ export function CalendarPage() {
                 <p className="mt-4 text-sm text-foreground/50">Loading…</p>
               ) : recentEvents.length === 0 ? (
                 <p className="mt-4 text-sm text-foreground/50">
-                  No quotations yet.
+                  No department quotations or budgets yet.
                 </p>
               ) : (
                 <ul className="mt-4 space-y-1">

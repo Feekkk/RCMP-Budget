@@ -7,8 +7,7 @@ export const Route = createFileRoute("/user/profile")({
       { title: "Account — Budget Tracker" },
       {
         name: "description",
-        content:
-          "Manage your personal details used on requisitions and purchase documents.",
+        content: "View your staff profile used across Budget Tracker.",
       },
     ],
   }),

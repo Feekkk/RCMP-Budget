@@ -7,7 +7,7 @@ export const Route = createFileRoute("/user/calendar")({
       { title: "Calendar — Budget Tracker" },
       {
         name: "description",
-        content: "Track deadlines, reviews, and approval milestones for your department.",
+        content: "Track department quotations and yearly budgets by date.",
       },
     ],
   }),

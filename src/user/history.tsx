@@ -40,8 +40,8 @@ import {
   type QuotationListItem,
 } from "@/lib/quotation-fns";
 import {
-  getDepartmentBudget,
-  listDepartmentBudgets,
+  getMyBudget,
+  listMyBudgets,
   resubmitYearlyBudget,
   type BudgetDetail,
   type BudgetListItem,
@@ -130,7 +130,7 @@ export function HistoryPage() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([listMyQuotations(), listDepartmentBudgets()])
+    Promise.all([listMyQuotations(), listMyBudgets()])
       .then(([quotationRows, budgetRows]) => {
         if (!active) return;
         setQuotations(quotationRows);
@@ -190,7 +190,7 @@ export function HistoryPage() {
 
     let active = true;
     setDetailLoading(true);
-    getDepartmentBudget({ data: { budgetId: selectedBudgetId } })
+    getMyBudget({ data: { budgetId: selectedBudgetId } })
       .then((row) => {
         if (active) setBudgetDetail(row);
       })
@@ -306,7 +306,7 @@ export function HistoryPage() {
           <div>
             <h1 className="font-display text-4xl">History</h1>
             <p className="mt-2 text-sm text-foreground/60">
-              Track your quotations and department yearly budgets in one place.
+              Track your quotations and yearly budgets in one place.
             </p>
           </div>
           <DropdownMenu>
@@ -476,12 +476,12 @@ export function HistoryPage() {
 
             <TabsContent value="budgets" className="mt-4">
               {loading ? (
-                <EmptyState message="Loading department budgets…" />
+                <EmptyState message="Loading your budgets…" />
               ) : visibleBudgets.length === 0 ? (
                 <EmptyState
                   message={
                     budgets.length === 0
-                      ? "No department budgets yet. Submit a yearly budget request."
+                      ? "No budgets yet. Submit a yearly budget request."
                       : "No budgets match your filters."
                   }
                 />

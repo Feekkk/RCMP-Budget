@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, type LinkProps } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, type LinkProps } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   FileText,
@@ -9,8 +9,11 @@ import {
   type LucideIcon,
   User,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Wordmark } from "@/components/landing/Nav";
 import { cn } from "@/lib/utils";
+import { getCurrentUser, logout } from "@/lib/auth-fns";
+import type { AuthUser } from "@/lib/auth";
 import {
   Sheet,
   SheetContent,
@@ -30,7 +33,36 @@ const itemClass =
   "inline-flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition";
 const inactiveClass = "text-foreground/60 hover:bg-ivory hover:text-foreground";
 
-function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarNav({
+  user,
+  onNavigate,
+}: {
+  user: AuthUser | null;
+  onNavigate?: () => void;
+}) {
+  const navigate = useNavigate();
+  const initial =
+    user?.email?.trim()?.charAt(0)?.toUpperCase() ||
+    user?.roleName?.charAt(0) ||
+    "?";
+  const subtitle = [
+    user?.roleName,
+    user?.designation || user?.department,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const onLogout = async () => {
+    onNavigate?.();
+    try {
+      await logout();
+    } catch {
+      toast.error("Could not sign out. Please try again.");
+      return;
+    }
+    await navigate({ to: "/login" });
+  };
+
   return (
     <>
       <Wordmark />
@@ -67,21 +99,25 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       <div className="border-t border-foreground/10 pt-4">
         <div className="flex items-center gap-3 px-2">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-lime font-display text-base text-lime-foreground">
-            A
+            {initial}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">Afiq Danial</p>
-            <p className="truncate text-xs text-foreground/50">User · Technical 2</p>
+            <p className="truncate text-sm font-medium">
+              {user?.email ?? "Signed out"}
+            </p>
+            <p className="truncate text-xs text-foreground/50">
+              {subtitle || "—"}
+            </p>
           </div>
-          <Link
-            to="/login"
+          <button
+            type="button"
             aria-label="Log out"
             title="Log out"
-            onClick={onNavigate}
+            onClick={() => void onLogout()}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground/60 transition hover:bg-ivory hover:text-foreground"
           >
             <LogOut className="h-4 w-4" />
-          </Link>
+          </button>
         </div>
       </div>
     </>
@@ -90,6 +126,21 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
 export function Sidebar() {
   const [open, setOpen] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getCurrentUser()
+      .then((row) => {
+        if (active) setUser(row);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <>
@@ -112,13 +163,13 @@ export function Sidebar() {
             <SheetDescription>Main navigation menu</SheetDescription>
           </SheetHeader>
           <div className="flex h-full flex-col">
-            <SidebarNav onNavigate={() => setOpen(false)} />
+            <SidebarNav user={user} onNavigate={() => setOpen(false)} />
           </div>
         </SheetContent>
       </Sheet>
 
       <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-foreground/10 bg-background p-6 md:flex">
-        <SidebarNav />
+        <SidebarNav user={user} />
       </aside>
     </>
   );

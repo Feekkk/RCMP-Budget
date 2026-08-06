@@ -9,6 +9,7 @@ type SessionUser = {
 
 type UserRow = {
   user_id: number;
+  staff_id: number | null;
   email: string;
   password_hash: string;
   department: string | null;
@@ -31,6 +32,18 @@ async function getAuthSession() {
   return useSession<SessionUser>(sessionConfig());
 }
 
+function toAuthUser(row: Omit<UserRow, "password_hash">): AuthUser {
+  return {
+    userId: row.user_id,
+    staffId: row.staff_id,
+    email: row.email,
+    department: row.department,
+    designation: row.designation,
+    roleId: row.role_id,
+    roleName: row.role_name as RoleName,
+  };
+}
+
 export const login = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const parsed = z
@@ -49,7 +62,7 @@ export const login = createServerFn({ method: "POST" })
     const bcrypt = await import("bcrypt");
 
     const rows = await query<UserRow[]>(
-      `SELECT u.user_id, u.email, u.password_hash, u.department, u.designation, u.role_id, r.role_name
+      `SELECT u.user_id, u.staff_id, u.email, u.password_hash, u.department, u.designation, u.role_id, r.role_name
        FROM users u
        INNER JOIN roles r ON r.role_id = u.role_id
        WHERE u.staff_id = ?
@@ -67,14 +80,7 @@ export const login = createServerFn({ method: "POST" })
       throw new Error("Staff ID or password is wrong. Check and try again.");
     }
 
-    const user: AuthUser = {
-      userId: row.user_id,
-      email: row.email,
-      department: row.department,
-      designation: row.designation,
-      roleId: row.role_id,
-      roleName: row.role_name as RoleName,
-    };
+    const user = toAuthUser(row);
 
     await query("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = ?", [
       user.userId,
@@ -89,7 +95,30 @@ export const login = createServerFn({ method: "POST" })
 export const getCurrentUser = createServerFn({ method: "GET" }).handler(
   async (): Promise<AuthUser | null> => {
     const session = await getAuthSession();
-    return session.data.user ?? null;
+    const current = session.data.user;
+    if (!current) return null;
+
+    const { query } = await import("@/server/db");
+    const rows = await query<
+      Omit<UserRow, "password_hash">[]
+    >(
+      `SELECT u.user_id, u.staff_id, u.email, u.department, u.designation, u.role_id, r.role_name
+       FROM users u
+       INNER JOIN roles r ON r.role_id = u.role_id
+       WHERE u.user_id = ?
+       LIMIT 1`,
+      [current.userId],
+    );
+
+    const row = rows[0];
+    if (!row) {
+      await session.clear();
+      return null;
+    }
+
+    const user = toAuthUser(row);
+    await session.update({ user });
+    return user;
   },
 );
 
@@ -98,37 +127,3 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
   await session.clear();
   return { ok: true as const };
 });
-
-export const updateMyProfile = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      department: z.string().trim().max(120),
-      designation: z.string().trim().max(120),
-    }),
-  )
-  .handler(async ({ data }): Promise<AuthUser> => {
-    const session = await getAuthSession();
-    const current = session.data.user;
-    if (!current) {
-      throw new Error("Please sign in to update your profile. Please try again.");
-    }
-
-    const department = data.department || null;
-    const designation = data.designation || null;
-    const { query } = await import("@/server/db");
-
-    await query(
-      `UPDATE users
-       SET department = ?, designation = ?
-       WHERE user_id = ?`,
-      [department, designation, current.userId],
-    );
-
-    const user: AuthUser = {
-      ...current,
-      department,
-      designation,
-    };
-    await session.update({ user });
-    return user;
-  });

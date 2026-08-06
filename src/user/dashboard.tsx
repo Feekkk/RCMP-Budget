@@ -3,7 +3,6 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Plus,
   ArrowUpRight,
-  ArrowDownLeft,
   Clock,
   CheckCircle2,
   XCircle,
@@ -54,33 +53,6 @@ const stats = [
   },
 ];
 
-const flows = [
-  {
-    label: "CAPEX In",
-    value: "RM 2,000.00",
-    hint: "Funds received",
-    tone: "in" as const,
-  },
-  {
-    label: "CAPEX Out",
-    value: "RM 28,350.00",
-    hint: "Capital spend",
-    tone: "out" as const,
-  },
-  {
-    label: "OPEX In",
-    value: "RM 3,500.00",
-    hint: "Funds received",
-    tone: "in" as const,
-  },
-  {
-    label: "OPEX Out",
-    value: "RM 20,000.00",
-    hint: "Operating spend",
-    tone: "out" as const,
-  },
-];
-
 type Status = QuotationListItem["status"];
 
 const statusConfig: Record<Status, { icon: LucideIcon; tone: string }> = {
@@ -96,11 +68,29 @@ function formatRm(value: number) {
   })}`;
 }
 
+function timeGreeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function formatToday(date = new Date()) {
+  return date.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export function UserDashboard() {
   const navigate = useNavigate();
   const { revealed, toggle } = useAutoHideReveal();
   const [requisitions, setRequisitions] = useState<QuotationListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const greetingLabel = timeGreeting();
+  const todayLabel = formatToday();
 
   useEffect(() => {
     let active = true;
@@ -131,10 +121,8 @@ export function UserDashboard() {
       <main className="flex-1 overflow-y-auto p-6 md:p-12">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="font-display text-4xl">Good morning, Afiq</h1>
-            <p className="mt-2 text-sm text-foreground/60">
-              Here's what's happening with your requisitions today.
-            </p>
+            <h1 className="font-display text-4xl">{greetingLabel}</h1>
+            <p className="mt-2 text-sm text-foreground/60">{todayLabel}</p>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -242,43 +230,6 @@ export function UserDashboard() {
               );
             },
           )}
-        </div>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {flows.map(({ label, value, hint, tone }) => {
-            const Icon = tone === "in" ? ArrowDownLeft : ArrowUpRight;
-            return (
-              <div
-                key={label}
-                className="group relative overflow-hidden rounded-[1.5rem] bg-background p-5 shadow-card transition hover:-translate-y-0.5"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-full",
-                      tone === "in"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-red-100 text-red-600",
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium">{label}</p>
-                    <p className="text-xs text-foreground/50">{hint}</p>
-                  </div>
-                </div>
-                <p
-                  className={cn(
-                    "mt-5 font-display text-3xl tabular-nums",
-                    tone === "in" ? "text-emerald-600" : "text-red-600",
-                  )}
-                >
-                  {value}
-                </p>
-              </div>
-            );
-          })}
         </div>
 
         <div className="mt-8 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
