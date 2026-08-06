@@ -4,7 +4,7 @@ import { HodReportPage } from "@/hod/report";
 export const Route = createFileRoute("/hod/reports")({
   head: () => ({
     meta: [
-      { title: "Reports — Ledgerly" },
+      { title: "Reports — Budget Tracker" },
       {
         name: "description",
         content:

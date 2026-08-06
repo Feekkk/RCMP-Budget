@@ -83,14 +83,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Budgetly — Department Budget Tracker" },
+      { title: "Budget Tracker - RCMP" },
       {
         name: "description",
         content:
-          "Budgetly is a department budget tracker for requisitions, PRF generation, layered approvals, and real-time budget visibility.",
+          "Budget Tracker helps departments manage requisitions, PRF generation, layered approvals, and real-time budget visibility.",
       },
-      { name: "author", content: "Budgetly" },
-      { property: "og:title", content: "Budgetly — Department Budget Tracker" },
+      { name: "author", content: "Budget Tracker - RCMP" },
+      { property: "og:title", content: "Budget Tracker - RCMP" },
       {
         property: "og:description",
         content:

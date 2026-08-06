@@ -4,7 +4,7 @@ import { CalendarPage } from "@/hod/calendar";
 export const Route = createFileRoute("/hod/calendar")({
   head: () => ({
     meta: [
-      { title: "Calendar — Ledgerly" },
+      { title: "Calendar — Budget Tracker" },
       {
         name: "description",
         content: "Track approval deadlines, budget reviews, and department milestones.",

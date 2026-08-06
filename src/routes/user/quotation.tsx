@@ -4,7 +4,7 @@ import { QuotationPage } from "@/routes/quotation";
 export const Route = createFileRoute("/user/quotation")({
   head: () => ({
     meta: [
-      { title: "Request Quotation — Ledgerly" },
+      { title: "Request Quotation — Budget Tracker" },
       {
         name: "description",
         content: "Submit a quotation request for your department's approval workflow.",

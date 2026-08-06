@@ -4,7 +4,7 @@ import { RequestDetailPage } from "@/finance/request-detail";
 export const Route = createFileRoute("/finance/request_/$id")({
   head: ({ params }) => ({
     meta: [
-      { title: `${params.id} — Ledgerly` },
+      { title: `${params.id} — Budget Tracker` },
       {
         name: "description",
         content: "Review the budget request details and process payment.",

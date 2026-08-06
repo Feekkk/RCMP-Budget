@@ -4,7 +4,7 @@ import { ProfilePage } from "@/user/profile";
 export const Route = createFileRoute("/user/profile")({
   head: () => ({
     meta: [
-      { title: "Account — Ledgerly" },
+      { title: "Account — Budget Tracker" },
       {
         name: "description",
         content:

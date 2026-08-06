@@ -7,7 +7,7 @@ export function DashboardMock() {
         <div className="grid gap-6 md:grid-cols-[220px_1fr]">
           {/* Sidebar */}
           <aside className="hidden rounded-2xl bg-background/60 p-5 md:block">
-            <div className="mb-6 font-display text-2xl">Budgetly</div>
+            <div className="mb-6 font-display text-2xl">Budget Tracker</div>
             <nav className="space-y-1 text-sm">
               {[
                 { icon: LayoutGrid, label: "Overview", active: true },

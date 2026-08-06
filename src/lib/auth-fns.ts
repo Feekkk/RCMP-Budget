@@ -10,16 +10,14 @@ type SessionUser = {
 type UserRow = {
   user_id: number;
   email: string;
+  password_hash: string;
   department: string | null;
   designation: string | null;
   role_id: number;
   role_name: string;
 };
 
-// Dev only — swap back to process.env.SESSION_SECRET in production
 const sessionPassword = "budget_tracker-dev-session-secret-32";
-// const sessionPassword =
-//   process.env.SESSION_SECRET ?? "budget-tracker-dev-session-secret-32";
 
 function sessionConfig() {
   return {
@@ -33,33 +31,40 @@ async function getAuthSession() {
   return useSession<SessionUser>(sessionConfig());
 }
 
-export const loginByEmail = createServerFn({ method: "POST" })
+export const login = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const parsed = z
       .object({
-        email: z.string().trim().email(),
+        staffId: z.coerce.number().int().positive(),
+        password: z.string().min(1),
       })
       .safeParse(input);
     if (!parsed.success) {
-      throw new Error("Enter a valid email address. Please try again.");
+      throw new Error("Enter your staff ID and password. Please try again.");
     }
     return parsed.data;
   })
   .handler(async ({ data }): Promise<AuthUser> => {
     const { query } = await import("@/server/db");
-    const email = data.email.toLowerCase();
+    const bcrypt = await import("bcrypt");
+
     const rows = await query<UserRow[]>(
-      `SELECT u.user_id, u.email, u.department, u.designation, u.role_id, r.role_name
+      `SELECT u.user_id, u.email, u.password_hash, u.department, u.designation, u.role_id, r.role_name
        FROM users u
        INNER JOIN roles r ON r.role_id = u.role_id
-       WHERE LOWER(u.email) = ?
+       WHERE u.staff_id = ?
        LIMIT 1`,
-      [email],
+      [data.staffId],
     );
 
     const row = rows[0];
     if (!row) {
-      throw new Error("No account found for that email. Please try again.");
+      throw new Error("Staff ID or password is wrong. Check and try again.");
+    }
+
+    const ok = await bcrypt.compare(data.password, row.password_hash);
+    if (!ok) {
+      throw new Error("Staff ID or password is wrong. Check and try again.");
     }
 
     const user: AuthUser = {

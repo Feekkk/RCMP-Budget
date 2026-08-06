@@ -1,21 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { Wordmark } from "@/components/landing/Nav";
 import { Underline } from "@/components/landing/Underline";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { loginByEmail } from "@/lib/auth-fns";
+import { login } from "@/lib/auth-fns";
 import { homeForRole } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign in — Ledgerly" },
+      { title: "Sign in — Budget Tracker" },
       {
         name: "description",
         content:
-          "Sign in to your Ledgerly workspace to manage requisitions, PRFs, and approvals.",
+          "Sign in to your Budget Tracker workspace to manage requisitions, PRFs, and approvals.",
       },
     ],
   }),
@@ -24,20 +24,24 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [staffId, setStaffId] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim();
-    if (!trimmed) {
-      toast.error("Enter your email to continue.");
+    const trimmedId = staffId.trim();
+    if (!trimmedId || !password) {
+      toast.error("Enter your staff ID and password to continue.");
       return;
     }
 
     setLoading(true);
     try {
-      const user = await loginByEmail({ data: { email: trimmed } });
+      const user = await login({
+        data: { staffId: Number(trimmedId), password },
+      });
       const to = homeForRole(user);
       if (!to) {
         toast.error("Your account role has no workspace yet. Contact support for help.");
@@ -45,7 +49,7 @@ function LoginPage() {
       }
       await navigate({ to });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Sign in failed.");
+      toast.error(error instanceof Error ? error.message : "Sign in failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -65,38 +69,70 @@ function LoginPage() {
               </span>
             </h1>
             <p className="mt-6 max-w-md text-foreground/70">
-              Sign in with your work email to review requisitions, approve PRFs,
+              Sign in with your staff ID to review requisitions, approve PRFs,
               and keep an eye on your department's real-time budget.
             </p>
           </div>
           <p className="text-xs text-foreground/50">
-            © {new Date().getFullYear()} Ledgerly
+            © {new Date().getFullYear()} Budget Tracker
           </p>
         </div>
 
         <div className="flex items-center justify-center bg-ivory p-6 md:p-12">
           <div className="w-full max-w-md rounded-[2rem] bg-background p-8 shadow-card md:p-10">
-            <h2 className="font-display text-3xl">Sign in to Ledgerly</h2>
+            <h2 className="font-display text-3xl">Sign in to Budget Tracker</h2>
             <p className="mt-1 text-sm text-foreground/60">
-              Enter your email and we'll take you to your workspace.
+              Enter your staff ID and password to open your workspace.
             </p>
 
             <form onSubmit={onSubmit} className="mt-8 space-y-4">
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium">
-                  Email
+                <label htmlFor="staffId" className="text-sm font-medium">
+                  Staff ID
                 </label>
                 <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
+                  id="staffId"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="username"
                   autoFocus
-                  placeholder="you@unikl.edu.my"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your staff ID"
+                  value={staffId}
+                  onChange={(e) => setStaffId(e.target.value)}
                   disabled={loading}
                   className="h-12 rounded-full border-foreground/15 bg-ivory px-5 text-base shadow-none"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-sm font-medium">
+                  Password
+                </label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="Your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                    className="h-12 rounded-full border-foreground/15 bg-ivory px-5 pr-12 text-base shadow-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    disabled={loading}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute top-1/2 right-4 -translate-y-1/2 text-foreground/50 transition hover:text-foreground disabled:opacity-60"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <button
@@ -112,10 +148,7 @@ function LoginPage() {
             </form>
 
             <p className="mt-6 text-center text-sm text-foreground/60">
-              Don't have an account?{" "}
-              <a href="#" className="text-foreground underline underline-offset-4">
-                Request access
-              </a>
+              Restricted for UNIKL RCMP staff only.
             </p>
 
             <p className="mt-8 text-center text-xs text-foreground/50">

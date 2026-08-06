@@ -4,7 +4,7 @@ import { CeoDashboard } from "@/ceo/dashboard";
 export const Route = createFileRoute("/ceo/")({
   head: () => ({
     meta: [
-      { title: "CEO Dashboard — Ledgerly" },
+      { title: "CEO Dashboard — Budget Tracker" },
       {
         name: "description",
         content: "Review high-value requisitions that need executive approval.",

@@ -4,7 +4,7 @@ import { HistoryPage } from "@/user/history";
 export const Route = createFileRoute("/user/history")({
   head: () => ({
     meta: [
-      { title: "History — Ledgerly" },
+      { title: "History — Budget Tracker" },
       {
         name: "description",
         content:
