@@ -266,10 +266,11 @@ export const listMyBudgets = createServerFn({ method: "GET" }).handler(
          yb.created_by,
          qs.status_name,
          u.email,
-         u.department
+         d.department_name AS department
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE yb.created_by = ?
        ORDER BY yb.created_at DESC, yb.budget_id DESC`,
       [user.userId],
@@ -327,10 +328,11 @@ export const getMyBudget = createServerFn({ method: "GET" })
          yb.created_by,
          qs.status_name,
          u.email,
-         u.department
+         d.department_name AS department
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE yb.budget_id = ?
          AND yb.created_by = ?
        LIMIT 1`,
@@ -445,10 +447,11 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
          yb.created_by,
          qs.status_name,
          u.email,
-         u.department
+         d.department_name AS department
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE yb.budget_id = ?
          AND yb.created_by = ?
        LIMIT 1`,
@@ -553,10 +556,11 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
          yb.created_by,
          qs.status_name,
          u.email,
-         u.department
+         d.department_name AS department
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE yb.budget_id = ?
        LIMIT 1`,
       [data.budgetId],

@@ -12,6 +12,7 @@ type UserRow = {
   staff_id: number | null;
   email: string;
   password_hash: string;
+  department_id: number | null;
   department: string | null;
   designation: string | null;
   role_id: number;
@@ -37,6 +38,7 @@ function toAuthUser(row: Omit<UserRow, "password_hash">): AuthUser {
     userId: row.user_id,
     staffId: row.staff_id,
     email: row.email,
+    departmentId: row.department_id,
     department: row.department,
     designation: row.designation,
     roleId: row.role_id,
@@ -62,9 +64,11 @@ export const login = createServerFn({ method: "POST" })
     const bcrypt = await import("bcrypt");
 
     const rows = await query<UserRow[]>(
-      `SELECT u.user_id, u.staff_id, u.email, u.password_hash, u.department, u.designation, u.role_id, r.role_name
+      `SELECT u.user_id, u.staff_id, u.email, u.password_hash, u.department_id,
+              d.department_name AS department, u.designation, u.role_id, r.role_name
        FROM users u
        INNER JOIN roles r ON r.role_id = u.role_id
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE u.staff_id = ?
        LIMIT 1`,
       [data.staffId],
@@ -99,12 +103,12 @@ export const getCurrentUser = createServerFn({ method: "GET" }).handler(
     if (!current) return null;
 
     const { query } = await import("@/server/db");
-    const rows = await query<
-      Omit<UserRow, "password_hash">[]
-    >(
-      `SELECT u.user_id, u.staff_id, u.email, u.department, u.designation, u.role_id, r.role_name
+    const rows = await query<Omit<UserRow, "password_hash">[]>(
+      `SELECT u.user_id, u.staff_id, u.email, u.department_id,
+              d.department_name AS department, u.designation, u.role_id, r.role_name
        FROM users u
        INNER JOIN roles r ON r.role_id = u.role_id
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE u.user_id = ?
        LIMIT 1`,
       [current.userId],

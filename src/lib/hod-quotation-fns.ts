@@ -79,9 +79,9 @@ export const listHodQuotations = createServerFn({ method: "GET" }).handler(
     const { query } = await import("@/server/db");
     const params: unknown[] = [];
     let departmentFilter = "";
-    if (user.department) {
-      departmentFilter = "AND u.department = ?";
-      params.push(user.department);
+    if (user.departmentId != null) {
+      departmentFilter = "AND u.department_id = ?";
+      params.push(user.departmentId);
     }
 
     const rows = await query<HodQuotationRow[]>(
@@ -146,9 +146,9 @@ export const reviewHodQuotation = createServerFn({ method: "POST" })
     const { query } = await import("@/server/db");
     const params: unknown[] = [data.quotationId];
     let departmentFilter = "";
-    if (user.department) {
-      departmentFilter = "AND u.department = ?";
-      params.push(user.department);
+    if (user.departmentId != null) {
+      departmentFilter = "AND u.department_id = ?";
+      params.push(user.departmentId);
     }
 
     const rows = await query<HodQuotationRow[]>(
@@ -272,9 +272,9 @@ export const getHodQuotation = createServerFn({ method: "GET" })
     const { query } = await import("@/server/db");
     const params: unknown[] = [data.quotationId];
     let departmentFilter = "";
-    if (user.department) {
-      departmentFilter = "AND u.department = ?";
-      params.push(user.department);
+    if (user.departmentId != null) {
+      departmentFilter = "AND u.department_id = ?";
+      params.push(user.departmentId);
     }
 
     const rows = await query<DetailRow[]>(
@@ -283,11 +283,12 @@ export const getHodQuotation = createServerFn({ method: "GET" })
          qs.status_name,
          q.created_at,
          u.email AS requester_email,
-         u.department,
+         d.department_name AS department,
          u.designation
        FROM quotations q
        INNER JOIN quotation_statuses qs ON qs.status_id = q.status_id
        INNER JOIN users u ON u.user_id = q.user_id
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE q.quotation_id = ?
        ${departmentFilter}
        LIMIT 1`,
@@ -387,9 +388,9 @@ export const getHodQuotationAttachment = createServerFn({ method: "GET" })
       const { query } = await import("@/server/db");
       const params: unknown[] = [data.attachmentId];
       let departmentFilter = "";
-      if (user.department) {
-        departmentFilter = "AND u.department = ?";
-        params.push(user.department);
+      if (user.departmentId != null) {
+        departmentFilter = "AND u.department_id = ?";
+        params.push(user.departmentId);
       }
 
       const rows = await query<

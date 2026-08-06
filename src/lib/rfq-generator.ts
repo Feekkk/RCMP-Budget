@@ -309,9 +309,10 @@ export const generateRequestForQuotation = createServerFn({ method: "POST" })
 
     const { query } = await import("@/server/db");
     const rows = await query<FormRow[]>(
-      `SELECT q.quotation_id, q.created_at, u.email, u.department, u.designation
+      `SELECT q.quotation_id, q.created_at, u.email, d.department_name AS department, u.designation
        FROM quotations q
        INNER JOIN users u ON u.user_id = q.user_id
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE q.quotation_id = ? AND q.user_id = ?
        LIMIT 1`,
       [data.quotationId, user.userId],

@@ -113,9 +113,9 @@ export const listDepartmentCalendarEvents = createServerFn({
   const params: unknown[] = [];
   let departmentFilter = "";
 
-  if (user.department) {
-    departmentFilter = "AND u.department = ?";
-    params.push(user.department);
+  if (user.departmentId != null) {
+    departmentFilter = "AND u.department_id = ?";
+    params.push(user.departmentId);
   } else {
     departmentFilter = "AND u.user_id = ?";
     params.push(user.userId);

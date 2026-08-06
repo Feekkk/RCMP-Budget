@@ -168,9 +168,9 @@ export const listHodBudgets = createServerFn({ method: "GET" }).handler(
     const { query } = await import("@/server/db");
     const params: unknown[] = [];
     let departmentFilter = "";
-    if (user.department) {
-      departmentFilter = "AND u.department = ?";
-      params.push(user.department);
+    if (user.departmentId != null) {
+      departmentFilter = "AND u.department_id = ?";
+      params.push(user.departmentId);
     }
 
     const rows = await query<BudgetRow[]>(
@@ -185,11 +185,12 @@ export const listHodBudgets = createServerFn({ method: "GET" }).handler(
          yb.created_at,
          qs.status_name,
          u.email AS requester_email,
-         u.department,
+         d.department_name AS department,
          u.designation
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE 1 = 1
        ${departmentFilter}
        ORDER BY yb.created_at DESC, yb.budget_id DESC`,
@@ -209,9 +210,9 @@ export const getHodBudget = createServerFn({ method: "GET" })
     const { query } = await import("@/server/db");
     const params: unknown[] = [data.budgetId];
     let departmentFilter = "";
-    if (user.department) {
-      departmentFilter = "AND u.department = ?";
-      params.push(user.department);
+    if (user.departmentId != null) {
+      departmentFilter = "AND u.department_id = ?";
+      params.push(user.departmentId);
     }
 
     const rows = await query<BudgetRow[]>(
@@ -235,11 +236,12 @@ export const getHodBudget = createServerFn({ method: "GET" })
          yb.created_at,
          qs.status_name,
          u.email AS requester_email,
-         u.department,
+         d.department_name AS department,
          u.designation
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE yb.budget_id = ?
        ${departmentFilter}
        LIMIT 1`,
@@ -268,9 +270,9 @@ export const listHodBudgetReport = createServerFn({ method: "GET" })
     const budgetYear = data.budgetYear ?? new Date().getFullYear();
     const params: unknown[] = [budgetYear];
     let departmentFilter = "";
-    if (user.department) {
-      departmentFilter = "AND u.department = ?";
-      params.push(user.department);
+    if (user.departmentId != null) {
+      departmentFilter = "AND u.department_id = ?";
+      params.push(user.departmentId);
     }
 
     const rows = await query<BudgetRow[]>(
@@ -294,11 +296,12 @@ export const listHodBudgetReport = createServerFn({ method: "GET" })
          yb.created_at,
          qs.status_name,
          u.email AS requester_email,
-         u.department,
+         d.department_name AS department,
          u.designation
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE yb.budget_year = ?
          AND qs.status_name NOT LIKE '%rejected%'
        ${departmentFilter}
@@ -334,9 +337,9 @@ export const reviewHodBudget = createServerFn({ method: "POST" })
     const { query } = await import("@/server/db");
     const params: unknown[] = [data.budgetId];
     let departmentFilter = "";
-    if (user.department) {
-      departmentFilter = "AND u.department = ?";
-      params.push(user.department);
+    if (user.departmentId != null) {
+      departmentFilter = "AND u.department_id = ?";
+      params.push(user.departmentId);
     }
 
     const rows = await query<BudgetRow[]>(
@@ -351,11 +354,12 @@ export const reviewHodBudget = createServerFn({ method: "POST" })
          yb.created_at,
          qs.status_name,
          u.email AS requester_email,
-         u.department,
+         d.department_name AS department,
          u.designation
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE yb.budget_id = ?
        ${departmentFilter}
        LIMIT 1`,
