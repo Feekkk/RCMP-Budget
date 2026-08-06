@@ -16,7 +16,7 @@ const items: { label: string; icon: LucideIcon; to?: LinkProps["to"] }[] = [
   { label: "Approvals", icon: FileCheck, to: "/hod/approval" },
   { label: "Calendar", icon: Calendar, to: "/hod/calendar" },
   { label: "Reports", icon: FileChartColumn, to: "/hod/reports" },
-  { label: "Settings", icon: Settings },
+  { label: "Settings", icon: Settings, to: "/hod/settings" },
 ];
 
 const itemClass =

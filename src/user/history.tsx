@@ -46,6 +46,7 @@ import {
   type BudgetDetail,
   type BudgetListItem,
 } from "@/lib/budget-fns";
+import { isYearlyBudgetFormEnabled } from "@/lib/settings-fns";
 import {
   generatePurchaseRequisition,
   type PurchaseRequisitionFormat,
@@ -127,6 +128,7 @@ export function HistoryPage() {
   const [budgetDetail, setBudgetDetail] = useState<BudgetDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [generatingPrfId, setGeneratingPrfId] = useState<number | null>(null);
+  const [budgetFormEnabled, setBudgetFormEnabled] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -146,6 +148,20 @@ export function HistoryPage() {
       })
       .finally(() => {
         if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    isYearlyBudgetFormEnabled()
+      .then((enabled) => {
+        if (active) setBudgetFormEnabled(enabled);
+      })
+      .catch(() => {
+        if (active) setBudgetFormEnabled(true);
       });
     return () => {
       active = false;
@@ -326,9 +342,19 @@ export function HistoryPage() {
                 Request quotation
               </DropdownMenuItem>
               <DropdownMenuItem
-                onSelect={() => void navigate({ to: "/user/budget" })}
+                disabled={!budgetFormEnabled}
+                onSelect={() => {
+                  if (!budgetFormEnabled) {
+                    toast.error(
+                      "Yearly budget submissions are closed. Try again later.",
+                    );
+                    return;
+                  }
+                  void navigate({ to: "/user/budget" });
+                }}
               >
                 Yearly budget
+                {!budgetFormEnabled ? " (Closed)" : ""}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -567,6 +593,7 @@ export function HistoryPage() {
               <BudgetDetailCard
                 key={budgetDetail.id}
                 detail={budgetDetail}
+                formEnabled={budgetFormEnabled}
                 onClose={closeDetail}
                 onResubmitted={(updated) => {
                   setBudgetDetail(updated);
@@ -851,16 +878,18 @@ function QuotationDetailCard({
 
 function BudgetDetailCard({
   detail,
+  formEnabled,
   onClose,
   onResubmitted,
 }: {
   detail: BudgetDetail;
+  formEnabled: boolean;
   onClose: () => void;
   onResubmitted: (detail: BudgetDetail) => void;
 }) {
   const { icon: StatusIcon, tone } = statusConfig[detail.status];
   const isCapex = detail.budgetType === "CAPEX";
-  const canEdit = detail.status === "Rejected" && detail.isMine;
+  const canEdit = detail.status === "Rejected" && detail.isMine && formEnabled;
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [code, setCode] = useState(detail.code);
@@ -1308,6 +1337,15 @@ function BudgetDetailCard({
               />
             )}
           </dl>
+
+          {detail.status === "Rejected" && detail.isMine && !formEnabled && (
+            <div className="mt-8 border-t border-foreground/10 pt-6">
+              <p className="text-sm text-foreground/50">
+                Yearly budget submissions are closed. You can edit this again
+                when your admin reopens them.
+              </p>
+            </div>
+          )}
 
           {canEdit && (
             <div className="mt-8 border-t border-foreground/10 pt-6">

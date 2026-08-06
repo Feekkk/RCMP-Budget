@@ -166,6 +166,11 @@ export const submitYearlyBudget = createServerFn({ method: "POST" })
       throw new Error("Please sign in to submit your budget.");
     }
 
+    const { assertYearlyBudgetFormEnabled } = await import(
+      "@/lib/settings.server"
+    );
+    await assertYearlyBudgetFormEnabled();
+
     const { getConnection } = await import("@/server/db");
     const conn = await getConnection();
     const budgetYear = data.budgetYear ?? new Date().getFullYear();
@@ -411,6 +416,11 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
     if (!user) {
       throw new Error("Please sign in to resubmit your budget.");
     }
+
+    const { assertYearlyBudgetFormEnabled } = await import(
+      "@/lib/settings.server"
+    );
+    await assertYearlyBudgetFormEnabled();
 
     const { query } = await import("@/server/db");
     const rows = await query<BudgetRow[]>(

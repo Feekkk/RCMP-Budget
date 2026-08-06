@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -23,6 +23,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { submitYearlyBudget } from "@/lib/budget-fns";
+import { isYearlyBudgetFormEnabled } from "@/lib/settings-fns";
 
 const OPEX_CODES = [
   {
@@ -98,6 +99,8 @@ export function BudgetFormPage() {
   const [opexItems, setOpexItems] = useState<OpexItem[]>([]);
   const [capexItems, setCapexItems] = useState<CapexItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
+  const [formEnabled, setFormEnabled] = useState(true);
 
   const [opexCode, setOpexCode] = useState("");
   const [opexActivity, setOpexActivity] = useState("");
@@ -116,6 +119,24 @@ export function BudgetFormPage() {
   const [capexEffect, setCapexEffect] = useState("");
   const [capexAlternative, setCapexAlternative] = useState("");
   const [capexRemarks, setCapexRemarks] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    isYearlyBudgetFormEnabled()
+      .then((enabled) => {
+        if (!active) return;
+        setFormEnabled(enabled);
+      })
+      .catch(() => {
+        if (active) setFormEnabled(true);
+      })
+      .finally(() => {
+        if (active) setCheckingAccess(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const capexUnit = Number(capexCostPerUnit) || 0;
   const capexEstimated = capexUnit * capexQuantity;
@@ -204,6 +225,12 @@ export function BudgetFormPage() {
   };
 
   const submit = async () => {
+    if (!formEnabled) {
+      toast.error(
+        "Yearly budget submissions are closed. Try again when your admin reopens them.",
+      );
+      return;
+    }
     if (opexItems.length === 0 && capexItems.length === 0) {
       toast.error("Add at least one OPEX or CAPEX line before submitting.");
       return;
@@ -273,6 +300,26 @@ export function BudgetFormPage() {
           </p>
         </div>
 
+        {checkingAccess ? (
+          <div className="mt-8 rounded-[1.5rem] border border-dashed border-foreground/15 bg-background py-16 text-center shadow-card">
+            <p className="text-sm text-foreground/50">Checking access…</p>
+          </div>
+        ) : !formEnabled ? (
+          <div className="mt-8 rounded-[1.5rem] border border-dashed border-foreground/15 bg-background py-16 text-center shadow-card">
+            <ClipboardList className="mx-auto h-8 w-8 text-foreground/30" />
+            <p className="mt-3 text-base font-medium">Submissions are closed</p>
+            <p className="mt-2 text-sm text-foreground/50">
+              Yearly budget forms are turned off right now. Check back when your
+              admin reopens them.
+            </p>
+            <Link
+              to="/user"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-lime px-5 py-2.5 text-sm font-medium text-lime-foreground transition hover:brightness-95"
+            >
+              Back to dashboard
+            </Link>
+          </div>
+        ) : (
         <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_380px]">
           <div className="rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
             <Tabs defaultValue="opex">
@@ -665,6 +712,7 @@ export function BudgetFormPage() {
             </button>
           </div>
         </div>
+        )}
       </main>
     </div>
   );

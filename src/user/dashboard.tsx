@@ -27,6 +27,7 @@ import {
   listMyQuotations,
   type QuotationListItem,
 } from "@/lib/quotation-fns";
+import { isYearlyBudgetFormEnabled } from "@/lib/settings-fns";
 
 const stats = [
   {
@@ -89,6 +90,7 @@ export function UserDashboard() {
   const { revealed, toggle } = useAutoHideReveal();
   const [requisitions, setRequisitions] = useState<QuotationListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [budgetFormEnabled, setBudgetFormEnabled] = useState(true);
   const greetingLabel = timeGreeting();
   const todayLabel = formatToday();
 
@@ -108,6 +110,20 @@ export function UserDashboard() {
       })
       .finally(() => {
         if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    isYearlyBudgetFormEnabled()
+      .then((enabled) => {
+        if (active) setBudgetFormEnabled(enabled);
+      })
+      .catch(() => {
+        if (active) setBudgetFormEnabled(true);
       });
     return () => {
       active = false;
@@ -138,8 +154,20 @@ export function UserDashboard() {
               <DropdownMenuItem onSelect={() => void navigate({ to: "/user/quotation" })}>
                 Request Quotation
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void navigate({ to: "/user/budget" })}>
+              <DropdownMenuItem
+                disabled={!budgetFormEnabled}
+                onSelect={() => {
+                  if (!budgetFormEnabled) {
+                    toast.error(
+                      "Yearly budget submissions are closed. Try again later.",
+                    );
+                    return;
+                  }
+                  void navigate({ to: "/user/budget" });
+                }}
+              >
                 Yearly Budget
+                {!budgetFormEnabled ? " (Closed)" : ""}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 const items: { label: string; icon: LucideIcon; to?: LinkProps["to"] }[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/ceo" },
-  { label: "Settings", icon: Settings },
+  { label: "Settings", icon: Settings, to: "/ceo/settings" },
 ];
 
 const itemClass =
