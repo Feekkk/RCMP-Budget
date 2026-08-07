@@ -601,3 +601,51 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
       isMine: updated.created_by === user.userId,
     };
   });
+
+export const deleteYearlyBudget = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      budgetId: z.number().int().positive(),
+    }),
+  )
+  .handler(async ({ data }): Promise<{ budgetId: number }> => {
+    const session = await useSession<SessionUser>(sessionConfig());
+    const user = session.data.user;
+    if (!user) {
+      throw new Error("Please sign in to delete your budget.");
+    }
+
+    const { query } = await import("@/server/db");
+    const rows = await query<
+      { budget_id: number; status_name: string; created_by: number }[]
+    >(
+      `SELECT
+         yb.budget_id,
+         yb.created_by,
+         qs.status_name
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       WHERE yb.budget_id = ?
+         AND yb.created_by = ?
+       LIMIT 1`,
+      [data.budgetId, user.userId],
+    );
+
+    const row = rows[0];
+    if (!row) {
+      throw new Error("Budget not found. Refresh the page and try again.");
+    }
+
+    if (mapBudgetStatus(row.status_name) !== "Pending") {
+      throw new Error(
+        "Only pending budgets can be deleted. Refresh and try again.",
+      );
+    }
+
+    await query(
+      `DELETE FROM yearly_budgets WHERE budget_id = ? AND created_by = ?`,
+      [data.budgetId, user.userId],
+    );
+
+    return { budgetId: data.budgetId };
+  });

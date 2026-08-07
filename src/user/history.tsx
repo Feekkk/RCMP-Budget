@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   ChevronDown,
   Paperclip,
+  Trash2,
   X,
   Wallet,
   Receipt,
@@ -43,6 +44,7 @@ import {
   getMyBudget,
   listMyBudgets,
   resubmitYearlyBudget,
+  deleteYearlyBudget,
   type BudgetDetail,
   type BudgetListItem,
 } from "@/lib/budget-fns";
@@ -615,6 +617,10 @@ export function HistoryPage() {
                     ),
                   );
                 }}
+                onDeleted={(budgetId) => {
+                  setBudgets((prev) => prev.filter((row) => row.id !== budgetId));
+                  closeDetail();
+                }}
               />
             )}
           </DetailOverlay>,
@@ -881,11 +887,13 @@ function BudgetDetailCard({
   formEnabled,
   onClose,
   onResubmitted,
+  onDeleted,
 }: {
   detail: BudgetDetail;
   formEnabled: boolean;
   onClose: () => void;
   onResubmitted: (detail: BudgetDetail) => void;
+  onDeleted: (budgetId: number) => void;
 }) {
   const { icon: StatusIcon, tone } = statusConfig[detail.status];
   const isCapex = detail.budgetType === "CAPEX";
@@ -893,9 +901,12 @@ function BudgetDetailCard({
     (detail.status === "Pending" || detail.status === "Rejected") &&
     detail.isMine &&
     formEnabled;
+  const canDelete = detail.status === "Pending" && detail.isMine;
   const isResubmit = detail.status === "Rejected";
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [code, setCode] = useState(detail.code);
   const [activity, setActivity] = useState(detail.activity ?? "");
   const [itemName, setItemName] = useState(detail.itemName ?? "");
@@ -1025,6 +1036,35 @@ function BudgetDetailCard({
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (deleting || !canDelete) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+
+    setDeleting(true);
+    const toastId = toast.loading(`Deleting YB-${detail.id}…`);
+    try {
+      await deleteYearlyBudget({ data: { budgetId: detail.id } });
+      toast.success(`YB-${detail.id} deleted`, {
+        id: toastId,
+        description: "This budget request has been removed.",
+      });
+      onDeleted(detail.id);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not delete this budget. Try again.",
+        { id: toastId },
+      );
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1370,18 +1410,45 @@ function BudgetDetailCard({
             </div>
           )}
 
-          {canEdit && (
-            <div className="mt-8 border-t border-foreground/10 pt-6">
-              <button
-                type="button"
-                onClick={startEdit}
-                className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory"
-              >
-                <ClipboardPen className="h-4 w-4" />
-                Edit form
-              </button>
+          {canEdit || canDelete ? (
+            <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={startEdit}
+                  disabled={deleting}
+                  className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory disabled:opacity-50"
+                >
+                  <ClipboardPen className="h-4 w-4" />
+                  Edit form
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={() => void handleDelete()}
+                  disabled={deleting}
+                  className="inline-flex items-center gap-2 rounded-full border border-red-200 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deleting
+                    ? "Deleting…"
+                    : confirmDelete
+                      ? "Confirm delete"
+                      : "Delete"}
+                </button>
+              )}
+              {canDelete && confirmDelete && !deleting && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-foreground/60 transition hover:bg-ivory hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              )}
             </div>
-          )}
+          ) : null}
         </>
       )}
     </div>
