@@ -8,9 +8,12 @@ export const Route = createFileRoute("/hod/settings")({
       { title: "Settings — Budget Tracker" },
       {
         name: "description",
-        content: "View system settings configured for Budget Tracker.",
+        content:
+          "Manage system options and view department staff email and last login.",
       },
     ],
   }),
-  component: () => <SystemSettingsPage Sidebar={Sidebar} />,
+  component: () => (
+    <SystemSettingsPage Sidebar={Sidebar} showDepartmentStaff />
+  ),
 });

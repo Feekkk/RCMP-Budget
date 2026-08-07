@@ -132,3 +132,92 @@ export const isYearlyBudgetFormEnabled = createServerFn({
   );
   return readYearlyBudgetFormEnabled();
 });
+
+export type DepartmentStaffMember = {
+  userId: number;
+  staffId: number | null;
+  email: string;
+  designation: string | null;
+  roleName: string;
+  lastLogin: string | null;
+  lastLoginLabel: string;
+};
+
+type StaffRow = {
+  user_id: number;
+  staff_id: number | null;
+  email: string;
+  designation: string | null;
+  role_name: string;
+  last_login: Date | string | null;
+};
+
+function formatLastLogin(value: Date | string | null): {
+  lastLogin: string | null;
+  lastLoginLabel: string;
+} {
+  if (!value) {
+    return { lastLogin: null, lastLoginLabel: "Never" };
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return { lastLogin: null, lastLoginLabel: "Never" };
+  }
+  return {
+    lastLogin: date.toISOString(),
+    lastLoginLabel: date.toLocaleString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  };
+}
+
+export const listHodDepartmentStaff = createServerFn({ method: "GET" }).handler(
+  async (): Promise<DepartmentStaffMember[]> => {
+    const session = await useSession<SessionUser>(sessionConfig());
+    const user = session.data.user;
+    if (!user) {
+      throw new Error("Please sign in to view department staff.");
+    }
+    if (user.roleName !== "HOD") {
+      throw new Error("Only HOD accounts can view department staff.");
+    }
+    if (user.departmentId == null) {
+      throw new Error(
+        "Your account has no department. Ask an admin to assign one.",
+      );
+    }
+
+    const { query } = await import("@/server/db");
+    const rows = await query<StaffRow[]>(
+      `SELECT
+         u.user_id,
+         u.staff_id,
+         u.email,
+         u.designation,
+         r.role_name,
+         u.last_login
+       FROM users u
+       INNER JOIN roles r ON r.role_id = u.role_id
+       WHERE u.department_id = ?
+       ORDER BY u.email ASC`,
+      [user.departmentId],
+    );
+
+    return rows.map((row) => {
+      const { lastLogin, lastLoginLabel } = formatLastLogin(row.last_login);
+      return {
+        userId: row.user_id,
+        staffId: row.staff_id,
+        email: row.email,
+        designation: row.designation,
+        roleName: row.role_name,
+        lastLogin,
+        lastLoginLabel,
+      };
+    });
+  },
+);
