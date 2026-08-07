@@ -18,6 +18,7 @@ import {
   Receipt,
   ArrowUpRight,
   ArrowDownLeft,
+  ArrowRightLeft,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -45,6 +46,7 @@ import {
   listMyBudgets,
   resubmitYearlyBudget,
   deleteYearlyBudget,
+  transferYearlyBudget,
   type BudgetDetail,
   type BudgetListItem,
 } from "@/lib/budget-fns";
@@ -593,7 +595,7 @@ export function HistoryPage() {
               </p>
             ) : (
               <BudgetDetailCard
-                key={budgetDetail.id}
+                key={`${budgetDetail.id}-${budgetDetail.budgetType}`}
                 detail={budgetDetail}
                 formEnabled={budgetFormEnabled}
                 onClose={closeDetail}
@@ -604,6 +606,7 @@ export function HistoryPage() {
                       row.id === updated.id
                         ? {
                             ...row,
+                            budgetType: updated.budgetType,
                             title:
                               updated.budgetType === "CAPEX"
                                 ? updated.itemName || row.title
@@ -902,10 +905,14 @@ function BudgetDetailCard({
     detail.isMine &&
     formEnabled;
   const canDelete = detail.status === "Pending" && detail.isMine;
+  const canTransfer =
+    detail.status === "Pending" && detail.isMine && formEnabled;
   const isResubmit = detail.status === "Rejected";
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [code, setCode] = useState(detail.code);
   const [activity, setActivity] = useState(detail.activity ?? "");
@@ -927,6 +934,12 @@ function BudgetDetailCard({
   const unitValue = Number(costPerUnit) || 0;
   const capexEstimated = unitValue * quantity;
   const codeOptions = isCapex ? CAPEX_CODES : OPEX_CODES;
+
+  useEffect(() => {
+    if (detail.status !== "Pending") {
+      setTransferOpen(false);
+    }
+  }, [detail.status]);
 
   const resetForm = () => {
     setCode(detail.code);
@@ -953,6 +966,39 @@ function BudgetDetailCard({
   const cancelEdit = () => {
     resetForm();
     setEditing(false);
+  };
+
+  const closeTransfer = () => {
+    if (transferring) return;
+    setTransferOpen(false);
+  };
+
+  const handleTransfer = async (payload: TransferBudgetInput) => {
+    if (transferring || !canTransfer) return;
+    setTransferring(true);
+    const toastId = toast.loading(
+      `Transferring YB-${detail.id} to ${payload.targetType}…`,
+    );
+    try {
+      const updated = await transferYearlyBudget({
+        data: { budgetId: detail.id, ...payload },
+      });
+      onResubmitted(updated);
+      setTransferOpen(false);
+      toast.success(`YB-${detail.id} transferred to ${payload.targetType}`, {
+        id: toastId,
+        description: "Still waiting for HOD review.",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not transfer this budget. Try again.",
+        { id: toastId },
+      );
+    } finally {
+      setTransferring(false);
+    }
   };
 
   const handleResubmit = async () => {
@@ -1410,24 +1456,37 @@ function BudgetDetailCard({
             </div>
           )}
 
-          {canEdit || canDelete ? (
+          {canEdit || canDelete || canTransfer ? (
             <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
               {canEdit && (
                 <button
                   type="button"
                   onClick={startEdit}
-                  disabled={deleting}
+                  disabled={deleting || transferring}
                   className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory disabled:opacity-50"
                 >
                   <ClipboardPen className="h-4 w-4" />
                   Edit form
                 </button>
               )}
+              {canTransfer && (
+                <button
+                  type="button"
+                  onClick={() => setTransferOpen(true)}
+                  disabled={deleting || transferring}
+                  className="group inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-5 py-2.5 text-sm font-medium text-sky-800 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-100 hover:shadow-md disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none"
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-200/70 text-sky-700">
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                  </span>
+                  Transfer
+                </button>
+              )}
               {canDelete && (
                 <button
                   type="button"
                   onClick={() => void handleDelete()}
-                  disabled={deleting}
+                  disabled={deleting || transferring}
                   className="inline-flex items-center gap-2 rounded-full border border-red-200 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -1451,6 +1510,458 @@ function BudgetDetailCard({
           ) : null}
         </>
       )}
+
+      {transferOpen &&
+        createPortal(
+          <DetailOverlay onClose={closeTransfer}>
+            <TransferBudgetCard
+              detail={detail}
+              transferring={transferring}
+              onClose={closeTransfer}
+              onTransfer={(payload) => void handleTransfer(payload)}
+            />
+          </DetailOverlay>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+type TransferBudgetInput =
+  | {
+      targetType: "CAPEX";
+      code: (typeof CAPEX_CODES)[number]["value"];
+      itemName: string;
+      justification: string;
+      targetMonths?: string;
+      quantity: number;
+      costPerUnit: number;
+      budgetAmount: number;
+      effectIfNotApproved?: string;
+      alternative?: string;
+      remarks?: string;
+    }
+  | {
+      targetType: "OPEX";
+      code: (typeof OPEX_CODES)[number]["value"];
+      activity: string;
+      objective: string;
+      justification: string;
+      targetMonths?: string;
+      budgetAmount: number;
+      remarks?: string;
+    };
+
+function TransferBudgetCard({
+  detail,
+  transferring,
+  onClose,
+  onTransfer,
+}: {
+  detail: BudgetDetail;
+  transferring: boolean;
+  onClose: () => void;
+  onTransfer: (payload: TransferBudgetInput) => void;
+}) {
+  const targetType = detail.budgetType === "OPEX" ? "CAPEX" : "OPEX";
+  const sourceType = detail.budgetType;
+
+  const [capexCode, setCapexCode] = useState<
+    (typeof CAPEX_CODES)[number]["value"] | ""
+  >("");
+  const [opexCode, setOpexCode] = useState<
+    (typeof OPEX_CODES)[number]["value"] | ""
+  >("");
+  const [itemName, setItemName] = useState(detail.activity ?? "");
+  const [activity, setActivity] = useState(detail.itemName ?? "");
+  const [objective, setObjective] = useState(detail.objective ?? "");
+  const [justification, setJustification] = useState(detail.justification);
+  const [targetMonths, setTargetMonths] = useState(detail.targetMonths ?? "");
+  const [quantity, setQuantity] = useState(1);
+  const [costPerUnit, setCostPerUnit] = useState(
+    detail.amount > 0 ? String(detail.amount) : "",
+  );
+  const [budgetAmount, setBudgetAmount] = useState(
+    detail.amount > 0 ? String(detail.amount) : "",
+  );
+  const [effectIfNotApproved, setEffectIfNotApproved] = useState("");
+  const [alternative, setAlternative] = useState("");
+  const [remarks, setRemarks] = useState(detail.remarks ?? "");
+
+  const unitValue = Number(costPerUnit) || 0;
+  const estimatedPrice = quantity * unitValue;
+  const opexBudgetValue = Number(budgetAmount) || 0;
+
+  const submitTransfer = () => {
+    if (targetType === "CAPEX") {
+      if (!capexCode) {
+        toast.error("Choose a CAPEX code to continue.");
+        return;
+      }
+      if (!itemName.trim()) {
+        toast.error("Enter the item name to continue.");
+        return;
+      }
+      if (!justification.trim()) {
+        toast.error("Add a justification to continue.");
+        return;
+      }
+      if (unitValue <= 0) {
+        toast.error("Enter a cost per unit above zero.");
+        return;
+      }
+      onTransfer({
+        targetType: "CAPEX",
+        code: capexCode,
+        itemName: itemName.trim(),
+        justification: justification.trim(),
+        targetMonths: targetMonths || undefined,
+        quantity,
+        costPerUnit: unitValue,
+        budgetAmount: estimatedPrice,
+        effectIfNotApproved: effectIfNotApproved.trim() || undefined,
+        alternative: alternative.trim() || undefined,
+        remarks: remarks.trim() || undefined,
+      });
+      return;
+    }
+
+    if (!opexCode) {
+      toast.error("Choose an OPEX code to continue.");
+      return;
+    }
+    if (!activity.trim()) {
+      toast.error("Enter the activity to continue.");
+      return;
+    }
+    if (!objective.trim()) {
+      toast.error("Add the objectives to continue.");
+      return;
+    }
+    if (!justification.trim()) {
+      toast.error("Add a justification to continue.");
+      return;
+    }
+    if (opexBudgetValue <= 0) {
+      toast.error("Enter a budget amount above zero.");
+      return;
+    }
+    onTransfer({
+      targetType: "OPEX",
+      code: opexCode,
+      activity: activity.trim(),
+      objective: objective.trim(),
+      justification: justification.trim(),
+      targetMonths: targetMonths || undefined,
+      budgetAmount: opexBudgetValue,
+      remarks: remarks.trim() || undefined,
+    });
+  };
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+            Transfer to {targetType}
+          </p>
+          <h2 className="mt-1 font-display text-3xl">YB-{detail.id}</h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            From {sourceType} · {formatRm(detail.amount)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={transferring}
+          aria-label="Close transfer form"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground/50 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-ivory p-4">
+        <p className="text-xs text-foreground/50">
+          Current {sourceType} {sourceType === "OPEX" ? "activity" : "item"}
+        </p>
+        <p className="mt-1 text-sm font-medium">
+          {sourceType === "OPEX"
+            ? detail.activity || "—"
+            : detail.itemName || "—"}
+        </p>
+        <p className="mt-0.5 text-xs text-foreground/50">
+          {budgetCodeLabel(detail.code, sourceType)}
+        </p>
+      </div>
+
+      <div className="mt-6 space-y-4">
+        {targetType === "CAPEX" ? (
+          <>
+            <div className="space-y-2">
+              <Label>CAPEX code</Label>
+              <Select
+                value={capexCode}
+                onValueChange={(value) =>
+                  setCapexCode(value as (typeof CAPEX_CODES)[number]["value"])
+                }
+                disabled={transferring}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select CAPEX code" />
+                </SelectTrigger>
+                <SelectContent className="z-[110]">
+                  {CAPEX_CODES.map((entry) => (
+                    <SelectItem key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-item-${detail.id}`}>Item</Label>
+              <Input
+                id={`transfer-item-${detail.id}`}
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                placeholder="e.g. Laboratory microscope"
+                disabled={transferring}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-justification-${detail.id}`}>
+                Justification
+              </Label>
+              <Textarea
+                id={`transfer-justification-${detail.id}`}
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                placeholder="Why this item is needed"
+                disabled={transferring}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-target-${detail.id}`}>
+                Target months
+              </Label>
+              <Input
+                id={`transfer-target-${detail.id}`}
+                type="month"
+                value={targetMonths}
+                onChange={(e) => setTargetMonths(e.target.value)}
+                disabled={transferring}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`transfer-qty-${detail.id}`}>Quantity</Label>
+                <Input
+                  id={`transfer-qty-${detail.id}`}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={quantity}
+                  onChange={(e) =>
+                    setQuantity(Math.max(1, Number(e.target.value) || 1))
+                  }
+                  disabled={transferring}
+                  className="h-11 rounded-xl tabular-nums"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`transfer-unit-${detail.id}`}>
+                  Cost per unit (RM)
+                </Label>
+                <Input
+                  id={`transfer-unit-${detail.id}`}
+                  inputMode="decimal"
+                  value={costPerUnit}
+                  onChange={(e) =>
+                    setCostPerUnit(e.target.value.replace(/[^\d.]/g, ""))
+                  }
+                  placeholder="0.00"
+                  disabled={transferring}
+                  className="h-11 rounded-xl tabular-nums"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-ivory px-4 py-3">
+              <p className="text-xs text-foreground/50">Estimated price</p>
+              <p className="mt-1 font-display text-2xl tabular-nums">
+                {formatRm(estimatedPrice)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-effect-${detail.id}`}>
+                Effect if not approved
+              </Label>
+              <Textarea
+                id={`transfer-effect-${detail.id}`}
+                value={effectIfNotApproved}
+                onChange={(e) => setEffectIfNotApproved(e.target.value)}
+                placeholder="Optional"
+                disabled={transferring}
+                className="min-h-16 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-alt-${detail.id}`}>Alternative</Label>
+              <Textarea
+                id={`transfer-alt-${detail.id}`}
+                value={alternative}
+                onChange={(e) => setAlternative(e.target.value)}
+                placeholder="Optional"
+                disabled={transferring}
+                className="min-h-16 rounded-xl"
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label>OPEX code</Label>
+              <Select
+                value={opexCode}
+                onValueChange={(value) =>
+                  setOpexCode(value as (typeof OPEX_CODES)[number]["value"])
+                }
+                disabled={transferring}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select OPEX code" />
+                </SelectTrigger>
+                <SelectContent className="z-[110]">
+                  {OPEX_CODES.map((entry) => (
+                    <SelectItem key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-activity-${detail.id}`}>
+                Activities / Programme / Event
+              </Label>
+              <Input
+                id={`transfer-activity-${detail.id}`}
+                value={activity}
+                onChange={(e) => setActivity(e.target.value)}
+                placeholder="e.g. Annual maintenance"
+                disabled={transferring}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-objective-${detail.id}`}>
+                Objectives
+              </Label>
+              <Textarea
+                id={`transfer-objective-${detail.id}`}
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                placeholder="What this budget aims to achieve"
+                disabled={transferring}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-justification-${detail.id}`}>
+                Justification
+              </Label>
+              <Textarea
+                id={`transfer-justification-${detail.id}`}
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                placeholder="Why this budget is needed"
+                disabled={transferring}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-target-${detail.id}`}>
+                Target months
+              </Label>
+              <Input
+                id={`transfer-target-${detail.id}`}
+                type="month"
+                value={targetMonths}
+                onChange={(e) => setTargetMonths(e.target.value)}
+                disabled={transferring}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-budget-${detail.id}`}>
+                OPEX budget (RM)
+              </Label>
+              <Input
+                id={`transfer-budget-${detail.id}`}
+                inputMode="decimal"
+                value={budgetAmount}
+                onChange={(e) =>
+                  setBudgetAmount(e.target.value.replace(/[^\d.]/g, ""))
+                }
+                placeholder="0.00"
+                disabled={transferring}
+                className="h-11 rounded-xl tabular-nums"
+              />
+            </div>
+          </>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor={`transfer-remarks-${detail.id}`}>Remarks</Label>
+          <Input
+            id={`transfer-remarks-${detail.id}`}
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            placeholder="Optional"
+            disabled={transferring}
+            className="h-11 rounded-xl"
+          />
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-wrap items-center gap-2.5 border-t border-foreground/10 pt-6">
+        <button
+          type="button"
+          onClick={submitTransfer}
+          disabled={transferring}
+          className="group inline-flex items-center gap-2 rounded-full bg-sky-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-700 hover:shadow-md disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none"
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20">
+            <ArrowRightLeft className="h-3.5 w-3.5" />
+          </span>
+          {transferring
+            ? "Transferring…"
+            : `Confirm transfer to ${targetType}`}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={transferring}
+          className="rounded-full px-4 py-2.5 text-sm text-foreground/50 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

@@ -649,3 +649,243 @@ export const deleteYearlyBudget = createServerFn({ method: "POST" })
 
     return { budgetId: data.budgetId };
   });
+
+const CAPEX_TRANSFER_CODES = ["200-1100", "200-1000", "200-0500"] as const;
+const OPEX_TRANSFER_CODES = [
+  "926-0000",
+  "916-0000",
+  "999-1003",
+  "992-0000",
+  "923-0000",
+] as const;
+
+export const transferYearlyBudget = createServerFn({ method: "POST" })
+  .validator(
+    z.discriminatedUnion("targetType", [
+      z.object({
+        budgetId: z.number().int().positive(),
+        targetType: z.literal("CAPEX"),
+        code: z.enum(CAPEX_TRANSFER_CODES),
+        itemName: z.string().trim().min(1),
+        justification: z.string().trim().min(1),
+        targetMonths: z.string().trim().max(7).optional(),
+        quantity: z.number().int().positive(),
+        costPerUnit: z.number().positive(),
+        budgetAmount: z.number().positive(),
+        effectIfNotApproved: z.string().trim().optional(),
+        alternative: z.string().trim().optional(),
+        remarks: z.string().trim().optional(),
+      }),
+      z.object({
+        budgetId: z.number().int().positive(),
+        targetType: z.literal("OPEX"),
+        code: z.enum(OPEX_TRANSFER_CODES),
+        activity: z.string().trim().min(1),
+        objective: z.string().trim().min(1),
+        justification: z.string().trim().min(1),
+        targetMonths: z.string().trim().max(7).optional(),
+        budgetAmount: z.number().positive(),
+        remarks: z.string().trim().optional(),
+      }),
+    ]),
+  )
+  .handler(async ({ data }): Promise<BudgetDetail> => {
+    const session = await useSession<SessionUser>(sessionConfig());
+    const user = session.data.user;
+    if (!user) {
+      throw new Error("Please sign in to transfer your budget.");
+    }
+
+    const { assertYearlyBudgetFormEnabled } = await import(
+      "@/lib/settings.server"
+    );
+    await assertYearlyBudgetFormEnabled();
+
+    const { query } = await import("@/server/db");
+    const rows = await query<BudgetRow[]>(
+      `SELECT
+         yb.budget_id,
+         yb.budget_year,
+         yb.budget_type,
+         yb.code,
+         yb.activity,
+         yb.item_name,
+         yb.target_months,
+         yb.objective,
+         yb.justification,
+         yb.quantity,
+         yb.cost_per_unit,
+         yb.budget_amount,
+         yb.effect_if_not_approved,
+         yb.alternative,
+         yb.remarks,
+         yb.reject_remarks,
+         yb.created_at,
+         yb.created_by,
+         qs.status_name,
+         u.email,
+         d.department_name AS department
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
+       WHERE yb.budget_id = ?
+         AND yb.created_by = ?
+       LIMIT 1`,
+      [data.budgetId, user.userId],
+    );
+
+    const row = rows[0];
+    if (!row) {
+      throw new Error("Budget not found. Refresh the page and try again.");
+    }
+
+    if (mapBudgetStatus(row.status_name) !== "Pending") {
+      throw new Error(
+        "Only pending budgets can be transferred. Refresh and try again.",
+      );
+    }
+
+    if (data.targetType === "CAPEX") {
+      if (row.budget_type !== "OPEX") {
+        throw new Error("Only OPEX budgets can be transferred to CAPEX.");
+      }
+
+      await query(
+        `UPDATE yearly_budgets
+         SET status_id = ?,
+             budget_type = 'CAPEX',
+             code = ?,
+             activity = NULL,
+             item_name = ?,
+             target_months = ?,
+             objective = NULL,
+             justification = ?,
+             quantity = ?,
+             cost_per_unit = ?,
+             budget_amount = ?,
+             effect_if_not_approved = ?,
+             alternative = ?,
+             remarks = ?,
+             reject_remarks = NULL
+         WHERE budget_id = ? AND created_by = ?`,
+        [
+          SUBMIT_STATUS_ID,
+          data.code,
+          data.itemName,
+          data.targetMonths || null,
+          data.justification,
+          data.quantity,
+          data.costPerUnit,
+          data.budgetAmount,
+          data.effectIfNotApproved || null,
+          data.alternative || null,
+          data.remarks || null,
+          data.budgetId,
+          user.userId,
+        ],
+      );
+    } else {
+      if (row.budget_type !== "CAPEX") {
+        throw new Error("Only CAPEX budgets can be transferred to OPEX.");
+      }
+
+      await query(
+        `UPDATE yearly_budgets
+         SET status_id = ?,
+             budget_type = 'OPEX',
+             code = ?,
+             activity = ?,
+             item_name = NULL,
+             target_months = ?,
+             objective = ?,
+             justification = ?,
+             quantity = NULL,
+             cost_per_unit = NULL,
+             budget_amount = ?,
+             effect_if_not_approved = NULL,
+             alternative = NULL,
+             remarks = ?,
+             reject_remarks = NULL
+         WHERE budget_id = ? AND created_by = ?`,
+        [
+          SUBMIT_STATUS_ID,
+          data.code,
+          data.activity,
+          data.targetMonths || null,
+          data.objective,
+          data.justification,
+          data.budgetAmount,
+          data.remarks || null,
+          data.budgetId,
+          user.userId,
+        ],
+      );
+    }
+
+    const updatedRows = await query<BudgetRow[]>(
+      `SELECT
+         yb.budget_id,
+         yb.budget_year,
+         yb.budget_type,
+         yb.code,
+         yb.activity,
+         yb.item_name,
+         yb.target_months,
+         yb.objective,
+         yb.justification,
+         yb.quantity,
+         yb.cost_per_unit,
+         yb.budget_amount,
+         yb.effect_if_not_approved,
+         yb.alternative,
+         yb.remarks,
+         yb.reject_remarks,
+         yb.created_at,
+         yb.created_by,
+         qs.status_name,
+         u.email,
+         d.department_name AS department
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
+       WHERE yb.budget_id = ?
+       LIMIT 1`,
+      [data.budgetId],
+    );
+
+    const updated = updatedRows[0];
+    if (!updated) {
+      throw new Error(
+        "Budget was transferred, but could not reload. Refresh the page.",
+      );
+    }
+
+    const { date } = formatBudgetDate(updated.created_at);
+    return {
+      id: updated.budget_id,
+      budgetYear: Number(updated.budget_year),
+      budgetType: updated.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+      code: updated.code,
+      activity: updated.activity,
+      itemName: updated.item_name,
+      targetMonths: updated.target_months,
+      objective: updated.objective,
+      justification: updated.justification,
+      quantity: updated.quantity == null ? null : Number(updated.quantity),
+      costPerUnit:
+        updated.cost_per_unit == null ? null : Number(updated.cost_per_unit),
+      amount: Number(updated.budget_amount),
+      effectIfNotApproved: updated.effect_if_not_approved,
+      alternative: updated.alternative,
+      remarks: updated.remarks,
+      rejectRemarks: updated.reject_remarks,
+      date,
+      status: mapBudgetStatus(updated.status_name),
+      statusName: updated.status_name,
+      createdByEmail: updated.email,
+      department: updated.department,
+      isMine: updated.created_by === user.userId,
+    };
+  });
