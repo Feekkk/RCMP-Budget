@@ -8,6 +8,7 @@ import {
   FileDown,
   Maximize2,
   Minimize2,
+  Pencil,
   Receipt,
   X,
   type LucideIcon,
@@ -30,6 +31,7 @@ import {
   listHodBudgetReport,
   reviewHodBudget,
   transferHodBudget,
+  updateHodBudget,
   type HodBudgetDetail,
 } from "@/lib/hod-budget-fns";
 import {
@@ -83,6 +85,31 @@ type TransferBudgetInput =
       remarks?: string;
     };
 
+type EditBudgetInput =
+  | {
+      budgetType: "CAPEX";
+      code: (typeof CAPEX_CODES)[number]["value"];
+      itemName: string;
+      justification: string;
+      targetMonths?: string;
+      quantity: number;
+      costPerUnit: number;
+      budgetAmount: number;
+      effectIfNotApproved?: string;
+      alternative?: string;
+      remarks?: string;
+    }
+  | {
+      budgetType: "OPEX";
+      code: (typeof OPEX_CODES)[number]["value"];
+      activity: string;
+      objective: string;
+      justification: string;
+      targetMonths?: string;
+      budgetAmount: number;
+      remarks?: string;
+    };
+
 const currentYear = new Date().getFullYear();
 const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
 
@@ -124,6 +151,9 @@ export function HodReportPage() {
   );
   const [transferBudgetRow, setTransferBudgetRow] =
     useState<HodBudgetDetail | null>(null);
+  const [editBudgetRow, setEditBudgetRow] = useState<HodBudgetDetail | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!maximized) return;
@@ -335,6 +365,35 @@ export function HodReportPage() {
     }
   };
 
+  const editBudget = async (id: number, payload: EditBudgetInput) => {
+    const key = `yb-${id}`;
+    if (reviewingKey != null) return;
+    setReviewingKey(key);
+    const toastId = toast.loading(`Saving YB-${id}…`);
+    try {
+      const updated = await updateHodBudget({
+        data: { budgetId: id, ...payload },
+      });
+      setBudgets((prev) =>
+        prev.map((row) => (row.id === id ? updated : row)),
+      );
+      setEditBudgetRow(null);
+      toast.success(`YB-${id} updated`, {
+        id: toastId,
+        description: "Budget details were saved.",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Could not save YB-${id}. Try again.`,
+        { id: toastId },
+      );
+    } finally {
+      setReviewingKey(null);
+    }
+  };
+
   const reviewQuotation = async (
     id: number,
     decision: "Approved" | "Rejected",
@@ -479,6 +538,7 @@ export function HodReportPage() {
                     onApprove={(id) => void reviewBudget(id, "Approved")}
                     onReject={setRejectBudget}
                     onTransfer={setTransferBudgetRow}
+                    onEdit={setEditBudgetRow}
                   />
                 )}
               </div>
@@ -523,6 +583,7 @@ export function HodReportPage() {
                     onApprove={(id) => void reviewBudget(id, "Approved")}
                     onReject={setRejectBudget}
                     onTransfer={setTransferBudgetRow}
+                    onEdit={setEditBudgetRow}
                   />
                 )}
               </div>
@@ -600,6 +661,24 @@ export function HodReportPage() {
               onTransfer={(payload) =>
                 void transferBudget(transferBudgetRow.id, payload)
               }
+            />
+          </DetailOverlay>,
+          document.body,
+        )}
+
+      {editBudgetRow &&
+        createPortal(
+          <DetailOverlay
+            onClose={() => {
+              if (reviewingKey != null) return;
+              setEditBudgetRow(null);
+            }}
+          >
+            <EditBudgetCard
+              detail={editBudgetRow}
+              reviewing={reviewingKey === `yb-${editBudgetRow.id}`}
+              onClose={() => setEditBudgetRow(null)}
+              onSave={(payload) => void editBudget(editBudgetRow.id, payload)}
             />
           </DetailOverlay>,
           document.body,
@@ -780,48 +859,60 @@ function BudgetActions({
   onApprove,
   onReject,
   onTransfer,
+  onEdit,
 }: {
   row: HodBudgetDetail;
   reviewing: boolean;
   onApprove: () => void;
   onReject: () => void;
   onTransfer: () => void;
+  onEdit: () => void;
 }) {
-  if (row.status !== "Pending") {
-    return <span className="text-xs text-foreground/40">—</span>;
-  }
-
   return (
     <div className="flex items-center justify-center gap-1.5">
+      {row.status === "Pending" && (
+        <>
+          <button
+            type="button"
+            onClick={onApprove}
+            disabled={reviewing}
+            aria-label="Approve"
+            title="Approve"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 transition hover:brightness-95 disabled:opacity-50"
+          >
+            <Check className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onReject}
+            disabled={reviewing}
+            aria-label="Reject"
+            title="Reject"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-600 transition hover:brightness-95 disabled:opacity-50"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onTransfer}
+            disabled={reviewing}
+            aria-label="Transfer"
+            title="Transfer"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-800 transition hover:brightness-95 disabled:opacity-50"
+          >
+            <ArrowRightLeft className="h-3.5 w-3.5" />
+          </button>
+        </>
+      )}
       <button
         type="button"
-        onClick={onApprove}
+        onClick={onEdit}
         disabled={reviewing}
-        aria-label="Approve"
-        title="Approve"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 transition hover:brightness-95 disabled:opacity-50"
+        aria-label="Edit"
+        title="Edit"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-800 transition hover:brightness-95 disabled:opacity-50"
       >
-        <Check className="h-3.5 w-3.5" />
-      </button>
-      <button
-        type="button"
-        onClick={onReject}
-        disabled={reviewing}
-        aria-label="Reject"
-        title="Reject"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-600 transition hover:brightness-95 disabled:opacity-50"
-      >
-        <X className="h-3.5 w-3.5" />
-      </button>
-      <button
-        type="button"
-        onClick={onTransfer}
-        disabled={reviewing}
-        aria-label="Transfer"
-        title="Transfer"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-800 transition hover:brightness-95 disabled:opacity-50"
-      >
-        <ArrowRightLeft className="h-3.5 w-3.5" />
+        <Pencil className="h-3.5 w-3.5" />
       </button>
     </div>
   );
@@ -1336,6 +1427,394 @@ function TransferBudgetCard({
   );
 }
 
+function EditBudgetCard({
+  detail,
+  reviewing,
+  onClose,
+  onSave,
+}: {
+  detail: HodBudgetDetail;
+  reviewing: boolean;
+  onClose: () => void;
+  onSave: (payload: EditBudgetInput) => void;
+}) {
+  const isCapex = detail.budgetType === "CAPEX";
+  const [capexCode, setCapexCode] = useState<
+    (typeof CAPEX_CODES)[number]["value"] | ""
+  >(
+    CAPEX_CODES.some((entry) => entry.value === detail.code)
+      ? (detail.code as (typeof CAPEX_CODES)[number]["value"])
+      : "",
+  );
+  const [opexCode, setOpexCode] = useState<
+    (typeof OPEX_CODES)[number]["value"] | ""
+  >(
+    OPEX_CODES.some((entry) => entry.value === detail.code)
+      ? (detail.code as (typeof OPEX_CODES)[number]["value"])
+      : "",
+  );
+  const [itemName, setItemName] = useState(detail.itemName ?? "");
+  const [activity, setActivity] = useState(detail.activity ?? "");
+  const [objective, setObjective] = useState(detail.objective ?? "");
+  const [justification, setJustification] = useState(detail.justification);
+  const [targetMonths, setTargetMonths] = useState(detail.targetMonths ?? "");
+  const [quantity, setQuantity] = useState(detail.quantity ?? 1);
+  const [costPerUnit, setCostPerUnit] = useState(
+    detail.costPerUnit == null ? "" : String(detail.costPerUnit),
+  );
+  const [budgetAmount, setBudgetAmount] = useState(
+    detail.amount > 0 ? String(detail.amount) : "",
+  );
+  const [effectIfNotApproved, setEffectIfNotApproved] = useState(
+    detail.effectIfNotApproved ?? "",
+  );
+  const [alternative, setAlternative] = useState(detail.alternative ?? "");
+  const [remarks, setRemarks] = useState(detail.remarks ?? "");
+
+  const unitValue = Number(costPerUnit) || 0;
+  const estimatedPrice = quantity * unitValue;
+  const opexBudgetValue = Number(budgetAmount) || 0;
+
+  const submitEdit = () => {
+    if (isCapex) {
+      if (!capexCode) {
+        toast.error("Choose a CAPEX code to continue.");
+        return;
+      }
+      if (!itemName.trim()) {
+        toast.error("Enter the item name to continue.");
+        return;
+      }
+      if (!justification.trim()) {
+        toast.error("Add a justification to continue.");
+        return;
+      }
+      if (unitValue <= 0) {
+        toast.error("Enter a cost per unit above zero.");
+        return;
+      }
+      onSave({
+        budgetType: "CAPEX",
+        code: capexCode,
+        itemName: itemName.trim(),
+        justification: justification.trim(),
+        targetMonths: targetMonths || undefined,
+        quantity,
+        costPerUnit: unitValue,
+        budgetAmount: estimatedPrice,
+        effectIfNotApproved: effectIfNotApproved.trim() || undefined,
+        alternative: alternative.trim() || undefined,
+        remarks: remarks.trim() || undefined,
+      });
+      return;
+    }
+
+    if (!opexCode) {
+      toast.error("Choose an OPEX code to continue.");
+      return;
+    }
+    if (!activity.trim()) {
+      toast.error("Enter the activity to continue.");
+      return;
+    }
+    if (!objective.trim()) {
+      toast.error("Add the objectives to continue.");
+      return;
+    }
+    if (!justification.trim()) {
+      toast.error("Add a justification to continue.");
+      return;
+    }
+    if (opexBudgetValue <= 0) {
+      toast.error("Enter a budget amount above zero.");
+      return;
+    }
+    onSave({
+      budgetType: "OPEX",
+      code: opexCode,
+      activity: activity.trim(),
+      objective: objective.trim(),
+      justification: justification.trim(),
+      targetMonths: targetMonths || undefined,
+      budgetAmount: opexBudgetValue,
+      remarks: remarks.trim() || undefined,
+    });
+  };
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+            Edit {detail.budgetType}
+          </p>
+          <h2 className="mt-1 font-display text-3xl">YB-{detail.id}</h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            RM {formatRm(detail.amount)} · {detail.requester}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={reviewing}
+          aria-label="Close edit form"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground/50 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-6 space-y-4">
+        {isCapex ? (
+          <>
+            <div className="space-y-2">
+              <Label>CAPEX code</Label>
+              <Select
+                value={capexCode}
+                onValueChange={(value) =>
+                  setCapexCode(value as (typeof CAPEX_CODES)[number]["value"])
+                }
+                disabled={reviewing}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select CAPEX code" />
+                </SelectTrigger>
+                <SelectContent className="z-[110]">
+                  {CAPEX_CODES.map((entry) => (
+                    <SelectItem key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`edit-item-${detail.id}`}>Item</Label>
+              <Input
+                id={`edit-item-${detail.id}`}
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                placeholder="e.g. Laboratory microscope"
+                disabled={reviewing}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`edit-justification-${detail.id}`}>
+                Justification
+              </Label>
+              <Textarea
+                id={`edit-justification-${detail.id}`}
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                placeholder="Why this item is needed"
+                disabled={reviewing}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`edit-target-${detail.id}`}>Target months</Label>
+              <Input
+                id={`edit-target-${detail.id}`}
+                type="month"
+                value={targetMonths}
+                onChange={(e) => setTargetMonths(e.target.value)}
+                disabled={reviewing}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`edit-qty-${detail.id}`}>Quantity</Label>
+                <Input
+                  id={`edit-qty-${detail.id}`}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={quantity}
+                  onChange={(e) =>
+                    setQuantity(Math.max(1, Number(e.target.value) || 1))
+                  }
+                  disabled={reviewing}
+                  className="h-11 rounded-xl tabular-nums"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`edit-unit-${detail.id}`}>
+                  Cost per unit (RM)
+                </Label>
+                <Input
+                  id={`edit-unit-${detail.id}`}
+                  inputMode="decimal"
+                  value={costPerUnit}
+                  onChange={(e) =>
+                    setCostPerUnit(e.target.value.replace(/[^\d.]/g, ""))
+                  }
+                  placeholder="0.00"
+                  disabled={reviewing}
+                  className="h-11 rounded-xl tabular-nums"
+                />
+              </div>
+            </div>
+            <div className="rounded-2xl bg-ivory px-4 py-3">
+              <p className="text-xs text-foreground/50">Estimated price</p>
+              <p className="mt-1 font-display text-2xl tabular-nums">
+                RM {formatRm(estimatedPrice)}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`edit-effect-${detail.id}`}>
+                Effect if not approved
+              </Label>
+              <Textarea
+                id={`edit-effect-${detail.id}`}
+                value={effectIfNotApproved}
+                onChange={(e) => setEffectIfNotApproved(e.target.value)}
+                placeholder="Optional"
+                disabled={reviewing}
+                className="min-h-16 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`edit-alt-${detail.id}`}>Alternative</Label>
+              <Textarea
+                id={`edit-alt-${detail.id}`}
+                value={alternative}
+                onChange={(e) => setAlternative(e.target.value)}
+                placeholder="Optional"
+                disabled={reviewing}
+                className="min-h-16 rounded-xl"
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label>OPEX code</Label>
+              <Select
+                value={opexCode}
+                onValueChange={(value) =>
+                  setOpexCode(value as (typeof OPEX_CODES)[number]["value"])
+                }
+                disabled={reviewing}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select OPEX code" />
+                </SelectTrigger>
+                <SelectContent className="z-[110]">
+                  {OPEX_CODES.map((entry) => (
+                    <SelectItem key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`edit-activity-${detail.id}`}>
+                Activities / Programme / Event
+              </Label>
+              <Input
+                id={`edit-activity-${detail.id}`}
+                value={activity}
+                onChange={(e) => setActivity(e.target.value)}
+                placeholder="e.g. Annual maintenance"
+                disabled={reviewing}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`edit-objective-${detail.id}`}>Objectives</Label>
+              <Textarea
+                id={`edit-objective-${detail.id}`}
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                placeholder="What this budget aims to achieve"
+                disabled={reviewing}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`edit-opex-justification-${detail.id}`}>
+                Justification
+              </Label>
+              <Textarea
+                id={`edit-opex-justification-${detail.id}`}
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                placeholder="Why this budget is needed"
+                disabled={reviewing}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`edit-opex-target-${detail.id}`}>
+                Target months
+              </Label>
+              <Input
+                id={`edit-opex-target-${detail.id}`}
+                type="month"
+                value={targetMonths}
+                onChange={(e) => setTargetMonths(e.target.value)}
+                disabled={reviewing}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`edit-budget-${detail.id}`}>
+                OPEX budget (RM)
+              </Label>
+              <Input
+                id={`edit-budget-${detail.id}`}
+                inputMode="decimal"
+                value={budgetAmount}
+                onChange={(e) =>
+                  setBudgetAmount(e.target.value.replace(/[^\d.]/g, ""))
+                }
+                placeholder="0.00"
+                disabled={reviewing}
+                className="h-11 rounded-xl tabular-nums"
+              />
+            </div>
+          </>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor={`edit-remarks-${detail.id}`}>Remarks</Label>
+          <Input
+            id={`edit-remarks-${detail.id}`}
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            placeholder="Optional"
+            disabled={reviewing}
+            className="h-11 rounded-xl"
+          />
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-wrap items-center gap-2.5 border-t border-foreground/10 pt-6">
+        <button
+          type="button"
+          onClick={submitEdit}
+          disabled={reviewing}
+          className="inline-flex items-center gap-2 rounded-full bg-amber-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-amber-800 disabled:opacity-50"
+        >
+          <Pencil className="h-4 w-4" />
+          {reviewing ? "Saving…" : "Save changes"}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={reviewing}
+          className="rounded-full px-4 py-2.5 text-sm text-foreground/50 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function OpexTable({
   rows,
   total,
@@ -1343,6 +1822,7 @@ function OpexTable({
   onApprove,
   onReject,
   onTransfer,
+  onEdit,
 }: {
   rows: HodBudgetDetail[];
   total: number;
@@ -1350,6 +1830,7 @@ function OpexTable({
   onApprove: (id: number) => void;
   onReject: (row: HodBudgetDetail) => void;
   onTransfer: (row: HodBudgetDetail) => void;
+  onEdit: (row: HodBudgetDetail) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-foreground/15">
@@ -1420,6 +1901,7 @@ function OpexTable({
                   onApprove={() => onApprove(row.id)}
                   onReject={() => onReject(row)}
                   onTransfer={() => onTransfer(row)}
+                  onEdit={() => onEdit(row)}
                 />
               </td>
             </tr>
@@ -1455,6 +1937,7 @@ function CapexTable({
   onApprove,
   onReject,
   onTransfer,
+  onEdit,
 }: {
   rows: HodBudgetDetail[];
   year: number;
@@ -1463,6 +1946,7 @@ function CapexTable({
   onApprove: (id: number) => void;
   onReject: (row: HodBudgetDetail) => void;
   onTransfer: (row: HodBudgetDetail) => void;
+  onEdit: (row: HodBudgetDetail) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-foreground/15">
@@ -1572,6 +2056,7 @@ function CapexTable({
                   onApprove={() => onApprove(row.id)}
                   onReject={() => onReject(row)}
                   onTransfer={() => onTransfer(row)}
+                  onEdit={() => onEdit(row)}
                 />
               </td>
             </tr>

@@ -557,3 +557,188 @@ export const transferHodBudget = createServerFn({ method: "POST" })
       statusName: "approved budget",
     };
   });
+
+export const updateHodBudget = createServerFn({ method: "POST" })
+  .validator(
+    z.discriminatedUnion("budgetType", [
+      z.object({
+        budgetId: z.number().int().positive(),
+        budgetType: z.literal("CAPEX"),
+        code: z.enum(CAPEX_TRANSFER_CODES),
+        itemName: z.string().trim().min(1),
+        justification: z.string().trim().min(1),
+        targetMonths: z.string().trim().max(7).optional(),
+        quantity: z.number().int().positive(),
+        costPerUnit: z.number().positive(),
+        budgetAmount: z.number().positive(),
+        effectIfNotApproved: z.string().trim().optional(),
+        alternative: z.string().trim().optional(),
+        remarks: z.string().trim().optional(),
+      }),
+      z.object({
+        budgetId: z.number().int().positive(),
+        budgetType: z.literal("OPEX"),
+        code: z.enum(OPEX_TRANSFER_CODES),
+        activity: z.string().trim().min(1),
+        objective: z.string().trim().min(1),
+        justification: z.string().trim().min(1),
+        targetMonths: z.string().trim().max(7).optional(),
+        budgetAmount: z.number().positive(),
+        remarks: z.string().trim().optional(),
+      }),
+    ]),
+  )
+  .middleware([hodOnly])
+  .handler(async ({ data, context }): Promise<HodBudgetDetail> => {
+    const { user } = context;
+
+    const { query } = await import("@/server/db");
+    const params: unknown[] = [data.budgetId];
+    let departmentFilter = "";
+    if (user.departmentId != null) {
+      departmentFilter = "AND u.department_id = ?";
+      params.push(user.departmentId);
+    }
+
+    const rows = await query<BudgetRow[]>(
+      `SELECT
+         yb.budget_id,
+         yb.budget_year,
+         yb.budget_type,
+         yb.code,
+         yb.activity,
+         yb.item_name,
+         yb.target_months,
+         yb.objective,
+         yb.justification,
+         yb.quantity,
+         yb.cost_per_unit,
+         yb.budget_amount,
+         yb.effect_if_not_approved,
+         yb.alternative,
+         yb.remarks,
+         yb.reject_remarks,
+         yb.created_at,
+         qs.status_name,
+         u.email AS requester_email,
+         d.department_name AS department,
+         u.designation
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
+       WHERE yb.budget_id = ?
+       ${departmentFilter}
+       LIMIT 1`,
+      params,
+    );
+
+    const row = rows[0];
+    if (!row) {
+      throw new Error("Budget not found. Refresh the list and try again.");
+    }
+
+    if (mapStatus(row.status_name) === "Rejected") {
+      throw new Error("Rejected budgets cannot be edited.");
+    }
+
+    if (
+      (data.budgetType === "OPEX" && row.budget_type !== "OPEX") ||
+      (data.budgetType === "CAPEX" && row.budget_type !== "CAPEX")
+    ) {
+      throw new Error("Budget type cannot be changed. Refresh and try again.");
+    }
+
+    if (data.budgetType === "CAPEX") {
+      await query(
+        `UPDATE yearly_budgets
+         SET code = ?,
+             item_name = ?,
+             target_months = ?,
+             justification = ?,
+             quantity = ?,
+             cost_per_unit = ?,
+             budget_amount = ?,
+             effect_if_not_approved = ?,
+             alternative = ?,
+             remarks = ?
+         WHERE budget_id = ?`,
+        [
+          data.code,
+          data.itemName,
+          data.targetMonths || null,
+          data.justification,
+          data.quantity,
+          data.costPerUnit,
+          data.budgetAmount,
+          data.effectIfNotApproved || null,
+          data.alternative || null,
+          data.remarks || null,
+          data.budgetId,
+        ],
+      );
+    } else {
+      await query(
+        `UPDATE yearly_budgets
+         SET code = ?,
+             activity = ?,
+             target_months = ?,
+             objective = ?,
+             justification = ?,
+             budget_amount = ?,
+             remarks = ?
+         WHERE budget_id = ?`,
+        [
+          data.code,
+          data.activity,
+          data.targetMonths || null,
+          data.objective,
+          data.justification,
+          data.budgetAmount,
+          data.remarks || null,
+          data.budgetId,
+        ],
+      );
+    }
+
+    const updatedRows = await query<BudgetRow[]>(
+      `SELECT
+         yb.budget_id,
+         yb.budget_year,
+         yb.budget_type,
+         yb.code,
+         yb.activity,
+         yb.item_name,
+         yb.target_months,
+         yb.objective,
+         yb.justification,
+         yb.quantity,
+         yb.cost_per_unit,
+         yb.budget_amount,
+         yb.effect_if_not_approved,
+         yb.alternative,
+         yb.remarks,
+         yb.reject_remarks,
+         yb.created_at,
+         qs.status_name,
+         u.email AS requester_email,
+         d.department_name AS department,
+         u.designation
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
+       WHERE yb.budget_id = ?
+       LIMIT 1`,
+      [data.budgetId],
+    );
+
+    const updated = updatedRows[0];
+    if (!updated) {
+      throw new Error(
+        "Budget was updated, but could not reload. Refresh the page.",
+      );
+    }
+
+    return toDetail(updated);
+  });
