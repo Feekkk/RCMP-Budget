@@ -10,6 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as UserRouteRouteImport } from './routes/user/route'
+import { Route as ProcumentRouteRouteImport } from './routes/procument/route'
+import { Route as HodRouteRouteImport } from './routes/hod/route'
+import { Route as FinanceRouteRouteImport } from './routes/finance/route'
+import { Route as CeoRouteRouteImport } from './routes/ceo/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UserIndexRouteImport } from './routes/user/index'
 import { Route as ProcumentIndexRouteImport } from './routes/procument/index'
@@ -37,114 +42,144 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UserRouteRoute = UserRouteRouteImport.update({
+  id: '/user',
+  path: '/user',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProcumentRouteRoute = ProcumentRouteRouteImport.update({
+  id: '/procument',
+  path: '/procument',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HodRouteRoute = HodRouteRouteImport.update({
+  id: '/hod',
+  path: '/hod',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceRouteRoute = FinanceRouteRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CeoRouteRoute = CeoRouteRouteImport.update({
+  id: '/ceo',
+  path: '/ceo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserIndexRoute = UserIndexRouteImport.update({
-  id: '/user/',
-  path: '/user/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => UserRouteRoute,
 } as any)
 const ProcumentIndexRoute = ProcumentIndexRouteImport.update({
-  id: '/procument/',
-  path: '/procument/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProcumentRouteRoute,
 } as any)
 const HodIndexRoute = HodIndexRouteImport.update({
-  id: '/hod/',
-  path: '/hod/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => HodRouteRoute,
 } as any)
 const FinanceIndexRoute = FinanceIndexRouteImport.update({
-  id: '/finance/',
-  path: '/finance/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => FinanceRouteRoute,
 } as any)
 const CeoIndexRoute = CeoIndexRouteImport.update({
-  id: '/ceo/',
-  path: '/ceo/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => CeoRouteRoute,
 } as any)
 const UserQuotationRoute = UserQuotationRouteImport.update({
-  id: '/user/quotation',
-  path: '/user/quotation',
-  getParentRoute: () => rootRouteImport,
+  id: '/quotation',
+  path: '/quotation',
+  getParentRoute: () => UserRouteRoute,
 } as any)
 const UserProfileRoute = UserProfileRouteImport.update({
-  id: '/user/profile',
-  path: '/user/profile',
-  getParentRoute: () => rootRouteImport,
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => UserRouteRoute,
 } as any)
 const UserHistoryRoute = UserHistoryRouteImport.update({
-  id: '/user/history',
-  path: '/user/history',
-  getParentRoute: () => rootRouteImport,
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => UserRouteRoute,
 } as any)
 const UserDepartmentRoute = UserDepartmentRouteImport.update({
-  id: '/user/department',
-  path: '/user/department',
-  getParentRoute: () => rootRouteImport,
+  id: '/department',
+  path: '/department',
+  getParentRoute: () => UserRouteRoute,
 } as any)
 const UserCalendarRoute = UserCalendarRouteImport.update({
-  id: '/user/calendar',
-  path: '/user/calendar',
-  getParentRoute: () => rootRouteImport,
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => UserRouteRoute,
 } as any)
 const UserBudgetRoute = UserBudgetRouteImport.update({
-  id: '/user/budget',
-  path: '/user/budget',
-  getParentRoute: () => rootRouteImport,
+  id: '/budget',
+  path: '/budget',
+  getParentRoute: () => UserRouteRoute,
 } as any)
 const ProcumentSettingsRoute = ProcumentSettingsRouteImport.update({
-  id: '/procument/settings',
-  path: '/procument/settings',
-  getParentRoute: () => rootRouteImport,
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => ProcumentRouteRoute,
 } as any)
 const ProcumentQuotationsRoute = ProcumentQuotationsRouteImport.update({
-  id: '/procument/quotations',
-  path: '/procument/quotations',
-  getParentRoute: () => rootRouteImport,
+  id: '/quotations',
+  path: '/quotations',
+  getParentRoute: () => ProcumentRouteRoute,
 } as any)
 const HodSettingsRoute = HodSettingsRouteImport.update({
-  id: '/hod/settings',
-  path: '/hod/settings',
-  getParentRoute: () => rootRouteImport,
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => HodRouteRoute,
 } as any)
 const HodReportsRoute = HodReportsRouteImport.update({
-  id: '/hod/reports',
-  path: '/hod/reports',
-  getParentRoute: () => rootRouteImport,
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => HodRouteRoute,
 } as any)
 const HodCalendarRoute = HodCalendarRouteImport.update({
-  id: '/hod/calendar',
-  path: '/hod/calendar',
-  getParentRoute: () => rootRouteImport,
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => HodRouteRoute,
 } as any)
 const FinanceSettingsRoute = FinanceSettingsRouteImport.update({
-  id: '/finance/settings',
-  path: '/finance/settings',
-  getParentRoute: () => rootRouteImport,
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => FinanceRouteRoute,
 } as any)
 const FinanceRequestRoute = FinanceRequestRouteImport.update({
-  id: '/finance/request',
-  path: '/finance/request',
-  getParentRoute: () => rootRouteImport,
+  id: '/request',
+  path: '/request',
+  getParentRoute: () => FinanceRouteRoute,
 } as any)
 const CeoSettingsRoute = CeoSettingsRouteImport.update({
-  id: '/ceo/settings',
-  path: '/ceo/settings',
-  getParentRoute: () => rootRouteImport,
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => CeoRouteRoute,
 } as any)
 const FinanceRequestIdRoute = FinanceRequestIdRouteImport.update({
-  id: '/finance/request_/$id',
-  path: '/finance/request/$id',
-  getParentRoute: () => rootRouteImport,
+  id: '/request_/$id',
+  path: '/request/$id',
+  getParentRoute: () => FinanceRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ceo': typeof CeoRouteRouteWithChildren
+  '/finance': typeof FinanceRouteRouteWithChildren
+  '/hod': typeof HodRouteRouteWithChildren
+  '/procument': typeof ProcumentRouteRouteWithChildren
+  '/user': typeof UserRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/ceo/settings': typeof CeoSettingsRoute
   '/finance/request': typeof FinanceRequestRoute
@@ -194,6 +229,11 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ceo': typeof CeoRouteRouteWithChildren
+  '/finance': typeof FinanceRouteRouteWithChildren
+  '/hod': typeof HodRouteRouteWithChildren
+  '/procument': typeof ProcumentRouteRouteWithChildren
+  '/user': typeof UserRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/ceo/settings': typeof CeoSettingsRoute
   '/finance/request': typeof FinanceRequestRoute
@@ -220,6 +260,11 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ceo'
+    | '/finance'
+    | '/hod'
+    | '/procument'
+    | '/user'
     | '/login'
     | '/ceo/settings'
     | '/finance/request'
@@ -268,6 +313,11 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ceo'
+    | '/finance'
+    | '/hod'
+    | '/procument'
+    | '/user'
     | '/login'
     | '/ceo/settings'
     | '/finance/request'
@@ -293,27 +343,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CeoRouteRoute: typeof CeoRouteRouteWithChildren
+  FinanceRouteRoute: typeof FinanceRouteRouteWithChildren
+  HodRouteRoute: typeof HodRouteRouteWithChildren
+  ProcumentRouteRoute: typeof ProcumentRouteRouteWithChildren
+  UserRouteRoute: typeof UserRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
-  CeoSettingsRoute: typeof CeoSettingsRoute
-  FinanceRequestRoute: typeof FinanceRequestRoute
-  FinanceSettingsRoute: typeof FinanceSettingsRoute
-  HodCalendarRoute: typeof HodCalendarRoute
-  HodReportsRoute: typeof HodReportsRoute
-  HodSettingsRoute: typeof HodSettingsRoute
-  ProcumentQuotationsRoute: typeof ProcumentQuotationsRoute
-  ProcumentSettingsRoute: typeof ProcumentSettingsRoute
-  UserBudgetRoute: typeof UserBudgetRoute
-  UserCalendarRoute: typeof UserCalendarRoute
-  UserDepartmentRoute: typeof UserDepartmentRoute
-  UserHistoryRoute: typeof UserHistoryRoute
-  UserProfileRoute: typeof UserProfileRoute
-  UserQuotationRoute: typeof UserQuotationRoute
-  CeoIndexRoute: typeof CeoIndexRoute
-  FinanceIndexRoute: typeof FinanceIndexRoute
-  HodIndexRoute: typeof HodIndexRoute
-  ProcumentIndexRoute: typeof ProcumentIndexRoute
-  UserIndexRoute: typeof UserIndexRoute
-  FinanceRequestIdRoute: typeof FinanceRequestIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -325,6 +360,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/user': {
+      id: '/user'
+      path: '/user'
+      fullPath: '/user'
+      preLoaderRoute: typeof UserRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/procument': {
+      id: '/procument'
+      path: '/procument'
+      fullPath: '/procument'
+      preLoaderRoute: typeof ProcumentRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hod': {
+      id: '/hod'
+      path: '/hod'
+      fullPath: '/hod'
+      preLoaderRoute: typeof HodRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/finance': {
+      id: '/finance'
+      path: '/finance'
+      fullPath: '/finance'
+      preLoaderRoute: typeof FinanceRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ceo': {
+      id: '/ceo'
+      path: '/ceo'
+      fullPath: '/ceo'
+      preLoaderRoute: typeof CeoRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -334,170 +404,245 @@ declare module '@tanstack/react-router' {
     }
     '/user/': {
       id: '/user/'
-      path: '/user'
+      path: '/'
       fullPath: '/user/'
       preLoaderRoute: typeof UserIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof UserRouteRoute
     }
     '/procument/': {
       id: '/procument/'
-      path: '/procument'
+      path: '/'
       fullPath: '/procument/'
       preLoaderRoute: typeof ProcumentIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ProcumentRouteRoute
     }
     '/hod/': {
       id: '/hod/'
-      path: '/hod'
+      path: '/'
       fullPath: '/hod/'
       preLoaderRoute: typeof HodIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HodRouteRoute
     }
     '/finance/': {
       id: '/finance/'
-      path: '/finance'
+      path: '/'
       fullPath: '/finance/'
       preLoaderRoute: typeof FinanceIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof FinanceRouteRoute
     }
     '/ceo/': {
       id: '/ceo/'
-      path: '/ceo'
+      path: '/'
       fullPath: '/ceo/'
       preLoaderRoute: typeof CeoIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof CeoRouteRoute
     }
     '/user/quotation': {
       id: '/user/quotation'
-      path: '/user/quotation'
+      path: '/quotation'
       fullPath: '/user/quotation'
       preLoaderRoute: typeof UserQuotationRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof UserRouteRoute
     }
     '/user/profile': {
       id: '/user/profile'
-      path: '/user/profile'
+      path: '/profile'
       fullPath: '/user/profile'
       preLoaderRoute: typeof UserProfileRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof UserRouteRoute
     }
     '/user/history': {
       id: '/user/history'
-      path: '/user/history'
+      path: '/history'
       fullPath: '/user/history'
       preLoaderRoute: typeof UserHistoryRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof UserRouteRoute
     }
     '/user/department': {
       id: '/user/department'
-      path: '/user/department'
+      path: '/department'
       fullPath: '/user/department'
       preLoaderRoute: typeof UserDepartmentRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof UserRouteRoute
     }
     '/user/calendar': {
       id: '/user/calendar'
-      path: '/user/calendar'
+      path: '/calendar'
       fullPath: '/user/calendar'
       preLoaderRoute: typeof UserCalendarRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof UserRouteRoute
     }
     '/user/budget': {
       id: '/user/budget'
-      path: '/user/budget'
+      path: '/budget'
       fullPath: '/user/budget'
       preLoaderRoute: typeof UserBudgetRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof UserRouteRoute
     }
     '/procument/settings': {
       id: '/procument/settings'
-      path: '/procument/settings'
+      path: '/settings'
       fullPath: '/procument/settings'
       preLoaderRoute: typeof ProcumentSettingsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ProcumentRouteRoute
     }
     '/procument/quotations': {
       id: '/procument/quotations'
-      path: '/procument/quotations'
+      path: '/quotations'
       fullPath: '/procument/quotations'
       preLoaderRoute: typeof ProcumentQuotationsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ProcumentRouteRoute
     }
     '/hod/settings': {
       id: '/hod/settings'
-      path: '/hod/settings'
+      path: '/settings'
       fullPath: '/hod/settings'
       preLoaderRoute: typeof HodSettingsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HodRouteRoute
     }
     '/hod/reports': {
       id: '/hod/reports'
-      path: '/hod/reports'
+      path: '/reports'
       fullPath: '/hod/reports'
       preLoaderRoute: typeof HodReportsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HodRouteRoute
     }
     '/hod/calendar': {
       id: '/hod/calendar'
-      path: '/hod/calendar'
+      path: '/calendar'
       fullPath: '/hod/calendar'
       preLoaderRoute: typeof HodCalendarRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof HodRouteRoute
     }
     '/finance/settings': {
       id: '/finance/settings'
-      path: '/finance/settings'
+      path: '/settings'
       fullPath: '/finance/settings'
       preLoaderRoute: typeof FinanceSettingsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof FinanceRouteRoute
     }
     '/finance/request': {
       id: '/finance/request'
-      path: '/finance/request'
+      path: '/request'
       fullPath: '/finance/request'
       preLoaderRoute: typeof FinanceRequestRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof FinanceRouteRoute
     }
     '/ceo/settings': {
       id: '/ceo/settings'
-      path: '/ceo/settings'
+      path: '/settings'
       fullPath: '/ceo/settings'
       preLoaderRoute: typeof CeoSettingsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof CeoRouteRoute
     }
     '/finance/request_/$id': {
       id: '/finance/request_/$id'
-      path: '/finance/request/$id'
+      path: '/request/$id'
       fullPath: '/finance/request/$id'
       preLoaderRoute: typeof FinanceRequestIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof FinanceRouteRoute
     }
   }
 }
 
-const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  LoginRoute: LoginRoute,
+interface CeoRouteRouteChildren {
+  CeoSettingsRoute: typeof CeoSettingsRoute
+  CeoIndexRoute: typeof CeoIndexRoute
+}
+
+const CeoRouteRouteChildren: CeoRouteRouteChildren = {
   CeoSettingsRoute: CeoSettingsRoute,
+  CeoIndexRoute: CeoIndexRoute,
+}
+
+const CeoRouteRouteWithChildren = CeoRouteRoute._addFileChildren(
+  CeoRouteRouteChildren,
+)
+
+interface FinanceRouteRouteChildren {
+  FinanceRequestRoute: typeof FinanceRequestRoute
+  FinanceSettingsRoute: typeof FinanceSettingsRoute
+  FinanceIndexRoute: typeof FinanceIndexRoute
+  FinanceRequestIdRoute: typeof FinanceRequestIdRoute
+}
+
+const FinanceRouteRouteChildren: FinanceRouteRouteChildren = {
   FinanceRequestRoute: FinanceRequestRoute,
   FinanceSettingsRoute: FinanceSettingsRoute,
+  FinanceIndexRoute: FinanceIndexRoute,
+  FinanceRequestIdRoute: FinanceRequestIdRoute,
+}
+
+const FinanceRouteRouteWithChildren = FinanceRouteRoute._addFileChildren(
+  FinanceRouteRouteChildren,
+)
+
+interface HodRouteRouteChildren {
+  HodCalendarRoute: typeof HodCalendarRoute
+  HodReportsRoute: typeof HodReportsRoute
+  HodSettingsRoute: typeof HodSettingsRoute
+  HodIndexRoute: typeof HodIndexRoute
+}
+
+const HodRouteRouteChildren: HodRouteRouteChildren = {
   HodCalendarRoute: HodCalendarRoute,
   HodReportsRoute: HodReportsRoute,
   HodSettingsRoute: HodSettingsRoute,
+  HodIndexRoute: HodIndexRoute,
+}
+
+const HodRouteRouteWithChildren = HodRouteRoute._addFileChildren(
+  HodRouteRouteChildren,
+)
+
+interface ProcumentRouteRouteChildren {
+  ProcumentQuotationsRoute: typeof ProcumentQuotationsRoute
+  ProcumentSettingsRoute: typeof ProcumentSettingsRoute
+  ProcumentIndexRoute: typeof ProcumentIndexRoute
+}
+
+const ProcumentRouteRouteChildren: ProcumentRouteRouteChildren = {
   ProcumentQuotationsRoute: ProcumentQuotationsRoute,
   ProcumentSettingsRoute: ProcumentSettingsRoute,
+  ProcumentIndexRoute: ProcumentIndexRoute,
+}
+
+const ProcumentRouteRouteWithChildren = ProcumentRouteRoute._addFileChildren(
+  ProcumentRouteRouteChildren,
+)
+
+interface UserRouteRouteChildren {
+  UserBudgetRoute: typeof UserBudgetRoute
+  UserCalendarRoute: typeof UserCalendarRoute
+  UserDepartmentRoute: typeof UserDepartmentRoute
+  UserHistoryRoute: typeof UserHistoryRoute
+  UserProfileRoute: typeof UserProfileRoute
+  UserQuotationRoute: typeof UserQuotationRoute
+  UserIndexRoute: typeof UserIndexRoute
+}
+
+const UserRouteRouteChildren: UserRouteRouteChildren = {
   UserBudgetRoute: UserBudgetRoute,
   UserCalendarRoute: UserCalendarRoute,
   UserDepartmentRoute: UserDepartmentRoute,
   UserHistoryRoute: UserHistoryRoute,
   UserProfileRoute: UserProfileRoute,
   UserQuotationRoute: UserQuotationRoute,
-  CeoIndexRoute: CeoIndexRoute,
-  FinanceIndexRoute: FinanceIndexRoute,
-  HodIndexRoute: HodIndexRoute,
-  ProcumentIndexRoute: ProcumentIndexRoute,
   UserIndexRoute: UserIndexRoute,
-  FinanceRequestIdRoute: FinanceRequestIdRoute,
+}
+
+const UserRouteRouteWithChildren = UserRouteRoute._addFileChildren(
+  UserRouteRouteChildren,
+)
+
+const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
+  CeoRouteRoute: CeoRouteRouteWithChildren,
+  FinanceRouteRoute: FinanceRouteRouteWithChildren,
+  HodRouteRoute: HodRouteRouteWithChildren,
+  ProcumentRouteRoute: ProcumentRouteRouteWithChildren,
+  UserRouteRoute: UserRouteRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

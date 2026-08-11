@@ -1,21 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { roleMiddleware } from "@/lib/middleware";
 import type { AuthUser } from "@/lib/auth";
 
-type SessionUser = {
-  user: AuthUser;
-};
-
-const sessionPassword = "budget_tracker-dev-session-secret-32";
-
-function sessionConfig() {
-  return {
-    password: sessionPassword,
-    name: "budget_tracker",
-    maxAge: 60 * 60 * 24 * 7,
-  };
-}
+const userOnly = roleMiddleware("User");
 
 export type DepartmentBudgetStatus = "Pending" | "Approved" | "Rejected";
 
@@ -87,16 +75,6 @@ type QuotationRow = {
   first_item: string | null;
   requester_email: string;
 };
-
-function requireUser(user: AuthUser | undefined): AuthUser {
-  if (!user) {
-    throw new Error("Please sign in to view your department.");
-  }
-  if (user.roleName !== "User") {
-    throw new Error("Only staff accounts can open My Department.");
-  }
-  return user;
-}
 
 function mapBudgetStatus(statusName: string): DepartmentBudgetStatus {
   if (statusName.includes("rejected")) return "Rejected";
@@ -181,9 +159,9 @@ export const listDepartmentBudgetReport = createServerFn({ method: "GET" })
       budgetYear: z.number().int().min(2000).max(2100).optional(),
     }),
   )
-  .handler(async ({ data }): Promise<DepartmentBudgetDetail[]> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireUser(session.data.user);
+  .middleware([userOnly])
+  .handler(async ({ data, context }): Promise<DepartmentBudgetDetail[]> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const budgetYear = data.budgetYear ?? new Date().getFullYear();
@@ -229,46 +207,47 @@ export const listDepartmentBudgetReport = createServerFn({ method: "GET" })
 
 export const listDepartmentQuotations = createServerFn({
   method: "GET",
-}).handler(async (): Promise<DepartmentQuotationListItem[]> => {
-  const session = await useSession<SessionUser>(sessionConfig());
-  const user = requireUser(session.data.user);
+})
+  .middleware([userOnly])
+  .handler(async ({ context }): Promise<DepartmentQuotationListItem[]> => {
+    const { user } = context;
 
-  const { query } = await import("@/server/db");
-  const scope = departmentScope(user);
+    const { query } = await import("@/server/db");
+    const scope = departmentScope(user);
 
-  const rows = await query<QuotationRow[]>(
-    `SELECT
-       q.quotation_id,
-       qs.status_name,
-       q.created_at,
-       COUNT(qi.quotation_item_id) AS item_count,
-       COALESCE(SUM(qi.item_price * qi.item_quantity), 0) AS total_amount,
-       (
-         SELECT qi2.item_name
-         FROM quotations_items qi2
-         WHERE qi2.quotation_id = q.quotation_id
-         ORDER BY qi2.quotation_item_id ASC
-         LIMIT 1
-       ) AS first_item,
-       u.email AS requester_email
-     FROM quotations q
-     INNER JOIN quotation_statuses qs ON qs.status_id = q.status_id
-     INNER JOIN users u ON u.user_id = q.user_id
-     LEFT JOIN quotations_items qi ON qi.quotation_id = q.quotation_id
-     WHERE 1 = 1
-     ${scope.filter}
-     GROUP BY q.quotation_id, qs.status_name, q.created_at, u.email
-     ORDER BY q.created_at DESC`,
-    scope.params,
-  );
+    const rows = await query<QuotationRow[]>(
+      `SELECT
+         q.quotation_id,
+         qs.status_name,
+         q.created_at,
+         COUNT(qi.quotation_item_id) AS item_count,
+         COALESCE(SUM(qi.item_price * qi.item_quantity), 0) AS total_amount,
+         (
+           SELECT qi2.item_name
+           FROM quotations_items qi2
+           WHERE qi2.quotation_id = q.quotation_id
+           ORDER BY qi2.quotation_item_id ASC
+           LIMIT 1
+         ) AS first_item,
+         u.email AS requester_email
+       FROM quotations q
+       INNER JOIN quotation_statuses qs ON qs.status_id = q.status_id
+       INNER JOIN users u ON u.user_id = q.user_id
+       LEFT JOIN quotations_items qi ON qi.quotation_id = q.quotation_id
+       WHERE 1 = 1
+       ${scope.filter}
+       GROUP BY q.quotation_id, qs.status_name, q.created_at, u.email
+       ORDER BY q.created_at DESC`,
+      scope.params,
+    );
 
-  return rows.map((row) => ({
-    id: row.quotation_id,
-    title: formatTitle(row.first_item, Number(row.item_count)),
-    requester: row.requester_email,
-    amount: Number(row.total_amount),
-    date: formatDate(row.created_at),
-    status: mapQuotationStatus(row.status_name),
-    statusName: row.status_name,
-  }));
-});
+    return rows.map((row) => ({
+      id: row.quotation_id,
+      title: formatTitle(row.first_item, Number(row.item_count)),
+      requester: row.requester_email,
+      amount: Number(row.total_amount),
+      date: formatDate(row.created_at),
+      status: mapQuotationStatus(row.status_name),
+      statusName: row.status_name,
+    }));
+  });

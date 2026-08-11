@@ -1,11 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { getAuthSession } from "@/lib/session";
 import type { AuthUser, RoleName } from "@/lib/auth";
-
-type SessionUser = {
-  user: AuthUser;
-};
 
 type UserRow = {
   user_id: number;
@@ -18,20 +14,6 @@ type UserRow = {
   role_id: number;
   role_name: string;
 };
-
-const sessionPassword = "budget_tracker-dev-session-secret-32";
-
-function sessionConfig() {
-  return {
-    password: sessionPassword,
-    name: "budget_tracker",
-    maxAge: 60 * 60 * 24 * 7,
-  };
-}
-
-async function getAuthSession() {
-  return useSession<SessionUser>(sessionConfig());
-}
 
 function toAuthUser(row: Omit<UserRow, "password_hash">): AuthUser {
   return {

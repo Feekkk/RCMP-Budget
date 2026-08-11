@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
 import { z } from "zod";
-import type { AuthUser, RoleName } from "@/lib/auth";
+import { authMiddleware, roleMiddleware } from "@/lib/middleware";
 
 export const YEARLY_BUDGET_FORM_SETTING = "Yearly Budget Form";
 
@@ -12,42 +11,14 @@ export type SystemSetting = {
   enabled: boolean;
 };
 
-type SessionUser = {
-  user: AuthUser;
-};
-
 type SettingRow = {
   setting_id: number;
   setting_name: string;
   setting_value: number;
 };
 
-const sessionPassword = "budget_tracker-dev-session-secret-32";
-
-const adminRoles = new Set<RoleName>([
-  "HOD",
-  "Finance",
-  "Procument",
-  "CEO",
-]);
-
-function sessionConfig() {
-  return {
-    password: sessionPassword,
-    name: "budget_tracker",
-    maxAge: 60 * 60 * 24 * 7,
-  };
-}
-
-function requireAdmin(user: AuthUser | undefined): AuthUser {
-  if (!user) {
-    throw new Error("Please sign in to view settings.");
-  }
-  if (!adminRoles.has(user.roleName)) {
-    throw new Error("You don't have access to settings. Ask an admin for help.");
-  }
-  return user;
-}
+const adminOnly = roleMiddleware("HOD", "Finance", "Procument", "CEO");
+const hodOnly = roleMiddleware("HOD");
 
 function toSetting(row: SettingRow): SystemSetting {
   return {
@@ -58,11 +29,9 @@ function toSetting(row: SettingRow): SystemSetting {
   };
 }
 
-export const listSystemSettings = createServerFn({ method: "GET" }).handler(
-  async (): Promise<SystemSetting[]> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    requireAdmin(session.data.user);
-
+export const listSystemSettings = createServerFn({ method: "GET" })
+  .middleware([adminOnly])
+  .handler(async (): Promise<SystemSetting[]> => {
     const { query } = await import("@/server/db");
     const rows = await query<SettingRow[]>(
       `SELECT setting_id, setting_name, setting_value
@@ -71,8 +40,7 @@ export const listSystemSettings = createServerFn({ method: "GET" }).handler(
     );
 
     return rows.map(toSetting);
-  },
-);
+  });
 
 export const updateSystemSetting = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
@@ -87,10 +55,8 @@ export const updateSystemSetting = createServerFn({ method: "POST" })
     }
     return parsed.data;
   })
+  .middleware([adminOnly])
   .handler(async ({ data }): Promise<SystemSetting> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    requireAdmin(session.data.user);
-
     const { query } = await import("@/server/db");
     const existing = await query<SettingRow[]>(
       `SELECT setting_id, setting_name, setting_value
@@ -122,16 +88,14 @@ export const updateSystemSetting = createServerFn({ method: "POST" })
 
 export const isYearlyBudgetFormEnabled = createServerFn({
   method: "GET",
-}).handler(async (): Promise<boolean> => {
-  const session = await useSession<SessionUser>(sessionConfig());
-  if (!session.data.user) {
-    throw new Error("Please sign in to continue.");
-  }
-  const { readYearlyBudgetFormEnabled } = await import(
-    "@/lib/settings.server"
-  );
-  return readYearlyBudgetFormEnabled();
-});
+})
+  .middleware([authMiddleware])
+  .handler(async (): Promise<boolean> => {
+    const { readYearlyBudgetFormEnabled } = await import(
+      "@/lib/settings.server"
+    );
+    return readYearlyBudgetFormEnabled();
+  });
 
 export type DepartmentStaffMember = {
   userId: number;
@@ -175,16 +139,10 @@ function formatLastLogin(value: Date | string | null): {
   };
 }
 
-export const listHodDepartmentStaff = createServerFn({ method: "GET" }).handler(
-  async (): Promise<DepartmentStaffMember[]> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to view department staff.");
-    }
-    if (user.roleName !== "HOD") {
-      throw new Error("Only HOD accounts can view department staff.");
-    }
+export const listHodDepartmentStaff = createServerFn({ method: "GET" })
+  .middleware([hodOnly])
+  .handler(async ({ context }): Promise<DepartmentStaffMember[]> => {
+    const { user } = context;
     if (user.departmentId == null) {
       throw new Error(
         "Your account has no department. Ask an admin to assign one.",
@@ -219,5 +177,4 @@ export const listHodDepartmentStaff = createServerFn({ method: "GET" }).handler(
         lastLoginLabel,
       };
     });
-  },
-);
+  });

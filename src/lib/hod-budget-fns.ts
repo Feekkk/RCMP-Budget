@@ -1,24 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
 import { z } from "zod";
-import type { AuthUser } from "@/lib/auth";
-
-type SessionUser = {
-  user: AuthUser;
-};
+import { roleMiddleware } from "@/lib/middleware";
 
 const APPROVED_BUDGET_STATUS_ID = 12;
 const REJECTED_BUDGET_STATUS_ID = 13;
 
-const sessionPassword = "budget_tracker-dev-session-secret-32";
-
-function sessionConfig() {
-  return {
-    password: sessionPassword,
-    name: "budget_tracker",
-    maxAge: 60 * 60 * 24 * 7,
-  };
-}
+const hodOnly = roleMiddleware("HOD");
 
 export type HodBudgetStatus = "Pending" | "Approved" | "Rejected";
 
@@ -108,16 +95,6 @@ function formatDate(value: Date | string) {
   });
 }
 
-function requireHod(user: AuthUser | undefined): AuthUser {
-  if (!user) {
-    throw new Error("Please sign in to review budgets.");
-  }
-  if (user.roleName !== "HOD") {
-    throw new Error("Only HOD accounts can review budgets.");
-  }
-  return user;
-}
-
 function toListItem(row: BudgetRow): HodBudgetListItem {
   return {
     id: row.budget_id,
@@ -160,10 +137,10 @@ function toDetail(row: BudgetRow): HodBudgetDetail {
   };
 }
 
-export const listHodBudgets = createServerFn({ method: "GET" }).handler(
-  async (): Promise<HodBudgetListItem[]> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireHod(session.data.user);
+export const listHodBudgets = createServerFn({ method: "GET" })
+  .middleware([hodOnly])
+  .handler(async ({ context }): Promise<HodBudgetListItem[]> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const params: unknown[] = [];
@@ -198,14 +175,13 @@ export const listHodBudgets = createServerFn({ method: "GET" }).handler(
     );
 
     return rows.map(toListItem);
-  },
-);
+  });
 
 export const getHodBudget = createServerFn({ method: "GET" })
   .validator(z.object({ budgetId: z.number().int().positive() }))
-  .handler(async ({ data }): Promise<HodBudgetDetail> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireHod(session.data.user);
+  .middleware([hodOnly])
+  .handler(async ({ data, context }): Promise<HodBudgetDetail> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const params: unknown[] = [data.budgetId];
@@ -262,9 +238,9 @@ export const listHodBudgetReport = createServerFn({ method: "GET" })
       budgetYear: z.number().int().min(2000).max(2100).optional(),
     }),
   )
-  .handler(async ({ data }): Promise<HodBudgetDetail[]> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireHod(session.data.user);
+  .middleware([hodOnly])
+  .handler(async ({ data, context }): Promise<HodBudgetDetail[]> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const budgetYear = data.budgetYear ?? new Date().getFullYear();
@@ -330,9 +306,9 @@ export const reviewHodBudget = createServerFn({ method: "POST" })
         }
       }),
   )
-  .handler(async ({ data }): Promise<HodBudgetListItem> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireHod(session.data.user);
+  .middleware([hodOnly])
+  .handler(async ({ data, context }): Promise<HodBudgetListItem> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const params: unknown[] = [data.budgetId];
@@ -441,9 +417,9 @@ export const transferHodBudget = createServerFn({ method: "POST" })
       }),
     ]),
   )
-  .handler(async ({ data }): Promise<HodBudgetListItem> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireHod(session.data.user);
+  .middleware([hodOnly])
+  .handler(async ({ data, context }): Promise<HodBudgetListItem> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const params: unknown[] = [data.budgetId];

@@ -1,13 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
-import type { AuthUser } from "@/lib/auth";
-
-type SessionUser = {
-  user: AuthUser;
-};
+import { authMiddleware } from "@/lib/middleware";
 
 type FormRow = {
   quotation_id: number;
@@ -22,12 +17,6 @@ type ItemRow = {
   item_description: string;
   item_quantity: number;
   item_price: string | number;
-};
-
-const sessionConfig = {
-  password: "budget_tracker-dev-session-secret-32",
-  name: "budget_tracker",
-  maxAge: 60 * 60 * 24 * 7,
 };
 
 type RfqContext = {
@@ -300,12 +289,9 @@ async function buildRfqPdf(ctx: RfqContext) {
 
 export const generateRequestForQuotation = createServerFn({ method: "POST" })
   .validator(z.object({ quotationId: z.number().int().positive() }))
-  .handler(async ({ data }) => {
-    const session = await useSession<SessionUser>(sessionConfig);
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to generate an RFQ.");
-    }
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const rows = await query<FormRow[]>(

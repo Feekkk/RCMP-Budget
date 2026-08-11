@@ -1,23 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { roleMiddleware } from "@/lib/middleware";
 import type { AuthUser } from "@/lib/auth";
-
-type SessionUser = {
-  user: AuthUser;
-};
 
 const APPROVED_BUDGET_STATUS_ID = 12;
 
-const sessionPassword = "budget_tracker-dev-session-secret-32";
-
-function sessionConfig() {
-  return {
-    password: sessionPassword,
-    name: "budget_tracker",
-    maxAge: 60 * 60 * 24 * 7,
-  };
-}
+const hodOnly = roleMiddleware("HOD");
 
 export type AccountType = "CAPEX" | "OPEX";
 
@@ -44,13 +32,7 @@ type AccountRow = {
   debited: string | number;
 };
 
-function requireHod(user: AuthUser | undefined): AuthUser {
-  if (!user) {
-    throw new Error("Please sign in to manage your department budget.");
-  }
-  if (user.roleName !== "HOD") {
-    throw new Error("Only HOD accounts can manage the department budget.");
-  }
+function requireDepartment(user: AuthUser): AuthUser {
   if (user.departmentId == null) {
     throw new Error(
       "Your account has no department. Ask an admin to assign one.",
@@ -124,13 +106,12 @@ async function loadOverview(
   return { budgetYear, totalAllocation, totalSpent, totalBalance, accounts };
 }
 
-export const getHodFinanceOverview = createServerFn({ method: "GET" }).handler(
-  async (): Promise<FinanceOverview> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireHod(session.data.user);
+export const getHodFinanceOverview = createServerFn({ method: "GET" })
+  .middleware([hodOnly])
+  .handler(async ({ context }): Promise<FinanceOverview> => {
+    const user = requireDepartment(context.user);
     return loadOverview(user.departmentId as number, new Date().getFullYear());
-  },
-);
+  });
 
 export const recordFinanceEntry = createServerFn({ method: "POST" })
   .validator(
@@ -141,9 +122,9 @@ export const recordFinanceEntry = createServerFn({ method: "POST" })
       remarks: z.string().max(255).optional(),
     }),
   )
-  .handler(async ({ data }): Promise<FinanceOverview> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireHod(session.data.user);
+  .middleware([hodOnly])
+  .handler(async ({ data, context }): Promise<FinanceOverview> => {
+    const user = requireDepartment(context.user);
     const departmentId = user.departmentId as number;
     const budgetYear = new Date().getFullYear();
 

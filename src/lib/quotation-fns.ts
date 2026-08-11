@@ -1,15 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { ResultSetHeader } from "mysql2";
-import type { AuthUser } from "@/lib/auth";
-
-type SessionUser = {
-  user: AuthUser;
-};
+import { authMiddleware } from "@/lib/middleware";
 
 const SUBMIT_STATUS_ID = 1;
 
@@ -27,16 +22,6 @@ const itemSchema = z.object({
   attachment: attachmentSchema.optional(),
 });
 
-const sessionPassword = "budget_tracker-dev-session-secret-32";
-
-function sessionConfig() {
-  return {
-    password: sessionPassword,
-    name: "budget_tracker",
-    maxAge: 60 * 60 * 24 * 7,
-  };
-}
-
 function uploadsRoot() {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../../uploads");
 }
@@ -47,12 +32,9 @@ function safeFileName(name: string) {
 
 export const submitQuotation = createServerFn({ method: "POST" })
   .validator(z.object({ items: z.array(itemSchema).min(1) }))
-  .handler(async ({ data }) => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to submit a quotation.");
-    }
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const { user } = context;
 
     const { getConnection } = await import("@/server/db");
     const conn = await getConnection();
@@ -145,13 +127,10 @@ function formatTitle(firstItem: string | null, itemCount: number) {
   return `${firstItem} + ${itemCount - 1} more`;
 }
 
-export const listMyQuotations = createServerFn({ method: "GET" }).handler(
-  async (): Promise<QuotationListItem[]> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to view quotations.");
-    }
+export const listMyQuotations = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<QuotationListItem[]> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const rows = await query<QuotationRow[]>(
@@ -197,8 +176,7 @@ export const listMyQuotations = createServerFn({ method: "GET" }).handler(
         statusName: row.status_name,
       };
     });
-  },
-);
+  });
 export type QuotationDetail = {
   id: number;
   date: string;
@@ -241,12 +219,9 @@ type AttachmentRow = {
 
 export const getMyQuotation = createServerFn({ method: "GET" })
   .validator(z.object({ quotationId: z.number().int().positive() }))
-  .handler(async ({ data }): Promise<QuotationDetail> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to view quotations.");
-    }
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }): Promise<QuotationDetail> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const rows = await query<DetailRow[]>(

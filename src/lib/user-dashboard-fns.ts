@@ -1,20 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
-import type { AuthUser } from "@/lib/auth";
-
-type SessionUser = {
-  user: AuthUser;
-};
-
-const sessionPassword = "budget_tracker-dev-session-secret-32";
-
-function sessionConfig() {
-  return {
-    password: sessionPassword,
-    name: "budget_tracker",
-    maxAge: 60 * 60 * 24 * 7,
-  };
-}
+import { authMiddleware } from "@/lib/middleware";
 
 export type UserDashboardStats = {
   budgetYear: number;
@@ -47,13 +32,10 @@ function isPendingBudget(statusName: string) {
   return true;
 }
 
-export const getUserDashboardStats = createServerFn({ method: "GET" }).handler(
-  async (): Promise<UserDashboardStats> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to view your dashboard.");
-    }
+export const getUserDashboardStats = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<UserDashboardStats> => {
+    const { user } = context;
 
     const budgetYear = new Date().getFullYear();
     const { query } = await import("@/server/db");
@@ -110,5 +92,4 @@ export const getUserDashboardStats = createServerFn({ method: "GET" }).handler(
       allocation,
       pendingCount,
     };
-  },
-);
+  });

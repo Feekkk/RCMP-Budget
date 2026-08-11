@@ -1,8 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
 import { z } from "zod";
 import type { ResultSetHeader } from "mysql2";
-import type { AuthUser } from "@/lib/auth";
+import { authMiddleware } from "@/lib/middleware";
 
 export type BudgetStatus = "Pending" | "Approved" | "Rejected";
 
@@ -97,21 +96,7 @@ function formatBudgetDate(value: Date | string) {
   };
 }
 
-type SessionUser = {
-  user: AuthUser;
-};
-
 const SUBMIT_STATUS_ID = 11;
-
-const sessionPassword = "budget_tracker-dev-session-secret-32";
-
-function sessionConfig() {
-  return {
-    password: sessionPassword,
-    name: "budget_tracker",
-    maxAge: 60 * 60 * 24 * 7,
-  };
-}
 
 const opexLineSchema = z.object({
   code: z.string().trim().min(1),
@@ -159,12 +144,9 @@ export const submitYearlyBudget = createServerFn({ method: "POST" })
     }
     return parsed.data;
   })
-  .handler(async ({ data }) => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to submit your budget.");
-    }
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const { user } = context;
 
     const { assertYearlyBudgetFormEnabled } = await import(
       "@/lib/settings.server"
@@ -244,13 +226,10 @@ export const submitYearlyBudget = createServerFn({ method: "POST" })
     }
   });
 
-export const listMyBudgets = createServerFn({ method: "GET" }).handler(
-  async (): Promise<BudgetListItem[]> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to view budgets.");
-    }
+export const listMyBudgets = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<BudgetListItem[]> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const rows = await query<BudgetRow[]>(
@@ -293,17 +272,13 @@ export const listMyBudgets = createServerFn({ method: "GET" }).handler(
         isMine: true,
       };
     });
-  },
-);
+  });
 
 export const getMyBudget = createServerFn({ method: "GET" })
   .validator(z.object({ budgetId: z.number().int().positive() }))
-  .handler(async ({ data }): Promise<BudgetDetail> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to view budgets.");
-    }
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }): Promise<BudgetDetail> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const rows = await query<BudgetRow[]>(
@@ -412,12 +387,9 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
     }
     return parsed.data;
   })
-  .handler(async ({ data }): Promise<BudgetDetail> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to resubmit your budget.");
-    }
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }): Promise<BudgetDetail> => {
+    const { user } = context;
 
     const { assertYearlyBudgetFormEnabled } = await import(
       "@/lib/settings.server"
@@ -608,12 +580,9 @@ export const deleteYearlyBudget = createServerFn({ method: "POST" })
       budgetId: z.number().int().positive(),
     }),
   )
-  .handler(async ({ data }): Promise<{ budgetId: number }> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to delete your budget.");
-    }
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }): Promise<{ budgetId: number }> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const rows = await query<
@@ -689,12 +658,9 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
       }),
     ]),
   )
-  .handler(async ({ data }): Promise<BudgetDetail> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = session.data.user;
-    if (!user) {
-      throw new Error("Please sign in to transfer your budget.");
-    }
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }): Promise<BudgetDetail> => {
+    const { user } = context;
 
     const { assertYearlyBudgetFormEnabled } = await import(
       "@/lib/settings.server"

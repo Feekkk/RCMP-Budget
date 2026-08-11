@@ -1,27 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
-import { useSession } from "@tanstack/react-start/server";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import type { AuthUser } from "@/lib/auth";
-
-type SessionUser = {
-  user: AuthUser;
-};
+import { roleMiddleware } from "@/lib/middleware";
 
 const APPROVED_HOD_STATUS_ID = 6;
 const REJECTED_HOD_STATUS_ID = 7;
 
-const sessionPassword = "budget_tracker-dev-session-secret-32";
-
-function sessionConfig() {
-  return {
-    password: sessionPassword,
-    name: "budget_tracker",
-    maxAge: 60 * 60 * 24 * 7,
-  };
-}
+const hodOnly = roleMiddleware("HOD");
 
 export type HodQuotationListItem = {
   id: number;
@@ -61,20 +48,10 @@ function formatTitle(firstItem: string | null, itemCount: number) {
   return `${firstItem} + ${itemCount - 1} more`;
 }
 
-function requireHod(user: AuthUser | undefined): AuthUser {
-  if (!user) {
-    throw new Error("Please sign in to review requisitions.");
-  }
-  if (user.roleName !== "HOD") {
-    throw new Error("Only HOD accounts can review requisitions.");
-  }
-  return user;
-}
-
-export const listHodQuotations = createServerFn({ method: "GET" }).handler(
-  async (): Promise<HodQuotationListItem[]> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireHod(session.data.user);
+export const listHodQuotations = createServerFn({ method: "GET" })
+  .middleware([hodOnly])
+  .handler(async ({ context }): Promise<HodQuotationListItem[]> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const params: unknown[] = [];
@@ -129,8 +106,7 @@ export const listHodQuotations = createServerFn({ method: "GET" }).handler(
         statusName: row.status_name,
       };
     });
-  },
-);
+  });
 
 export const reviewHodQuotation = createServerFn({ method: "POST" })
   .validator(
@@ -139,9 +115,9 @@ export const reviewHodQuotation = createServerFn({ method: "POST" })
       decision: z.enum(["Approved", "Rejected"]),
     }),
   )
-  .handler(async ({ data }): Promise<HodQuotationListItem> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireHod(session.data.user);
+  .middleware([hodOnly])
+  .handler(async ({ data, context }): Promise<HodQuotationListItem> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const params: unknown[] = [data.quotationId];
@@ -265,9 +241,9 @@ type AttachmentRow = {
 
 export const getHodQuotation = createServerFn({ method: "GET" })
   .validator(z.object({ quotationId: z.number().int().positive() }))
-  .handler(async ({ data }): Promise<HodQuotationDetail> => {
-    const session = await useSession<SessionUser>(sessionConfig());
-    const user = requireHod(session.data.user);
+  .middleware([hodOnly])
+  .handler(async ({ data, context }): Promise<HodQuotationDetail> => {
+    const { user } = context;
 
     const { query } = await import("@/server/db");
     const params: unknown[] = [data.quotationId];
@@ -378,12 +354,13 @@ function mimeFromName(name: string) {
 
 export const getHodQuotationAttachment = createServerFn({ method: "GET" })
   .validator(z.object({ attachmentId: z.number().int().positive() }))
+  .middleware([hodOnly])
   .handler(
     async ({
       data,
+      context,
     }): Promise<{ fileName: string; mimeType: string; data: string }> => {
-      const session = await useSession<SessionUser>(sessionConfig());
-      const user = requireHod(session.data.user);
+      const { user } = context;
 
       const { query } = await import("@/server/db");
       const params: unknown[] = [data.attachmentId];
