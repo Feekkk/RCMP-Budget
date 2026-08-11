@@ -27,7 +27,6 @@ import { Route as ProcumentQuotationsRouteImport } from './routes/procument/quot
 import { Route as HodSettingsRouteImport } from './routes/hod/settings'
 import { Route as HodReportsRouteImport } from './routes/hod/reports'
 import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
-import { Route as HodApprovalRouteImport } from './routes/hod/approval'
 import { Route as FinanceSettingsRouteImport } from './routes/finance/settings'
 import { Route as FinanceRequestRouteImport } from './routes/finance/request'
 import { Route as CeoSettingsRouteImport } from './routes/ceo/settings'
@@ -123,11 +122,6 @@ const HodCalendarRoute = HodCalendarRouteImport.update({
   path: '/hod/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HodApprovalRoute = HodApprovalRouteImport.update({
-  id: '/hod/approval',
-  path: '/hod/approval',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const FinanceSettingsRoute = FinanceSettingsRouteImport.update({
   id: '/finance/settings',
   path: '/finance/settings',
@@ -155,7 +149,6 @@ export interface FileRoutesByFullPath {
   '/ceo/settings': typeof CeoSettingsRoute
   '/finance/request': typeof FinanceRequestRoute
   '/finance/settings': typeof FinanceSettingsRoute
-  '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
@@ -180,7 +173,6 @@ export interface FileRoutesByTo {
   '/ceo/settings': typeof CeoSettingsRoute
   '/finance/request': typeof FinanceRequestRoute
   '/finance/settings': typeof FinanceSettingsRoute
-  '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
@@ -206,7 +198,6 @@ export interface FileRoutesById {
   '/ceo/settings': typeof CeoSettingsRoute
   '/finance/request': typeof FinanceRequestRoute
   '/finance/settings': typeof FinanceSettingsRoute
-  '/hod/approval': typeof HodApprovalRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
@@ -233,7 +224,6 @@ export interface FileRouteTypes {
     | '/ceo/settings'
     | '/finance/request'
     | '/finance/settings'
-    | '/hod/approval'
     | '/hod/calendar'
     | '/hod/reports'
     | '/hod/settings'
@@ -258,7 +248,6 @@ export interface FileRouteTypes {
     | '/ceo/settings'
     | '/finance/request'
     | '/finance/settings'
-    | '/hod/approval'
     | '/hod/calendar'
     | '/hod/reports'
     | '/hod/settings'
@@ -283,7 +272,6 @@ export interface FileRouteTypes {
     | '/ceo/settings'
     | '/finance/request'
     | '/finance/settings'
-    | '/hod/approval'
     | '/hod/calendar'
     | '/hod/reports'
     | '/hod/settings'
@@ -309,7 +297,6 @@ export interface RootRouteChildren {
   CeoSettingsRoute: typeof CeoSettingsRoute
   FinanceRequestRoute: typeof FinanceRequestRoute
   FinanceSettingsRoute: typeof FinanceSettingsRoute
-  HodApprovalRoute: typeof HodApprovalRoute
   HodCalendarRoute: typeof HodCalendarRoute
   HodReportsRoute: typeof HodReportsRoute
   HodSettingsRoute: typeof HodSettingsRoute
@@ -457,13 +444,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HodCalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hod/approval': {
-      id: '/hod/approval'
-      path: '/hod/approval'
-      fullPath: '/hod/approval'
-      preLoaderRoute: typeof HodApprovalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/finance/settings': {
       id: '/finance/settings'
       path: '/finance/settings'
@@ -501,7 +481,6 @@ const rootRouteChildren: RootRouteChildren = {
   CeoSettingsRoute: CeoSettingsRoute,
   FinanceRequestRoute: FinanceRequestRoute,
   FinanceSettingsRoute: FinanceSettingsRoute,
-  HodApprovalRoute: HodApprovalRoute,
   HodCalendarRoute: HodCalendarRoute,
   HodReportsRoute: HodReportsRoute,
   HodSettingsRoute: HodSettingsRoute,

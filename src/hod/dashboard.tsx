@@ -404,7 +404,7 @@ export function HodDashboard() {
           <div className="flex items-center justify-between">
             <h2 className="font-display text-2xl">Pending approvals</h2>
             <Link
-              to="/hod/approval"
+              to="/hod/reports"
               className="inline-flex items-center gap-1 text-sm text-foreground/60 transition hover:text-foreground"
             >
               View all
@@ -425,7 +425,7 @@ export function HodDashboard() {
               {pending.map((req) => (
                 <li key={req.id}>
                   <Link
-                    to="/hod/approval"
+                    to="/hod/reports"
                     className="flex items-center justify-between gap-4 py-4 transition hover:bg-ivory/60"
                   >
                     <div className="min-w-0">

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, type LinkProps } from "@tanstack/react-router";
 import {
   LayoutDashboard,
-  FileCheck,
   Calendar,
   Settings,
   LogOut,
@@ -17,9 +16,8 @@ import type { AuthUser } from "@/lib/auth";
 
 const items: { label: string; icon: LucideIcon; to?: LinkProps["to"] }[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/hod" },
-  { label: "Approvals", icon: FileCheck, to: "/hod/approval" },
-  { label: "Calendar", icon: Calendar, to: "/hod/calendar" },
   { label: "Reports", icon: FileChartColumn, to: "/hod/reports" },
+  { label: "Calendar", icon: Calendar, to: "/hod/calendar" },
   { label: "Settings", icon: Settings, to: "/hod/settings" },
 ];
 
