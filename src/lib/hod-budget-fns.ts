@@ -742,3 +742,132 @@ export const updateHodBudget = createServerFn({ method: "POST" })
 
     return toDetail(updated);
   });
+
+export const createHodBudget = createServerFn({ method: "POST" })
+  .validator(
+    z.discriminatedUnion("budgetType", [
+      z.object({
+        budgetYear: z.number().int().min(2000).max(2100),
+        budgetType: z.literal("CAPEX"),
+        code: z.enum(CAPEX_TRANSFER_CODES),
+        itemName: z.string().trim().min(1),
+        justification: z.string().trim().min(1),
+        targetMonths: z.string().trim().max(7).optional(),
+        quantity: z.number().int().positive(),
+        costPerUnit: z.number().positive(),
+        budgetAmount: z.number().positive(),
+        effectIfNotApproved: z.string().trim().optional(),
+        alternative: z.string().trim().optional(),
+        remarks: z.string().trim().optional(),
+      }),
+      z.object({
+        budgetYear: z.number().int().min(2000).max(2100),
+        budgetType: z.literal("OPEX"),
+        code: z.enum(OPEX_TRANSFER_CODES),
+        activity: z.string().trim().min(1),
+        objective: z.string().trim().min(1),
+        justification: z.string().trim().min(1),
+        targetMonths: z.string().trim().max(7).optional(),
+        budgetAmount: z.number().positive(),
+        remarks: z.string().trim().optional(),
+      }),
+    ]),
+  )
+  .middleware([hodOnly])
+  .handler(async ({ data, context }): Promise<HodBudgetDetail> => {
+    const { user } = context;
+    const { query } = await import("@/server/db");
+
+    let insertId: number;
+
+    if (data.budgetType === "CAPEX") {
+      const result = await query<{ insertId: number }>(
+        `INSERT INTO yearly_budgets
+           (created_by, budget_year, status_id, budget_type, code, item_name,
+            target_months, justification, quantity, cost_per_unit, budget_amount,
+            effect_if_not_approved, alternative, remarks)
+         VALUES (?, ?, ?, 'CAPEX', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          user.userId,
+          data.budgetYear,
+          APPROVED_BUDGET_STATUS_ID,
+          data.code,
+          data.itemName,
+          data.targetMonths || null,
+          data.justification,
+          data.quantity,
+          data.costPerUnit,
+          data.budgetAmount,
+          data.effectIfNotApproved || null,
+          data.alternative || null,
+          data.remarks || null,
+        ],
+      );
+      insertId = result.insertId;
+    } else {
+      const result = await query<{ insertId: number }>(
+        `INSERT INTO yearly_budgets
+           (created_by, budget_year, status_id, budget_type, code, activity,
+            target_months, objective, justification, budget_amount, remarks)
+         VALUES (?, ?, ?, 'OPEX', ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          user.userId,
+          data.budgetYear,
+          APPROVED_BUDGET_STATUS_ID,
+          data.code,
+          data.activity,
+          data.targetMonths || null,
+          data.objective,
+          data.justification,
+          data.budgetAmount,
+          data.remarks || null,
+        ],
+      );
+      insertId = result.insertId;
+    }
+
+    if (!insertId) {
+      throw new Error("Could not add this budget line. Try again.");
+    }
+
+    const createdRows = await query<BudgetRow[]>(
+      `SELECT
+         yb.budget_id,
+         yb.budget_year,
+         yb.budget_type,
+         yb.code,
+         yb.activity,
+         yb.item_name,
+         yb.target_months,
+         yb.objective,
+         yb.justification,
+         yb.quantity,
+         yb.cost_per_unit,
+         yb.budget_amount,
+         yb.effect_if_not_approved,
+         yb.alternative,
+         yb.remarks,
+         yb.reject_remarks,
+         yb.created_at,
+         qs.status_name,
+         u.email AS requester_email,
+         d.department_name AS department,
+         u.designation
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
+       WHERE yb.budget_id = ?
+       LIMIT 1`,
+      [insertId],
+    );
+
+    const created = createdRows[0];
+    if (!created) {
+      throw new Error(
+        "Budget was added, but could not reload. Refresh the page.",
+      );
+    }
+
+    return toDetail(created);
+  });

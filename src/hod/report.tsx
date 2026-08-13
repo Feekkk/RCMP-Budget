@@ -9,6 +9,7 @@ import {
   Maximize2,
   Minimize2,
   Pencil,
+  Plus,
   Receipt,
   X,
   type LucideIcon,
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
+  createHodBudget,
   listHodBudgetReport,
   reviewHodBudget,
   transferHodBudget,
@@ -152,6 +154,9 @@ export function HodReportPage() {
   const [transferBudgetRow, setTransferBudgetRow] =
     useState<HodBudgetDetail | null>(null);
   const [editBudgetRow, setEditBudgetRow] = useState<HodBudgetDetail | null>(
+    null,
+  );
+  const [addBudgetType, setAddBudgetType] = useState<"OPEX" | "CAPEX" | null>(
     null,
   );
 
@@ -394,6 +399,32 @@ export function HodReportPage() {
     }
   };
 
+  const addBudget = async (payload: EditBudgetInput) => {
+    if (reviewingKey != null) return;
+    setReviewingKey("add-budget");
+    const toastId = toast.loading(`Adding ${payload.budgetType} line…`);
+    try {
+      const created = await createHodBudget({
+        data: { budgetYear: Number(budgetYear), ...payload },
+      });
+      setBudgets((prev) => [...prev, created]);
+      setAddBudgetType(null);
+      toast.success(`${payload.budgetType} line added`, {
+        id: toastId,
+        description: `YB-${created.id} is now on this year's report.`,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not add this budget line. Try again.",
+        { id: toastId },
+      );
+    } finally {
+      setReviewingKey(null);
+    }
+  };
+
   const reviewQuotation = async (
     id: number,
     decision: "Approved" | "Rejected",
@@ -512,6 +543,10 @@ export function HodReportPage() {
                     maximized={maximized}
                     onClick={() => setMaximized((value) => !value)}
                   />
+                  <AddBudgetButton
+                    budgetType="OPEX"
+                    onClick={() => setAddBudgetType("OPEX")}
+                  />
                   <ExportButton
                     disabled={loadingBudgets || opexRows.length === 0}
                     onClick={() => handleExport("opex")}
@@ -555,6 +590,10 @@ export function HodReportPage() {
                   <MaximizeButton
                     maximized={maximized}
                     onClick={() => setMaximized((value) => !value)}
+                  />
+                  <AddBudgetButton
+                    budgetType="CAPEX"
+                    onClick={() => setAddBudgetType("CAPEX")}
                   />
                   <ExportButton
                     disabled={loadingBudgets || capexRows.length === 0}
@@ -683,6 +722,24 @@ export function HodReportPage() {
           </DetailOverlay>,
           document.body,
         )}
+
+      {addBudgetType &&
+        createPortal(
+          <DetailOverlay
+            onClose={() => {
+              if (reviewingKey != null) return;
+              setAddBudgetType(null);
+            }}
+          >
+            <AddBudgetCard
+              budgetType={addBudgetType}
+              reviewing={reviewingKey === "add-budget"}
+              onClose={() => setAddBudgetType(null)}
+              onSave={(payload) => void addBudget(payload)}
+            />
+          </DetailOverlay>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -764,10 +821,11 @@ function ExportButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-sm font-medium text-lime-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      aria-label="Export to Excel"
+      title="Export to Excel"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-foreground/15 text-foreground/70 transition hover:bg-foreground/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
     >
       <FileDown className="h-4 w-4" />
-      Export to Excel
     </button>
   );
 }
@@ -792,6 +850,26 @@ function MaximizeButton({
       ) : (
         <Maximize2 className="h-4 w-4" />
       )}
+    </button>
+  );
+}
+
+function AddBudgetButton({
+  budgetType,
+  onClick,
+}: {
+  budgetType: "OPEX" | "CAPEX";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Add ${budgetType} line`}
+      title={`Add ${budgetType}`}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-foreground/15 text-foreground/70 transition hover:bg-foreground/5 hover:text-foreground"
+    >
+      <Plus className="h-4 w-4" />
     </button>
   );
 }
@@ -1801,6 +1879,368 @@ function EditBudgetCard({
         >
           <Pencil className="h-4 w-4" />
           {reviewing ? "Saving…" : "Save changes"}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={reviewing}
+          className="rounded-full px-4 py-2.5 text-sm text-foreground/50 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AddBudgetCard({
+  budgetType,
+  reviewing,
+  onClose,
+  onSave,
+}: {
+  budgetType: "OPEX" | "CAPEX";
+  reviewing: boolean;
+  onClose: () => void;
+  onSave: (payload: EditBudgetInput) => void;
+}) {
+  const isCapex = budgetType === "CAPEX";
+  const [capexCode, setCapexCode] = useState<
+    (typeof CAPEX_CODES)[number]["value"] | ""
+  >("");
+  const [opexCode, setOpexCode] = useState<
+    (typeof OPEX_CODES)[number]["value"] | ""
+  >("");
+  const [itemName, setItemName] = useState("");
+  const [activity, setActivity] = useState("");
+  const [objective, setObjective] = useState("");
+  const [justification, setJustification] = useState("");
+  const [targetMonths, setTargetMonths] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [costPerUnit, setCostPerUnit] = useState("");
+  const [budgetAmount, setBudgetAmount] = useState("");
+  const [effectIfNotApproved, setEffectIfNotApproved] = useState("");
+  const [alternative, setAlternative] = useState("");
+  const [remarks, setRemarks] = useState("");
+
+  const unitValue = Number(costPerUnit) || 0;
+  const estimatedPrice = quantity * unitValue;
+  const opexBudgetValue = Number(budgetAmount) || 0;
+
+  const submitAdd = () => {
+    if (isCapex) {
+      if (!capexCode) {
+        toast.error("Choose a CAPEX code to continue.");
+        return;
+      }
+      if (!itemName.trim()) {
+        toast.error("Enter the item name to continue.");
+        return;
+      }
+      if (!justification.trim()) {
+        toast.error("Add a justification to continue.");
+        return;
+      }
+      if (unitValue <= 0) {
+        toast.error("Enter a cost per unit above zero.");
+        return;
+      }
+      onSave({
+        budgetType: "CAPEX",
+        code: capexCode,
+        itemName: itemName.trim(),
+        justification: justification.trim(),
+        targetMonths: targetMonths || undefined,
+        quantity,
+        costPerUnit: unitValue,
+        budgetAmount: estimatedPrice,
+        effectIfNotApproved: effectIfNotApproved.trim() || undefined,
+        alternative: alternative.trim() || undefined,
+        remarks: remarks.trim() || undefined,
+      });
+      return;
+    }
+
+    if (!opexCode) {
+      toast.error("Choose an OPEX code to continue.");
+      return;
+    }
+    if (!activity.trim()) {
+      toast.error("Enter the activity to continue.");
+      return;
+    }
+    if (!objective.trim()) {
+      toast.error("Add the objectives to continue.");
+      return;
+    }
+    if (!justification.trim()) {
+      toast.error("Add a justification to continue.");
+      return;
+    }
+    if (opexBudgetValue <= 0) {
+      toast.error("Enter a budget amount above zero.");
+      return;
+    }
+    onSave({
+      budgetType: "OPEX",
+      code: opexCode,
+      activity: activity.trim(),
+      objective: objective.trim(),
+      justification: justification.trim(),
+      targetMonths: targetMonths || undefined,
+      budgetAmount: opexBudgetValue,
+      remarks: remarks.trim() || undefined,
+    });
+  };
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+            Add {budgetType}
+          </p>
+          <h2 className="mt-1 font-display text-3xl">New budget line</h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            Fill in the details, then add it to this year's report.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={reviewing}
+          aria-label="Close add form"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground/50 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-6 space-y-4">
+        {isCapex ? (
+          <>
+            <div className="space-y-2">
+              <Label>CAPEX code</Label>
+              <Select
+                value={capexCode}
+                onValueChange={(value) =>
+                  setCapexCode(value as (typeof CAPEX_CODES)[number]["value"])
+                }
+                disabled={reviewing}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select CAPEX code" />
+                </SelectTrigger>
+                <SelectContent className="z-[110]">
+                  {CAPEX_CODES.map((entry) => (
+                    <SelectItem key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-item">Item</Label>
+              <Input
+                id="add-item"
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                placeholder="e.g. Laboratory microscope"
+                disabled={reviewing}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-justification">Justification</Label>
+              <Textarea
+                id="add-justification"
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                placeholder="Why this item is needed"
+                disabled={reviewing}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-target">Target months</Label>
+              <Input
+                id="add-target"
+                type="month"
+                value={targetMonths}
+                onChange={(e) => setTargetMonths(e.target.value)}
+                disabled={reviewing}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="add-qty">Quantity</Label>
+                <Input
+                  id="add-qty"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={quantity}
+                  onChange={(e) =>
+                    setQuantity(Math.max(1, Number(e.target.value) || 1))
+                  }
+                  disabled={reviewing}
+                  className="h-11 rounded-xl tabular-nums"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="add-unit">Cost per unit (RM)</Label>
+                <Input
+                  id="add-unit"
+                  inputMode="decimal"
+                  value={costPerUnit}
+                  onChange={(e) =>
+                    setCostPerUnit(e.target.value.replace(/[^\d.]/g, ""))
+                  }
+                  placeholder="0.00"
+                  disabled={reviewing}
+                  className="h-11 rounded-xl tabular-nums"
+                />
+              </div>
+            </div>
+            <div className="rounded-2xl bg-ivory px-4 py-3">
+              <p className="text-xs text-foreground/50">Estimated price</p>
+              <p className="mt-1 font-display text-2xl tabular-nums">
+                RM {formatRm(estimatedPrice)}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-effect">Effect if not approved</Label>
+              <Textarea
+                id="add-effect"
+                value={effectIfNotApproved}
+                onChange={(e) => setEffectIfNotApproved(e.target.value)}
+                placeholder="Optional"
+                disabled={reviewing}
+                className="min-h-16 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-alt">Alternative</Label>
+              <Textarea
+                id="add-alt"
+                value={alternative}
+                onChange={(e) => setAlternative(e.target.value)}
+                placeholder="Optional"
+                disabled={reviewing}
+                className="min-h-16 rounded-xl"
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label>OPEX code</Label>
+              <Select
+                value={opexCode}
+                onValueChange={(value) =>
+                  setOpexCode(value as (typeof OPEX_CODES)[number]["value"])
+                }
+                disabled={reviewing}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select OPEX code" />
+                </SelectTrigger>
+                <SelectContent className="z-[110]">
+                  {OPEX_CODES.map((entry) => (
+                    <SelectItem key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-activity">
+                Activities / Programme / Event
+              </Label>
+              <Input
+                id="add-activity"
+                value={activity}
+                onChange={(e) => setActivity(e.target.value)}
+                placeholder="e.g. Annual maintenance"
+                disabled={reviewing}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-objective">Objectives</Label>
+              <Textarea
+                id="add-objective"
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                placeholder="What this budget aims to achieve"
+                disabled={reviewing}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-opex-justification">Justification</Label>
+              <Textarea
+                id="add-opex-justification"
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                placeholder="Why this budget is needed"
+                disabled={reviewing}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-opex-target">Target months</Label>
+              <Input
+                id="add-opex-target"
+                type="month"
+                value={targetMonths}
+                onChange={(e) => setTargetMonths(e.target.value)}
+                disabled={reviewing}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-budget">OPEX budget (RM)</Label>
+              <Input
+                id="add-budget"
+                inputMode="decimal"
+                value={budgetAmount}
+                onChange={(e) =>
+                  setBudgetAmount(e.target.value.replace(/[^\d.]/g, ""))
+                }
+                placeholder="0.00"
+                disabled={reviewing}
+                className="h-11 rounded-xl tabular-nums"
+              />
+            </div>
+          </>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="add-remarks">Remarks</Label>
+          <Input
+            id="add-remarks"
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            placeholder="Optional"
+            disabled={reviewing}
+            className="h-11 rounded-xl"
+          />
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-wrap items-center gap-2.5 border-t border-foreground/10 pt-6">
+        <button
+          type="button"
+          onClick={submitAdd}
+          disabled={reviewing}
+          className="inline-flex items-center gap-2 rounded-full bg-lime px-5 py-2.5 text-sm font-medium text-lime-foreground transition hover:opacity-90 disabled:opacity-50"
+        >
+          <Plus className="h-4 w-4" />
+          {reviewing ? "Adding…" : `Add ${budgetType}`}
         </button>
         <button
           type="button"
