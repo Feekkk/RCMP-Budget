@@ -3,6 +3,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   FileDown,
+  Maximize2,
+  Minimize2,
   Receipt,
   type LucideIcon,
 } from "lucide-react";
@@ -71,6 +73,21 @@ export function DepartmentPage() {
   >([]);
   const [loadingBudgets, setLoadingBudgets] = useState(true);
   const [loadingRequisitions, setLoadingRequisitions] = useState(true);
+  const [maximized, setMaximized] = useState(false);
+
+  useEffect(() => {
+    if (!maximized) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMaximized(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [maximized]);
 
   useEffect(() => {
     let active = true;
@@ -211,25 +228,42 @@ export function DepartmentPage() {
           />
         </div>
 
-        <div className="mt-6 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
+        <div
+          className={cn(
+            "mt-6 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8",
+            maximized &&
+              "fixed inset-0 z-50 mt-0 flex h-screen w-screen flex-col overflow-hidden rounded-none p-6 md:p-8",
+          )}
+        >
           {view === "opex" && (
             <>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <ReportSectionTitle>
                   Operating Expenditure {budgetYear} (OPEX)
                 </ReportSectionTitle>
-                <ExportButton
-                  disabled={loadingBudgets || opexRows.length === 0}
-                  onClick={() => handleExport("opex")}
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <MaximizeButton
+                    maximized={maximized}
+                    onClick={() => setMaximized((value) => !value)}
+                  />
+                  <ExportButton
+                    disabled={loadingBudgets || opexRows.length === 0}
+                    onClick={() => handleExport("opex")}
+                  />
+                </div>
               </div>
-              {loadingBudgets ? (
-                <LoadingState message="Loading OPEX ledger…" />
-              ) : opexRows.length === 0 ? (
-                <EmptyState message="No OPEX lines for this year yet." />
-              ) : (
-                <OpexTable rows={opexRows} total={opexTotal} />
-              )}
+              <div className={cn(maximized && "min-h-0 flex-1 overflow-auto")}>
+                {loadingBudgets ? (
+                  <LoadingState message="Loading OPEX ledger…" />
+                ) : opexRows.length === 0 ? (
+                  <EmptyState
+                    message="No OPEX lines for this year yet."
+                    maximized={maximized}
+                  />
+                ) : (
+                  <OpexTable rows={opexRows} total={opexTotal} />
+                )}
+              </div>
             </>
           )}
 
@@ -239,37 +273,57 @@ export function DepartmentPage() {
                 <ReportSectionTitle>
                   Capital Expenditure {budgetYear} (CAPEX)
                 </ReportSectionTitle>
-                <ExportButton
-                  disabled={loadingBudgets || capexRows.length === 0}
-                  onClick={() => handleExport("capex")}
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <MaximizeButton
+                    maximized={maximized}
+                    onClick={() => setMaximized((value) => !value)}
+                  />
+                  <ExportButton
+                    disabled={loadingBudgets || capexRows.length === 0}
+                    onClick={() => handleExport("capex")}
+                  />
+                </div>
               </div>
-              {loadingBudgets ? (
-                <LoadingState message="Loading CAPEX ledger…" />
-              ) : capexRows.length === 0 ? (
-                <EmptyState message="No CAPEX lines for this year yet." />
-              ) : (
-                <CapexTable
-                  rows={capexRows}
-                  year={Number(budgetYear)}
-                  total={capexTotal}
-                />
-              )}
+              <div className={cn(maximized && "min-h-0 flex-1 overflow-auto")}>
+                {loadingBudgets ? (
+                  <LoadingState message="Loading CAPEX ledger…" />
+                ) : capexRows.length === 0 ? (
+                  <EmptyState
+                    message="No CAPEX lines for this year yet."
+                    maximized={maximized}
+                  />
+                ) : (
+                  <CapexTable
+                    rows={capexRows}
+                    year={Number(budgetYear)}
+                    total={capexTotal}
+                  />
+                )}
+              </div>
             </>
           )}
 
           {view === "requisitions" && (
             <>
-              <div className="mb-4">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <ReportSectionTitle>Quotation Ledger</ReportSectionTitle>
+                <MaximizeButton
+                  maximized={maximized}
+                  onClick={() => setMaximized((value) => !value)}
+                />
               </div>
-              {loadingRequisitions ? (
-                <LoadingState message="Loading quotations…" />
-              ) : requisitions.length === 0 ? (
-                <EmptyState message="No quotations submitted yet." />
-              ) : (
-                <QuotationTable rows={requisitions} total={requisitionTotal} />
-              )}
+              <div className={cn(maximized && "min-h-0 flex-1 overflow-auto")}>
+                {loadingRequisitions ? (
+                  <LoadingState message="Loading quotations…" />
+                ) : requisitions.length === 0 ? (
+                  <EmptyState
+                    message="No quotations submitted yet."
+                    maximized={maximized}
+                  />
+                ) : (
+                  <QuotationTable rows={requisitions} total={requisitionTotal} />
+                )}
+              </div>
             </>
           )}
         </div>
@@ -355,10 +409,35 @@ function ExportButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-sm font-medium text-lime-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      aria-label="Export to Excel"
+      title="Export to Excel"
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-foreground/15 text-foreground/70 transition hover:bg-foreground/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
     >
       <FileDown className="h-4 w-4" />
-      Export to Excel
+    </button>
+  );
+}
+
+function MaximizeButton({
+  maximized,
+  onClick,
+}: {
+  maximized: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={maximized ? "Exit fullscreen" : "Maximize screen"}
+      title={maximized ? "Exit fullscreen" : "Maximize screen"}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-foreground/15 text-foreground/70 transition hover:bg-foreground/5 hover:text-foreground"
+    >
+      {maximized ? (
+        <Minimize2 className="h-4 w-4" />
+      ) : (
+        <Maximize2 className="h-4 w-4" />
+      )}
     </button>
   );
 }
@@ -375,9 +454,22 @@ function LoadingState({ message }: { message: string }) {
   return <p className="py-10 text-center text-sm text-foreground/50">{message}</p>;
 }
 
-function EmptyState({ message }: { message: string }) {
+function EmptyState({
+  message,
+  maximized,
+}: {
+  message: string;
+  maximized?: boolean;
+}) {
   return (
-    <div className="rounded-xl border border-dashed border-foreground/15 py-14 text-center">
+    <div
+      className={cn(
+        "rounded-xl border border-dashed border-foreground/15 text-center",
+        maximized
+          ? "flex h-full min-h-[calc(100vh-8rem)] items-center justify-center py-14"
+          : "py-14",
+      )}
+    >
       <p className="text-sm text-foreground/50">{message}</p>
     </div>
   );
