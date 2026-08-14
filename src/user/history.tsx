@@ -901,7 +901,9 @@ function BudgetDetailCard({
   const { icon: StatusIcon, tone } = statusConfig[detail.status];
   const isCapex = detail.budgetType === "CAPEX";
   const canEdit = detail.isMine && formEnabled;
-  const canDelete = detail.status === "Pending" && detail.isMine;
+  const canDelete =
+    (detail.status === "Pending" || detail.status === "Rejected") &&
+    detail.isMine;
   const canTransfer =
     detail.status === "Pending" && detail.isMine && formEnabled;
   const isResubmit = detail.status === "Rejected";
@@ -1092,13 +1094,18 @@ function BudgetDetailCard({
     }
 
     setDeleting(true);
-    const toastId = toast.loading(`Deleting YB-${detail.id}…`);
+    const toastId = toast.loading(
+      isResubmit ? `Removing YB-${detail.id}…` : `Deleting YB-${detail.id}…`,
+    );
     try {
       await deleteYearlyBudget({ data: { budgetId: detail.id } });
-      toast.success(`YB-${detail.id} deleted`, {
-        id: toastId,
-        description: "This budget request has been removed.",
-      });
+      toast.success(
+        isResubmit ? `YB-${detail.id} removed` : `YB-${detail.id} deleted`,
+        {
+          id: toastId,
+          description: "This budget request has been removed.",
+        },
+      );
       onDeleted(detail.id);
     } catch (error) {
       toast.error(
@@ -1488,10 +1495,16 @@ function BudgetDetailCard({
                 >
                   <Trash2 className="h-4 w-4" />
                   {deleting
-                    ? "Deleting…"
+                    ? isResubmit
+                      ? "Removing…"
+                      : "Deleting…"
                     : confirmDelete
-                      ? "Confirm delete"
-                      : "Delete"}
+                      ? isResubmit
+                        ? "Confirm remove"
+                        : "Confirm delete"
+                      : isResubmit
+                        ? "Remove"
+                        : "Delete"}
                 </button>
               )}
               {canDelete && confirmDelete && !deleting && (

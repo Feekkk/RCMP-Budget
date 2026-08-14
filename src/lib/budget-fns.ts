@@ -607,9 +607,10 @@ export const deleteYearlyBudget = createServerFn({ method: "POST" })
       throw new Error("Budget not found. Refresh the page and try again.");
     }
 
-    if (mapBudgetStatus(row.status_name) !== "Pending") {
+    const status = mapBudgetStatus(row.status_name);
+    if (status !== "Pending" && status !== "Rejected") {
       throw new Error(
-        "Only pending budgets can be deleted. Refresh and try again.",
+        "Only pending or rejected budgets can be removed. Refresh and try again.",
       );
     }
 
