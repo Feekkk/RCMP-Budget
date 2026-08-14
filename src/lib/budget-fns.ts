@@ -97,6 +97,7 @@ function formatBudgetDate(value: Date | string) {
 }
 
 const SUBMIT_STATUS_ID = 11;
+const APPROVED_BUDGET_STATUS_ID = 12;
 
 const opexLineSchema = z.object({
   code: z.string().trim().min(1),
@@ -436,11 +437,12 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
     }
 
     const status = mapBudgetStatus(row.status_name);
-    if (status !== "Pending" && status !== "Rejected") {
-      throw new Error(
-        "Only pending or rejected budgets can be edited. Refresh and try again.",
-      );
+    if (status !== "Pending" && status !== "Rejected" && status !== "Approved") {
+      throw new Error("This budget cannot be edited. Refresh and try again.");
     }
+
+    const nextStatusId =
+      status === "Approved" ? APPROVED_BUDGET_STATUS_ID : SUBMIT_STATUS_ID;
 
     if (
       (data.budgetType === "OPEX" && row.budget_type !== "OPEX") ||
@@ -463,7 +465,7 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
              reject_remarks = NULL
          WHERE budget_id = ? AND created_by = ?`,
         [
-          SUBMIT_STATUS_ID,
+          nextStatusId,
           data.code,
           data.activity,
           data.targetMonths || null,
@@ -492,7 +494,7 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
              reject_remarks = NULL
          WHERE budget_id = ? AND created_by = ?`,
         [
-          SUBMIT_STATUS_ID,
+          nextStatusId,
           data.code,
           data.itemName,
           data.targetMonths || null,

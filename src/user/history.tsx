@@ -900,10 +900,7 @@ function BudgetDetailCard({
 }) {
   const { icon: StatusIcon, tone } = statusConfig[detail.status];
   const isCapex = detail.budgetType === "CAPEX";
-  const canEdit =
-    (detail.status === "Pending" || detail.status === "Rejected") &&
-    detail.isMine &&
-    formEnabled;
+  const canEdit = detail.isMine && formEnabled;
   const canDelete = detail.status === "Pending" && detail.isMine;
   const canTransfer =
     detail.status === "Pending" && detail.isMine && formEnabled;
@@ -1070,7 +1067,9 @@ function BudgetDetailCard({
           id: toastId,
           description: isResubmit
             ? "It is pending HOD review again."
-            : "Still waiting for HOD review.",
+            : detail.status === "Approved"
+              ? "The approved details were saved."
+              : "Still waiting for HOD review.",
         },
       );
     } catch (error) {
@@ -1445,9 +1444,7 @@ function BudgetDetailCard({
             )}
           </dl>
 
-          {(detail.status === "Pending" || detail.status === "Rejected") &&
-            detail.isMine &&
-            !formEnabled && (
+          {detail.isMine && !formEnabled && (
             <div className="mt-8 border-t border-foreground/10 pt-6">
               <p className="text-sm text-foreground/50">
                 Yearly budget submissions are closed. You can edit this again
