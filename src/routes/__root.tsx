@@ -97,11 +97,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Requisitions, PRFs, multi-layer approvals, and live budget visibility in one calm workspace.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "/bt-logo.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "/bt-logo.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/bt-logo.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/bt-logo.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

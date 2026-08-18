@@ -16,6 +16,7 @@ export type HodQuotationListItem = {
   requester: string;
   amount: number;
   date: string;
+  createdAt: string;
   status: "Pending" | "Approved" | "Rejected";
   statusName: string;
 };
@@ -46,6 +47,34 @@ function formatTitle(firstItem: string | null, itemCount: number) {
   if (!firstItem) return "Quotation request";
   if (itemCount <= 1) return firstItem;
   return `${firstItem} + ${itemCount - 1} more`;
+}
+
+function toListItem(
+  row: HodQuotationRow,
+  status?: HodQuotationListItem["status"],
+): HodQuotationListItem {
+  const created =
+    row.created_at instanceof Date ? row.created_at : new Date(row.created_at);
+  const mapped = status ?? mapStatus(row.status_name);
+  return {
+    id: row.quotation_id,
+    title: formatTitle(row.first_item, Number(row.item_count)),
+    requester: row.requester_email,
+    amount: Number(row.total_amount),
+    date: created.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+    createdAt: created.toISOString(),
+    status: mapped,
+    statusName:
+      status === "Approved"
+        ? "approved_hod"
+        : status === "Rejected"
+          ? "rejected_hod"
+          : row.status_name,
+  };
 }
 
 export const listHodQuotations = createServerFn({ method: "GET" })
@@ -87,25 +116,7 @@ export const listHodQuotations = createServerFn({ method: "GET" })
       params,
     );
 
-    return rows.map((row) => {
-      const created =
-        row.created_at instanceof Date
-          ? row.created_at
-          : new Date(row.created_at);
-      return {
-        id: row.quotation_id,
-        title: formatTitle(row.first_item, Number(row.item_count)),
-        requester: row.requester_email,
-        amount: Number(row.total_amount),
-        date: created.toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        }),
-        status: mapStatus(row.status_name),
-        statusName: row.status_name,
-      };
-    });
+    return rows.map((row) => toListItem(row));
   });
 
 export const reviewHodQuotation = createServerFn({ method: "POST" })
@@ -172,25 +183,7 @@ export const reviewHodQuotation = createServerFn({ method: "POST" })
       data.quotationId,
     ]);
 
-    const created =
-      row.created_at instanceof Date
-        ? row.created_at
-        : new Date(row.created_at);
-
-    return {
-      id: row.quotation_id,
-      title: formatTitle(row.first_item, Number(row.item_count)),
-      requester: row.requester_email,
-      amount: Number(row.total_amount),
-      date: created.toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }),
-      status: data.decision,
-      statusName:
-        data.decision === "Approved" ? "approved_hod" : "rejected_hod",
-    };
+    return toListItem(row, data.decision);
   });
 
 export type HodQuotationDetail = {

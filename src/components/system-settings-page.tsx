@@ -132,7 +132,7 @@ export function SystemSettingsPage({
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-ivory text-foreground">
+    <div className="flex h-screen flex-col overflow-hidden bg-ivory text-foreground md:flex-row">
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-8 md:p-12">
         <div>

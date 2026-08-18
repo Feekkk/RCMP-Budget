@@ -18,6 +18,7 @@ export type HodBudgetListItem = {
   requester: string;
   amount: number;
   date: string;
+  createdAt: string;
   status: HodBudgetStatus;
   statusName: string;
 };
@@ -88,14 +89,18 @@ function budgetTitle(row: Pick<BudgetRow, "budget_type" | "activity" | "item_nam
 
 function formatDate(value: Date | string) {
   const created = value instanceof Date ? value : new Date(value);
-  return created.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return {
+    date: created.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+    createdAt: created.toISOString(),
+  };
 }
 
 function toListItem(row: BudgetRow): HodBudgetListItem {
+  const { date, createdAt } = formatDate(row.created_at);
   return {
     id: row.budget_id,
     budgetYear: Number(row.budget_year),
@@ -104,7 +109,8 @@ function toListItem(row: BudgetRow): HodBudgetListItem {
     code: row.code,
     requester: row.requester_email,
     amount: Number(row.budget_amount),
-    date: formatDate(row.created_at),
+    date,
+    createdAt,
     status: mapStatus(row.status_name),
     statusName: row.status_name,
   };
@@ -128,7 +134,7 @@ function toDetail(row: BudgetRow): HodBudgetDetail {
     alternative: row.alternative,
     remarks: row.remarks,
     rejectRemarks: row.reject_remarks,
-    date: formatDate(row.created_at),
+    date: formatDate(row.created_at).date,
     status: mapStatus(row.status_name),
     statusName: row.status_name,
     requester: row.requester_email,

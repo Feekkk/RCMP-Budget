@@ -24,6 +24,27 @@ export type FinanceOverview = {
   accounts: FinanceAccountSummary[];
 };
 
+export type MonthlyBudgetPoint = {
+  month: string;
+  budget: number;
+  actual: number;
+};
+
+export type HodDashboardStats = FinanceOverview & {
+  departmentName: string | null;
+  staffId: number | null;
+  displayName: string;
+  lastYearAllocation: number;
+  requestedCapex: number;
+  requestedOpex: number;
+  monthly: MonthlyBudgetPoint[];
+};
+
+type MonthSumRow = {
+  month_key: string;
+  total: string | number;
+};
+
 type AccountRow = {
   account_id: number;
   account_type: string;
@@ -111,6 +132,106 @@ export const getHodFinanceOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<FinanceOverview> => {
     const user = requireDepartment(context.user);
     return loadOverview(user.departmentId as number, new Date().getFullYear());
+  });
+
+export const getHodDashboardStats = createServerFn({ method: "GET" })
+  .middleware([hodOnly])
+  .handler(async ({ context }): Promise<HodDashboardStats> => {
+    const user = requireDepartment(context.user);
+    const departmentId = user.departmentId as number;
+    const now = new Date();
+    const budgetYear = now.getFullYear();
+    const overview = await loadOverview(departmentId, budgetYear);
+    const { query } = await import("@/server/db");
+
+    const lastYearRows = await query<{ total: string | number }[]>(
+      `SELECT COALESCE(SUM(CASE WHEN fe.entry_type = 'IN' THEN fe.amount END), 0) AS total
+       FROM finance_accounts fa
+       LEFT JOIN finance_account_entries fe ON fe.account_id = fa.account_id
+       WHERE fa.department_id = ? AND fa.budget_year = ?`,
+      [departmentId, budgetYear - 1],
+    );
+
+    const outRows = await query<MonthSumRow[]>(
+      `SELECT DATE_FORMAT(fe.created_at, '%Y-%m') AS month_key,
+              COALESCE(SUM(fe.amount), 0) AS total
+       FROM finance_account_entries fe
+       INNER JOIN finance_accounts fa ON fa.account_id = fe.account_id
+       WHERE fa.department_id = ?
+         AND fa.budget_year = ?
+         AND fe.entry_type = 'OUT'
+       GROUP BY DATE_FORMAT(fe.created_at, '%Y-%m')`,
+      [departmentId, budgetYear],
+    );
+
+    const approvedRows = await query<MonthSumRow[]>(
+      `SELECT DATE_FORMAT(yb.updated_at, '%Y-%m') AS month_key,
+              COALESCE(SUM(yb.budget_amount), 0) AS total
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       WHERE u.department_id = ?
+         AND yb.budget_year = ?
+         AND qs.status_name = 'approved budget'
+       GROUP BY DATE_FORMAT(yb.updated_at, '%Y-%m')`,
+      [departmentId, budgetYear],
+    );
+
+    const actualByMonth = new Map<string, number>();
+    for (const row of [...outRows, ...approvedRows]) {
+      actualByMonth.set(
+        row.month_key,
+        (actualByMonth.get(row.month_key) ?? 0) + Number(row.total),
+      );
+    }
+
+    const monthlyBudget = overview.totalAllocation / 12;
+    const monthCount = now.getMonth() + 1;
+    const monthly: MonthlyBudgetPoint[] = [];
+    for (let index = 0; index < monthCount; index += 1) {
+      const key = `${budgetYear}-${String(index + 1).padStart(2, "0")}`;
+      monthly.push({
+        month: new Date(budgetYear, index, 1).toLocaleDateString("en-GB", {
+          month: "short",
+        }),
+        budget: monthlyBudget,
+        actual: actualByMonth.get(key) ?? 0,
+      });
+    }
+
+    const requestedRows = await query<ApprovedBudgetRow[]>(
+      `SELECT yb.budget_type, COALESCE(SUM(yb.budget_amount), 0) AS total_amount
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       WHERE u.department_id = ?
+         AND yb.budget_year = ?
+         AND qs.status_name NOT LIKE '%rejected%'
+       GROUP BY yb.budget_type`,
+      [departmentId, budgetYear],
+    );
+
+    let requestedCapex = 0;
+    let requestedOpex = 0;
+    for (const row of requestedRows) {
+      const total = Number(row.total_amount);
+      if (row.budget_type === "CAPEX") requestedCapex = total;
+      if (row.budget_type === "OPEX") requestedOpex = total;
+    }
+
+    return {
+      ...overview,
+      departmentName: user.department,
+      staffId: user.staffId,
+      displayName:
+        user.designation?.trim() ||
+        user.email.split("@")[0]?.replace(/[._]/g, " ") ||
+        user.email,
+      lastYearAllocation: Number(lastYearRows[0]?.total ?? 0),
+      requestedCapex,
+      requestedOpex,
+      monthly,
+    };
   });
 
 export const recordFinanceEntry = createServerFn({ method: "POST" })
