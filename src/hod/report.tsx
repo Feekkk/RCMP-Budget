@@ -60,6 +60,7 @@ const OPEX_CODES = [
   { value: "999-1003", label: "999-1003 Printing exp-meter reading" },
   { value: "992-0000", label: "992-0000 IT & audio visual - expenses" },
   { value: "923-0000", label: "923-0000 IT & audio-repair & maintenance" },
+  { value: "945-0000", label: "945-0000 Professional fees" },
 ] as const;
 
 type TransferBudgetInput =

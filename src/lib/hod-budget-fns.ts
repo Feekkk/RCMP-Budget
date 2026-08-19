@@ -391,6 +391,7 @@ const OPEX_TRANSFER_CODES = [
   "999-1003",
   "992-0000",
   "923-0000",
+  "945-0000",
 ] as const;
 
 export const transferHodBudget = createServerFn({ method: "POST" })

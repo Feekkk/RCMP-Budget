@@ -1997,6 +1997,10 @@ const OPEX_CODES = [
     value: "923-0000",
     label: "923-0000 IT & AUDIO-REPAIR & MAINTENANCE (923-000/28503)",
   },
+  {
+    value: "945-0000",
+    label: "945-0000 PROFESSIONAL FEES (945-000/29106)",
+  },
 ] as const;
 
 const CAPEX_CODES = [
