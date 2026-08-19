@@ -1986,6 +1986,10 @@ const OPEX_CODES = [
     label: "916-0000 EQUIP. RENTAL (916-000/24501) - Photocopy machine include SST 8%",
   },
   {
+    value: "918-0001",
+    label: "918-0001 RENTAL - LAPTOP/PC (918-0001/24602)",
+  },
+  {
     value: "999-1003",
     label: "999-1003 PRINTING EXP-METER READING (999-1003/27101)",
   },
@@ -2029,6 +2033,7 @@ function budgetCodeLabel(code: string, budgetType: "OPEX" | "CAPEX") {
       : {
           "926-0000": "926-0000 Lease line for IT system",
           "916-0000": "916-0000 Equip. rental",
+          "918-0001": "918-0001 Rental - laptop/PC",
           "999-1003": "999-1003 Printing exp-meter reading",
           "992-0000": "992-0000 IT & audio visual - expenses",
           "923-0000": "923-0000 IT & audio-repair & maintenance",

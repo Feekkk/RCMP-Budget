@@ -57,6 +57,7 @@ const CAPEX_CODES = [
 const OPEX_CODES = [
   { value: "926-0000", label: "926-0000 Lease line for IT system" },
   { value: "916-0000", label: "916-0000 Equip. rental" },
+  { value: "918-0001", label: "918-0001 Rental - laptop/PC" },
   { value: "999-1003", label: "999-1003 Printing exp-meter reading" },
   { value: "992-0000", label: "992-0000 IT & audio visual - expenses" },
   { value: "923-0000", label: "923-0000 IT & audio-repair & maintenance" },

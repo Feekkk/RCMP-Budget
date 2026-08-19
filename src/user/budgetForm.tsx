@@ -35,6 +35,10 @@ const OPEX_CODES = [
     label: "916-0000 EQUIP. RENTAL (916-000/24501) - Photocopy machine include SST 8%",
   },
   {
+    value: "918-0001",
+    label: "918-0001 RENTAL - LAPTOP/PC (918-0001/24602)",
+  },
+  {
     value: "999-1003",
     label: "999-1003 PRINTING EXP-METER READING (999-1003/27101)",
   },
