@@ -1,7 +1,8 @@
 import ExcelJS from "exceljs";
 import type { HodBudgetDetail } from "@/lib/hod-budget-fns";
 
-const UNIVERSITY = "UNIVERSITI KUALA LUMPUR ROYAL COLLEGE OF MEDICINE PERAK (UniKL RCMP)";
+const UNIVERSITY =
+  "UNIVERSITI KUALA LUMPUR ROYAL COLLEGE OF MEDICINE PERAK (UniKL RCMP)";
 
 const thinBorder: Partial<ExcelJS.Borders> = {
   top: { style: "thin" },
@@ -9,6 +10,17 @@ const thinBorder: Partial<ExcelJS.Borders> = {
   bottom: { style: "thin" },
   right: { style: "thin" },
 };
+
+type BudgetExcelItem = {
+  itemName: string | null;
+  quantity: number;
+  costPerUnit: number;
+  amount: number;
+};
+
+export type BudgetExcelSource = HodBudgetDetail;
+
+type BudgetExcelLine = HodBudgetDetail & BudgetExcelItem;
 
 function fill(color: string): ExcelJS.Fill {
   return { type: "pattern", pattern: "solid", fgColor: { argb: color } };
@@ -36,6 +48,30 @@ function formatMonthLabel(value: string | null) {
   return date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 }
 
+function flattenBudgetLines(rows: BudgetExcelSource[]): BudgetExcelLine[] {
+  return rows.flatMap((row) => {
+    if (row.items && row.items.length > 0) {
+      return row.items.map((item) => ({
+        ...row,
+        itemName: item.itemName,
+        quantity: item.quantity,
+        costPerUnit: item.costPerUnit,
+        amount: item.amount,
+      }));
+    }
+
+    return [
+      {
+        ...row,
+        itemName: row.itemName,
+        quantity: row.quantity ?? 1,
+        costPerUnit: row.costPerUnit ?? row.amount,
+        amount: row.amount,
+      },
+    ];
+  });
+}
+
 async function download(workbook: ExcelJS.Workbook, filename: string) {
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
@@ -50,10 +86,11 @@ async function download(workbook: ExcelJS.Workbook, filename: string) {
 }
 
 export async function exportCapexExcel(
-  rows: HodBudgetDetail[],
+  rows: BudgetExcelSource[],
   year: number,
   categories: Record<string, string>,
 ) {
+  const lines = flattenBudgetLines(rows);
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("CAPEX", {
     views: [{ showGridLines: false }],
@@ -81,7 +118,7 @@ export async function exportCapexExcel(
 
   sheet.getCell("A4").value = "Department :";
   sheet.getCell("A4").font = { bold: true, size: 10 };
-  sheet.getCell("B4").value = rows[0]?.department ?? "";
+  sheet.getCell("B4").value = lines[0]?.department ?? "";
   sheet.getCell("B4").font = { size: 10 };
 
   sheet.mergeCells("F6:H6");
@@ -124,7 +161,7 @@ export async function exportCapexExcel(
   headerRow.height = 28;
 
   let rowIndex = 8;
-  rows.forEach((row, index) => {
+  lines.forEach((row, index) => {
     const excelRow = sheet.getRow(rowIndex);
     const values = [
       index + 1,
@@ -132,8 +169,8 @@ export async function exportCapexExcel(
       row.itemName ?? "",
       row.justification,
       formatMonthLabel(row.targetMonths),
-      row.quantity ?? "",
-      row.costPerUnit ?? "",
+      row.quantity,
+      row.costPerUnit,
       row.amount,
       row.effectIfNotApproved ?? "",
       row.alternative ?? "",
@@ -159,7 +196,7 @@ export async function exportCapexExcel(
   totalRow.getCell(7).font = { bold: true, size: 9 };
   totalRow.getCell(7).alignment = { horizontal: "center", vertical: "middle" };
   const totalCell = totalRow.getCell(8);
-  totalCell.value = rows.reduce((sum, row) => sum + row.amount, 0);
+  totalCell.value = lines.reduce((sum, row) => sum + row.amount, 0);
   totalCell.numFmt = "#,##0.00";
   totalCell.font = { bold: true, size: 9 };
   totalCell.border = {
@@ -172,7 +209,8 @@ export async function exportCapexExcel(
   await download(workbook, `CAPEX_Budget_${year}.xlsx`);
 }
 
-export async function exportOpexExcel(rows: HodBudgetDetail[], year: number) {
+export async function exportOpexExcel(rows: BudgetExcelSource[], year: number) {
+  const lines = flattenBudgetLines(rows);
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("OPEX", {
     views: [{ showGridLines: false }],
@@ -181,21 +219,24 @@ export async function exportOpexExcel(rows: HodBudgetDetail[], year: number) {
   sheet.columns = [
     { width: 6 },
     { width: 14 },
-    { width: 40 },
-    { width: 22 },
-    { width: 26 },
-    { width: 34 },
+    { width: 32 },
+    { width: 24 },
+    { width: 18 },
+    { width: 24 },
+    { width: 30 },
+    { width: 8 },
+    { width: 14 },
     { width: 16 },
     { width: 16 },
   ];
 
-  sheet.mergeCells("A1:H1");
+  sheet.mergeCells("A1:K1");
   const titleCell = sheet.getCell("A1");
   titleCell.value = UNIVERSITY;
   titleCell.font = { bold: true, size: 11 };
   titleCell.alignment = { horizontal: "center" };
 
-  sheet.mergeCells("A2:H2");
+  sheet.mergeCells("A2:K2");
   const subtitleCell = sheet.getCell("A2");
   subtitleCell.value = `BUDGET PROPOSED FOR OPERATING EXPENDITURES (OPEX) FOR YEAR ${year}`;
   subtitleCell.font = { bold: true, size: 11 };
@@ -203,7 +244,7 @@ export async function exportOpexExcel(rows: HodBudgetDetail[], year: number) {
 
   sheet.getCell("A4").value = "Department :";
   sheet.getCell("A4").font = { bold: true, size: 10 };
-  sheet.getCell("B4").value = rows[0]?.department ?? "";
+  sheet.getCell("B4").value = lines[0]?.department ?? "";
   sheet.getCell("B4").font = { bold: true, size: 10 };
   sheet.getCell("B4").border = { bottom: { style: "thin" } };
 
@@ -211,9 +252,12 @@ export async function exportOpexExcel(rows: HodBudgetDetail[], year: number) {
     "NO.",
     "CODE (AutoCount)",
     "ACTIVITIES / PROGRAMME / EVENT",
+    "ITEM",
     "TARGET MONTH/S TO SPEND",
     "OBJECTIVES",
     "JUSTIFICATIONS (CALCULATION)",
+    "QTY",
+    "COST P/UNIT (RM)",
     `OPEX BUDGET (RM)`,
     "REMARKS",
   ];
@@ -225,8 +269,8 @@ export async function exportOpexExcel(rows: HodBudgetDetail[], year: number) {
   });
   headerRow.height = 26;
 
-  const grouped = new Map<string, HodBudgetDetail[]>();
-  rows.forEach((row) => {
+  const grouped = new Map<string, BudgetExcelLine[]>();
+  lines.forEach((row) => {
     const list = grouped.get(row.code) ?? [];
     list.push(row);
     grouped.set(row.code, list);
@@ -242,9 +286,12 @@ export async function exportOpexExcel(rows: HodBudgetDetail[], year: number) {
         itemNumber,
         index === 0 ? code : "",
         row.activity ?? "",
+        row.itemName ?? "",
         formatMonthLabel(row.targetMonths),
         row.objective ?? "",
         row.justification,
+        row.quantity,
+        row.costPerUnit,
         row.amount,
         row.remarks ?? "",
       ];
@@ -254,23 +301,25 @@ export async function exportOpexExcel(rows: HodBudgetDetail[], year: number) {
         bodyCell(cell);
       });
       excelRow.getCell(1).alignment = { horizontal: "center", vertical: "top" };
-      excelRow.getCell(7).numFmt = "#,##0.00";
+      excelRow.getCell(8).alignment = { horizontal: "center", vertical: "top" };
+      excelRow.getCell(9).numFmt = "#,##0.00";
+      excelRow.getCell(10).numFmt = "#,##0.00";
       groupTotal += row.amount;
       itemNumber += 1;
       rowIndex += 1;
     });
 
     const totalRow = sheet.getRow(rowIndex);
-    for (let col = 1; col <= 8; col += 1) {
+    for (let col = 1; col <= 11; col += 1) {
       const cell = totalRow.getCell(col);
       cell.fill = fill("FFFFFF00");
       cell.border = thinBorder;
     }
-    const totalLabel = totalRow.getCell(6);
+    const totalLabel = totalRow.getCell(9);
     totalLabel.value = "Total";
     totalLabel.font = { bold: true, size: 9 };
     totalLabel.alignment = { horizontal: "right", vertical: "middle" };
-    const totalValue = totalRow.getCell(7);
+    const totalValue = totalRow.getCell(10);
     totalValue.value = groupTotal;
     totalValue.numFmt = "#,##0.00";
     totalValue.font = { bold: true, size: 9 };
@@ -278,15 +327,15 @@ export async function exportOpexExcel(rows: HodBudgetDetail[], year: number) {
   });
 
   const grandRow = sheet.getRow(rowIndex);
-  const grandLabel = grandRow.getCell(6);
+  const grandLabel = grandRow.getCell(9);
   grandLabel.value = `TOTAL BUDGET PROPOSED (OPEX) FOR YEAR`;
   grandLabel.font = { bold: true, size: 9 };
   grandLabel.alignment = { horizontal: "right", vertical: "middle" };
-  const grandValue = grandRow.getCell(7);
-  grandValue.value = rows.reduce((sum, row) => sum + row.amount, 0);
+  const grandValue = grandRow.getCell(10);
+  grandValue.value = lines.reduce((sum, row) => sum + row.amount, 0);
   grandValue.numFmt = "#,##0.00";
   grandValue.font = { bold: true, size: 9 };
-  for (let col = 1; col <= 8; col += 1) {
+  for (let col = 1; col <= 11; col += 1) {
     grandRow.getCell(col).border = thinBorder;
   }
 

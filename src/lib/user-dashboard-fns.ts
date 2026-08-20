@@ -8,6 +8,12 @@ export type AccountSplit = {
   balance: number;
 };
 
+export type CodeBudgetTotal = {
+  code: string;
+  budgetType: "OPEX" | "CAPEX";
+  amount: number;
+};
+
 export type MonthlySpend = {
   month: string;
   amount: number;
@@ -27,6 +33,8 @@ export type UserDashboardStats = {
   staffId: number | null;
   displayName: string;
   monthlySpend: MonthlySpend[];
+  codeBudgets: CodeBudgetTotal[];
+  totalCodeBudget: number;
   accounts: AccountSplit[];
 };
 
@@ -47,6 +55,12 @@ type AccountRow = {
 
 type MonthRow = {
   month_key: string;
+  total: string | number;
+};
+
+type CodeBudgetRow = {
+  code: string;
+  budget_type: string;
   total: string | number;
 };
 
@@ -219,6 +233,36 @@ export const getUserDashboardStats = createServerFn({ method: "GET" })
       quotationRows.filter((row) => isPendingQuotation(row.status_name)).length +
       budgetRows.filter((row) => isPendingBudget(row.status_name)).length;
 
+    const codeParams: unknown[] = [budgetYear];
+    let codeFilter = "";
+    if (user.departmentId != null) {
+      codeFilter = "AND (u.department_id = ? OR yb.created_by = ?)";
+      codeParams.push(user.departmentId, user.userId);
+    } else {
+      codeFilter = "AND yb.created_by = ?";
+      codeParams.push(user.userId);
+    }
+
+    const codeRows = await query<CodeBudgetRow[]>(
+      `SELECT yb.code, yb.budget_type, COALESCE(SUM(yb.budget_amount), 0) AS total
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       WHERE yb.budget_year = ?
+         AND qs.status_name NOT LIKE '%rejected%'
+       ${codeFilter}
+       GROUP BY yb.code, yb.budget_type
+       ORDER BY total DESC`,
+      codeParams,
+    );
+
+    const codeBudgets: CodeBudgetTotal[] = codeRows.map((row) => ({
+      code: row.code,
+      budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+      amount: Number(row.total),
+    }));
+    const totalCodeBudget = codeBudgets.reduce((sum, row) => sum + row.amount, 0);
+
     return {
       budgetYear,
       approvedSpent,
@@ -233,6 +277,8 @@ export const getUserDashboardStats = createServerFn({ method: "GET" })
       staffId: user.staffId,
       displayName: displayNameFor(user.email, user.designation),
       monthlySpend,
+      codeBudgets,
+      totalCodeBudget,
       accounts,
     };
   });

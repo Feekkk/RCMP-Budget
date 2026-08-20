@@ -137,7 +137,11 @@ export const listDepartmentCalendarEvents = createServerFn({
          yb.budget_type,
          yb.code,
          yb.activity,
-         yb.item_name,
+         (SELECT bi.item_name
+          FROM budget_items bi
+          WHERE bi.budget_id = yb.budget_id
+          ORDER BY bi.budget_item_id ASC
+          LIMIT 1) AS item_name,
          yb.target_months,
          yb.budget_amount,
          qs.status_name,

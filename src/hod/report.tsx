@@ -8,6 +8,7 @@ import {
   FileDown,
   Maximize2,
   Minimize2,
+  Minus,
   Pencil,
   Plus,
   Receipt,
@@ -31,10 +32,12 @@ import { cn } from "@/lib/utils";
 import {
   createHodBudget,
   listHodBudgetReport,
+  listHodBudgetYears,
   reviewHodBudget,
   transferHodBudget,
   updateHodBudget,
   type HodBudgetDetail,
+  type HodBudgetItem,
 } from "@/lib/hod-budget-fns";
 import {
   listHodQuotations,
@@ -64,6 +67,20 @@ const OPEX_CODES = [
   { value: "945-0000", label: "945-0000 Professional fees" },
 ] as const;
 
+type OpexPayloadItem = {
+  itemName: string;
+  quantity: number;
+  costPerUnit: number;
+  budgetAmount: number;
+};
+
+type OpexCostRow = {
+  id: number;
+  itemName: string;
+  quantity: number;
+  costPerUnit: string;
+};
+
 type TransferBudgetInput =
   | {
       targetType: "CAPEX";
@@ -85,7 +102,7 @@ type TransferBudgetInput =
       objective: string;
       justification: string;
       targetMonths?: string;
-      budgetAmount: number;
+      items: OpexPayloadItem[];
       remarks?: string;
     };
 
@@ -110,12 +127,18 @@ type EditBudgetInput =
       objective: string;
       justification: string;
       targetMonths?: string;
-      budgetAmount: number;
+      items: OpexPayloadItem[];
       remarks?: string;
     };
 
 const currentYear = new Date().getFullYear();
-const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
+const defaultYearOptions = [currentYear - 1, currentYear, currentYear + 1];
+
+function buildYearOptions(yearsWithData: number[]) {
+  return [...new Set([...defaultYearOptions, ...yearsWithData])].sort(
+    (a, b) => b - a,
+  );
+}
 
 type ReportView = "opex" | "capex" | "requisitions";
 
@@ -141,9 +164,210 @@ function statusTone(status: string) {
   return "bg-amber-100 text-amber-700";
 }
 
+function fallbackHodItems(row: HodBudgetDetail): HodBudgetItem[] {
+  if (row.items.length > 0) return row.items;
+  return [
+    {
+      id: row.id,
+      itemName: row.itemName,
+      quantity: row.quantity ?? 1,
+      costPerUnit: row.costPerUnit ?? row.amount,
+      amount: row.amount,
+    },
+  ];
+}
+
+function formatOpexItemBreakdown(items: HodBudgetItem[]) {
+  return items.map((item) => {
+    const name = item.itemName?.trim() || "Item";
+    return `${name} — ${item.quantity} × RM ${formatRm(item.costPerUnit)} = RM ${formatRm(item.amount)}`;
+  });
+}
+
+let hodOpexRowId = 1;
+
+function createOpexCostRow(source?: Partial<OpexCostRow>): OpexCostRow {
+  return {
+    id: hodOpexRowId++,
+    itemName: source?.itemName ?? "",
+    quantity: source?.quantity ?? 1,
+    costPerUnit: source?.costPerUnit ?? "",
+  };
+}
+
+function opexCostRowsFromDetail(detail: HodBudgetDetail): OpexCostRow[] {
+  const items = fallbackHodItems(detail);
+  if (items.length === 0) return [createOpexCostRow()];
+  return items.map((item) =>
+    createOpexCostRow({
+      itemName: item.itemName ?? "",
+      quantity: item.quantity,
+      costPerUnit: String(item.costPerUnit),
+    }),
+  );
+}
+
+function opexCostRowAmount(row: OpexCostRow) {
+  return row.quantity * (Number(row.costPerUnit) || 0);
+}
+
+function opexCostRowsTotal(rows: OpexCostRow[]) {
+  return rows.reduce((sum, row) => sum + opexCostRowAmount(row), 0);
+}
+
+function readyOpexPayloadItems(rows: OpexCostRow[]): OpexPayloadItem[] {
+  return rows
+    .filter(
+      (row) =>
+        row.itemName.trim() &&
+        row.quantity > 0 &&
+        Number(row.costPerUnit) > 0,
+    )
+    .map((row) => ({
+      itemName: row.itemName.trim(),
+      quantity: row.quantity,
+      costPerUnit: Number(row.costPerUnit),
+      budgetAmount: opexCostRowAmount(row),
+    }));
+}
+
+function HodOpexItemsEditor({
+  rows,
+  onChange,
+  disabled,
+}: {
+  rows: OpexCostRow[];
+  onChange: (rows: OpexCostRow[]) => void;
+  disabled?: boolean;
+}) {
+  const updateRow = (id: number, patch: Partial<OpexCostRow>) => {
+    onChange(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-xl border border-foreground/10 bg-background">
+        <div className="hidden grid-cols-[minmax(0,1fr)_100px_120px_100px_36px] gap-3 border-b border-foreground/10 bg-ivory/60 px-4 py-2.5 text-xs font-medium tracking-wide text-foreground/50 uppercase sm:grid">
+          <span>Item name</span>
+          <span className="text-center">Qty</span>
+          <span>Unit cost (RM)</span>
+          <span className="text-right">Line total</span>
+          <span />
+        </div>
+        <div className="divide-y divide-foreground/8">
+          {rows.map((row, index) => (
+            <div
+              key={row.id}
+              className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_100px_120px_100px_36px] sm:items-center sm:px-4 sm:py-3"
+            >
+              <div className="space-y-1">
+                <span className="text-xs text-foreground/50 sm:hidden">
+                  Item {index + 1}
+                </span>
+                <Input
+                  value={row.itemName}
+                  onChange={(e) => updateRow(row.id, { itemName: e.target.value })}
+                  placeholder="e.g. Toner cartridge"
+                  disabled={disabled}
+                  className="h-10 rounded-lg"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2 sm:justify-center">
+                <span className="text-xs text-foreground/50 sm:hidden">Qty</span>
+                <div className="flex items-center gap-0.5 rounded-full border border-foreground/10 p-0.5">
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() =>
+                      updateRow(row.id, {
+                        quantity: Math.max(1, row.quantity - 1),
+                      })
+                    }
+                    className="flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-ivory disabled:opacity-50"
+                    aria-label="Decrease quantity"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="w-8 text-center text-sm font-medium tabular-nums">
+                    {row.quantity}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() =>
+                      updateRow(row.id, { quantity: row.quantity + 1 })
+                    }
+                    className="flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-ivory disabled:opacity-50"
+                    aria-label="Increase quantity"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-foreground/50 sm:hidden">
+                  Unit cost (RM)
+                </span>
+                <Input
+                  inputMode="decimal"
+                  value={row.costPerUnit}
+                  onChange={(e) =>
+                    updateRow(row.id, {
+                      costPerUnit: e.target.value.replace(/[^\d.]/g, ""),
+                    })
+                  }
+                  placeholder="0.00"
+                  disabled={disabled}
+                  className="h-10 rounded-lg tabular-nums"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2 sm:justify-end">
+                <span className="text-xs text-foreground/50 sm:hidden">Total</span>
+                <span className="text-sm font-medium tabular-nums">
+                  RM {formatRm(opexCostRowAmount(row))}
+                </span>
+              </div>
+              <div className="flex justify-end sm:justify-center">
+                {rows.length > 1 && (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onChange(rows.filter((entry) => entry.id !== row.id))}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-foreground/40 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    aria-label="Remove item"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange([...rows, createOpexCostRow()])}
+        className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-4 py-2 text-sm text-foreground/70 transition hover:bg-ivory disabled:opacity-50"
+      >
+        <Plus className="h-4 w-4" />
+        Add item
+      </button>
+      <div className="rounded-2xl bg-ivory px-4 py-3">
+        <p className="text-xs text-foreground/50">Total OPEX budget</p>
+        <p className="mt-1 font-display text-2xl tabular-nums">
+          RM {formatRm(opexCostRowsTotal(rows))}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function HodReportPage() {
   const [view, setView] = useState<ReportView>("opex");
   const [budgetYear, setBudgetYear] = useState(String(currentYear));
+  const [yearChoices, setYearChoices] = useState(defaultYearOptions);
+  const [yearReady, setYearReady] = useState(false);
   const [budgets, setBudgets] = useState<HodBudgetDetail[]>([]);
   const [requisitions, setRequisitions] = useState<HodQuotationListItem[]>([]);
   const [loadingBudgets, setLoadingBudgets] = useState(true);
@@ -178,6 +402,29 @@ export function HodReportPage() {
 
   useEffect(() => {
     let active = true;
+    listHodBudgetYears()
+      .then((years) => {
+        if (!active) return;
+        setYearChoices(buildYearOptions(years));
+        const selected = Number(budgetYear);
+        if (years.length > 0 && !years.includes(selected)) {
+          setBudgetYear(String(Math.max(...years)));
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+      })
+      .finally(() => {
+        if (active) setYearReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!yearReady) return;
+    let active = true;
     setLoadingBudgets(true);
     listHodBudgetReport({ data: { budgetYear: Number(budgetYear) } })
       .then((rows) => {
@@ -197,7 +444,7 @@ export function HodReportPage() {
     return () => {
       active = false;
     };
-  }, [budgetYear]);
+  }, [budgetYear, yearReady]);
 
   useEffect(() => {
     let active = true;
@@ -307,53 +554,11 @@ export function HodReportPage() {
       `Transferring YB-${id} to ${payload.targetType}…`,
     );
     try {
-      await transferHodBudget({
+      const updated = await transferHodBudget({
         data: { budgetId: id, ...payload },
       });
       setBudgets((prev) =>
-        prev.map((row) => {
-          if (row.id !== id) return row;
-          if (payload.targetType === "CAPEX") {
-            return {
-              ...row,
-              budgetType: "CAPEX",
-              code: payload.code,
-              activity: null,
-              itemName: payload.itemName,
-              targetMonths: payload.targetMonths || null,
-              objective: null,
-              justification: payload.justification,
-              quantity: payload.quantity,
-              costPerUnit: payload.costPerUnit,
-              amount: payload.budgetAmount,
-              effectIfNotApproved: payload.effectIfNotApproved || null,
-              alternative: payload.alternative || null,
-              remarks: payload.remarks || null,
-              rejectRemarks: null,
-              status: "Approved",
-              statusName: "approved budget",
-            };
-          }
-          return {
-            ...row,
-            budgetType: "OPEX",
-            code: payload.code,
-            activity: payload.activity,
-            itemName: null,
-            targetMonths: payload.targetMonths || null,
-            objective: payload.objective,
-            justification: payload.justification,
-            quantity: null,
-            costPerUnit: null,
-            amount: payload.budgetAmount,
-            effectIfNotApproved: null,
-            alternative: null,
-            remarks: payload.remarks || null,
-            rejectRemarks: null,
-            status: "Approved",
-            statusName: "approved budget",
-          };
-        }),
+        prev.map((row) => (row.id === id ? updated : row)),
       );
       setTransferBudgetRow(null);
       toast.success(`YB-${id} transferred to ${payload.targetType}`, {
@@ -465,6 +670,10 @@ export function HodReportPage() {
     }
   };
 
+  const opexItemCount = opexRows.reduce(
+    (sum, row) => sum + Math.max(row.items.length, 1),
+    0,
+  );
   const opexTotal = opexRows.reduce((sum, row) => sum + row.amount, 0);
   const capexTotal = capexRows.reduce((sum, row) => sum + row.amount, 0);
   const requisitionTotal = requisitions.reduce(
@@ -490,7 +699,7 @@ export function HodReportPage() {
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent>
-                {yearOptions.map((year) => (
+                {yearChoices.map((year) => (
                   <SelectItem key={year} value={String(year)}>
                     FY {year}
                   </SelectItem>
@@ -504,7 +713,7 @@ export function HodReportPage() {
           <SummaryStat
             label={`OPEX FY ${budgetYear}`}
             value={`RM ${formatRm(opexTotal)}`}
-            hint={`${opexRows.length} line${opexRows.length === 1 ? "" : "s"}`}
+            hint={`${opexItemCount} item${opexItemCount === 1 ? "" : "s"} · ${opexRows.length} line${opexRows.length === 1 ? "" : "s"}`}
             icon={ArrowDownLeft}
             active={view === "opex"}
             onClick={() => setView("opex")}
@@ -564,7 +773,7 @@ export function HodReportPage() {
                   <LoadingState message="Loading OPEX report…" />
                 ) : opexRows.length === 0 ? (
                   <EmptyState
-                    message="No OPEX lines for this year yet."
+                    message="No OPEX lines for this year. Check the FY selector matches the year you used when submitting."
                     maximized={maximized}
                   />
                 ) : (
@@ -612,7 +821,7 @@ export function HodReportPage() {
                   <LoadingState message="Loading CAPEX report…" />
                 ) : capexRows.length === 0 ? (
                   <EmptyState
-                    message="No CAPEX lines for this year yet."
+                    message="No CAPEX lines for this year. Check the FY selector matches the year you used when submitting."
                     maximized={maximized}
                   />
                 ) : (
@@ -1136,6 +1345,8 @@ function TransferBudgetCard({
 }) {
   const targetType = detail.budgetType === "OPEX" ? "CAPEX" : "OPEX";
   const sourceType = detail.budgetType;
+  const sourceItems = fallbackHodItems(detail);
+  const firstSourceItem = sourceItems[0];
 
   const [capexCode, setCapexCode] = useState<
     (typeof CAPEX_CODES)[number]["value"] | ""
@@ -1143,17 +1354,42 @@ function TransferBudgetCard({
   const [opexCode, setOpexCode] = useState<
     (typeof OPEX_CODES)[number]["value"] | ""
   >("");
-  const [itemName, setItemName] = useState(detail.activity ?? "");
-  const [activity, setActivity] = useState(detail.itemName ?? "");
+  const [itemName, setItemName] = useState(
+    detail.budgetType === "OPEX"
+      ? (firstSourceItem?.itemName ?? detail.activity ?? "")
+      : (detail.itemName ?? ""),
+  );
+  const [activity, setActivity] = useState(
+    detail.budgetType === "CAPEX"
+      ? (detail.itemName ?? "")
+      : (detail.activity ?? ""),
+  );
   const [objective, setObjective] = useState(detail.objective ?? "");
   const [justification, setJustification] = useState(detail.justification);
   const [targetMonths, setTargetMonths] = useState(detail.targetMonths ?? "");
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(firstSourceItem?.quantity ?? 1);
   const [costPerUnit, setCostPerUnit] = useState(
-    detail.amount > 0 ? String(detail.amount) : "",
+    firstSourceItem?.costPerUnit != null
+      ? String(firstSourceItem.costPerUnit)
+      : detail.amount > 0
+        ? String(detail.amount)
+        : "",
   );
-  const [budgetAmount, setBudgetAmount] = useState(
-    detail.amount > 0 ? String(detail.amount) : "",
+  const [opexCostRows, setOpexCostRows] = useState<OpexCostRow[]>(() =>
+    detail.budgetType === "CAPEX"
+      ? [
+          createOpexCostRow({
+            itemName: detail.itemName ?? "",
+            quantity: detail.quantity ?? 1,
+            costPerUnit:
+              detail.costPerUnit != null
+                ? String(detail.costPerUnit)
+                : detail.amount > 0
+                  ? String(detail.amount)
+                  : "",
+          }),
+        ]
+      : opexCostRowsFromDetail(detail),
   );
   const [effectIfNotApproved, setEffectIfNotApproved] = useState("");
   const [alternative, setAlternative] = useState("");
@@ -1161,7 +1397,6 @@ function TransferBudgetCard({
 
   const unitValue = Number(costPerUnit) || 0;
   const estimatedPrice = quantity * unitValue;
-  const opexBudgetValue = Number(budgetAmount) || 0;
 
   const submitTransfer = () => {
     if (targetType === "CAPEX") {
@@ -1213,8 +1448,9 @@ function TransferBudgetCard({
       toast.error("Add a justification to continue.");
       return;
     }
-    if (opexBudgetValue <= 0) {
-      toast.error("Enter a budget amount above zero.");
+    const items = readyOpexPayloadItems(opexCostRows);
+    if (items.length === 0) {
+      toast.error("Add at least one item with name, qty, and unit cost.");
       return;
     }
     onTransfer({
@@ -1224,7 +1460,7 @@ function TransferBudgetCard({
       objective: objective.trim(),
       justification: justification.trim(),
       targetMonths: targetMonths || undefined,
-      budgetAmount: opexBudgetValue,
+      items,
       remarks: remarks.trim() || undefined,
     });
   };
@@ -1453,19 +1689,11 @@ function TransferBudgetCard({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor={`transfer-budget-${detail.id}`}>
-                OPEX budget (RM)
-              </Label>
-              <Input
-                id={`transfer-budget-${detail.id}`}
-                inputMode="decimal"
-                value={budgetAmount}
-                onChange={(e) =>
-                  setBudgetAmount(e.target.value.replace(/[^\d.]/g, ""))
-                }
-                placeholder="0.00"
+              <Label>Cost items</Label>
+              <HodOpexItemsEditor
+                rows={opexCostRows}
+                onChange={setOpexCostRows}
                 disabled={reviewing}
-                className="h-11 rounded-xl tabular-nums"
               />
             </div>
           </>
@@ -1542,8 +1770,8 @@ function EditBudgetCard({
   const [costPerUnit, setCostPerUnit] = useState(
     detail.costPerUnit == null ? "" : String(detail.costPerUnit),
   );
-  const [budgetAmount, setBudgetAmount] = useState(
-    detail.amount > 0 ? String(detail.amount) : "",
+  const [opexCostRows, setOpexCostRows] = useState<OpexCostRow[]>(() =>
+    opexCostRowsFromDetail(detail),
   );
   const [effectIfNotApproved, setEffectIfNotApproved] = useState(
     detail.effectIfNotApproved ?? "",
@@ -1553,7 +1781,6 @@ function EditBudgetCard({
 
   const unitValue = Number(costPerUnit) || 0;
   const estimatedPrice = quantity * unitValue;
-  const opexBudgetValue = Number(budgetAmount) || 0;
 
   const submitEdit = () => {
     if (isCapex) {
@@ -1605,8 +1832,9 @@ function EditBudgetCard({
       toast.error("Add a justification to continue.");
       return;
     }
-    if (opexBudgetValue <= 0) {
-      toast.error("Enter a budget amount above zero.");
+    const items = readyOpexPayloadItems(opexCostRows);
+    if (items.length === 0) {
+      toast.error("Add at least one item with name, qty, and unit cost.");
       return;
     }
     onSave({
@@ -1616,7 +1844,7 @@ function EditBudgetCard({
       objective: objective.trim(),
       justification: justification.trim(),
       targetMonths: targetMonths || undefined,
-      budgetAmount: opexBudgetValue,
+      items,
       remarks: remarks.trim() || undefined,
     });
   };
@@ -1841,19 +2069,11 @@ function EditBudgetCard({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor={`edit-budget-${detail.id}`}>
-                OPEX budget (RM)
-              </Label>
-              <Input
-                id={`edit-budget-${detail.id}`}
-                inputMode="decimal"
-                value={budgetAmount}
-                onChange={(e) =>
-                  setBudgetAmount(e.target.value.replace(/[^\d.]/g, ""))
-                }
-                placeholder="0.00"
+              <Label>Cost items</Label>
+              <HodOpexItemsEditor
+                rows={opexCostRows}
+                onChange={setOpexCostRows}
                 disabled={reviewing}
-                className="h-11 rounded-xl tabular-nums"
               />
             </div>
           </>
@@ -1920,14 +2140,15 @@ function AddBudgetCard({
   const [targetMonths, setTargetMonths] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [costPerUnit, setCostPerUnit] = useState("");
-  const [budgetAmount, setBudgetAmount] = useState("");
+  const [opexCostRows, setOpexCostRows] = useState<OpexCostRow[]>([
+    createOpexCostRow(),
+  ]);
   const [effectIfNotApproved, setEffectIfNotApproved] = useState("");
   const [alternative, setAlternative] = useState("");
   const [remarks, setRemarks] = useState("");
 
   const unitValue = Number(costPerUnit) || 0;
   const estimatedPrice = quantity * unitValue;
-  const opexBudgetValue = Number(budgetAmount) || 0;
 
   const submitAdd = () => {
     if (isCapex) {
@@ -1979,8 +2200,9 @@ function AddBudgetCard({
       toast.error("Add a justification to continue.");
       return;
     }
-    if (opexBudgetValue <= 0) {
-      toast.error("Enter a budget amount above zero.");
+    const items = readyOpexPayloadItems(opexCostRows);
+    if (items.length === 0) {
+      toast.error("Add at least one item with name, qty, and unit cost.");
       return;
     }
     onSave({
@@ -1990,7 +2212,7 @@ function AddBudgetCard({
       objective: objective.trim(),
       justification: justification.trim(),
       targetMonths: targetMonths || undefined,
-      budgetAmount: opexBudgetValue,
+      items,
       remarks: remarks.trim() || undefined,
     });
   };
@@ -2205,17 +2427,11 @@ function AddBudgetCard({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="add-budget">OPEX budget (RM)</Label>
-              <Input
-                id="add-budget"
-                inputMode="decimal"
-                value={budgetAmount}
-                onChange={(e) =>
-                  setBudgetAmount(e.target.value.replace(/[^\d.]/g, ""))
-                }
-                placeholder="0.00"
+              <Label>Cost items</Label>
+              <HodOpexItemsEditor
+                rows={opexCostRows}
+                onChange={setOpexCostRows}
                 disabled={reviewing}
-                className="h-11 rounded-xl tabular-nums"
               />
             </div>
           </>
@@ -2276,7 +2492,7 @@ function OpexTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-foreground/15">
-      <table className="min-w-[1300px] w-full border-collapse text-sm">
+      <table className="min-w-[1100px] w-full border-collapse text-sm">
         <thead>
           <tr className="bg-[#ebe6dc] text-center text-xs font-semibold uppercase tracking-wide text-foreground">
             <th className="border border-foreground/20 px-3 py-3">No.</th>
@@ -2303,51 +2519,63 @@ function OpexTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            <tr key={row.id} className="align-top odd:bg-background even:bg-ivory/40">
-              <td className="border border-foreground/15 px-3 py-3 text-center tabular-nums">
-                {index + 1}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-center font-medium tabular-nums">
-                {row.code}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3">
-                {row.activity || "—"}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-center">
-                {formatMonth(row.targetMonths)}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
-                {row.objective || "—"}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
-                {row.justification}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-right font-medium tabular-nums">
-                {formatRm(row.amount)}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-center">
-                <span
-                  className={cn(
-                    "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
-                    statusTone(row.status),
+          {rows.map((row, index) => {
+            const items = fallbackHodItems(row);
+            const itemLines = formatOpexItemBreakdown(items);
+
+            return (
+              <tr key={row.id} className="align-top odd:bg-background even:bg-ivory/40">
+                <td className="border border-foreground/15 px-3 py-3 text-center tabular-nums">
+                  {index + 1}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-center font-medium tabular-nums">
+                  {row.code}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3">
+                  {row.activity || "—"}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-center">
+                  {formatMonth(row.targetMonths)}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
+                  {row.objective || "—"}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
+                  <p>{row.justification}</p>
+                  {itemLines.length > 0 && (
+                    <ul className="mt-2 space-y-1 border-t border-foreground/10 pt-2 text-xs text-foreground/75">
+                      {itemLines.map((line, itemIndex) => (
+                        <li key={`${row.id}-item-${itemIndex}`}>{line}</li>
+                      ))}
+                    </ul>
                   )}
-                >
-                  {row.status}
-                </span>
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-center">
-                <BudgetActions
-                  row={row}
-                  reviewing={reviewingKey === `yb-${row.id}`}
-                  onApprove={() => onApprove(row.id)}
-                  onReject={() => onReject(row)}
-                  onTransfer={() => onTransfer(row)}
-                  onEdit={() => onEdit(row)}
-                />
-              </td>
-            </tr>
-          ))}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-right font-medium tabular-nums">
+                  {formatRm(row.amount)}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-center">
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                      statusTone(row.status),
+                    )}
+                  >
+                    {row.status}
+                  </span>
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-center">
+                  <BudgetActions
+                    row={row}
+                    reviewing={reviewingKey === `yb-${row.id}`}
+                    onApprove={() => onApprove(row.id)}
+                    onReject={() => onReject(row)}
+                    onTransfer={() => onTransfer(row)}
+                    onEdit={() => onEdit(row)}
+                  />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
         <tfoot>
           <tr className="bg-[#ebe6dc] font-medium">

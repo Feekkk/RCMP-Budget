@@ -30,6 +30,12 @@ export type MonthlyBudgetPoint = {
   actual: number;
 };
 
+export type CodeBudgetTotal = {
+  code: string;
+  budgetType: "OPEX" | "CAPEX";
+  amount: number;
+};
+
 export type HodDashboardStats = FinanceOverview & {
   departmentName: string | null;
   staffId: number | null;
@@ -38,6 +44,8 @@ export type HodDashboardStats = FinanceOverview & {
   requestedCapex: number;
   requestedOpex: number;
   monthly: MonthlyBudgetPoint[];
+  codeBudgets: CodeBudgetTotal[];
+  totalCodeBudget: number;
 };
 
 type MonthSumRow = {
@@ -65,6 +73,12 @@ function requireDepartment(user: AuthUser): AuthUser {
 type ApprovedBudgetRow = {
   budget_type: string;
   total_amount: string | number;
+};
+
+type CodeBudgetRow = {
+  code: string;
+  budget_type: string;
+  total: string | number;
 };
 
 async function loadOverview(
@@ -219,6 +233,26 @@ export const getHodDashboardStats = createServerFn({ method: "GET" })
       if (row.budget_type === "OPEX") requestedOpex = total;
     }
 
+    const codeRows = await query<CodeBudgetRow[]>(
+      `SELECT yb.code, yb.budget_type, COALESCE(SUM(yb.budget_amount), 0) AS total
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       WHERE u.department_id = ?
+         AND yb.budget_year = ?
+         AND qs.status_name NOT LIKE '%rejected%'
+       GROUP BY yb.code, yb.budget_type
+       ORDER BY total DESC`,
+      [departmentId, budgetYear],
+    );
+
+    const codeBudgets: CodeBudgetTotal[] = codeRows.map((row) => ({
+      code: row.code,
+      budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+      amount: Number(row.total),
+    }));
+    const totalCodeBudget = codeBudgets.reduce((sum, row) => sum + row.amount, 0);
+
     return {
       ...overview,
       departmentName: user.department,
@@ -231,6 +265,8 @@ export const getHodDashboardStats = createServerFn({ method: "GET" })
       requestedCapex,
       requestedOpex,
       monthly,
+      codeBudgets,
+      totalCodeBudget,
     };
   });
 

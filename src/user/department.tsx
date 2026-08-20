@@ -21,11 +21,12 @@ import {
 import { cn } from "@/lib/utils";
 import {
   listDepartmentBudgetReport,
+  listDepartmentBudgetYears,
   listDepartmentQuotations,
   type DepartmentBudgetDetail,
+  type DepartmentBudgetItem,
   type DepartmentQuotationListItem,
 } from "@/lib/department-fns";
-import type { HodBudgetDetail } from "@/lib/hod-budget-fns";
 
 const CAPEX_CATEGORIES: Record<string, string> = {
   "200-1100": "Renovation",
@@ -34,7 +35,13 @@ const CAPEX_CATEGORIES: Record<string, string> = {
 };
 
 const currentYear = new Date().getFullYear();
-const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
+const defaultYearOptions = [currentYear - 1, currentYear, currentYear + 1];
+
+function buildYearOptions(yearsWithData: number[]) {
+  return [...new Set([...defaultYearOptions, ...yearsWithData])].sort(
+    (a, b) => b - a,
+  );
+}
 
 type ReportView = "opex" | "capex" | "requisitions";
 
@@ -60,13 +67,24 @@ function statusTone(status: string) {
   return "bg-amber-100 text-amber-700";
 }
 
-function toExportRows(rows: DepartmentBudgetDetail[]): HodBudgetDetail[] {
-  return rows as HodBudgetDetail[];
+function fallbackItems(row: DepartmentBudgetDetail): DepartmentBudgetItem[] {
+  if (row.items.length > 0) return row.items;
+  return [
+    {
+      id: row.id,
+      itemName: row.itemName,
+      quantity: row.quantity ?? 1,
+      costPerUnit: row.costPerUnit ?? row.amount,
+      amount: row.amount,
+    },
+  ];
 }
 
 export function DepartmentPage() {
   const [view, setView] = useState<ReportView>("opex");
   const [budgetYear, setBudgetYear] = useState(String(currentYear));
+  const [yearChoices, setYearChoices] = useState(defaultYearOptions);
+  const [yearReady, setYearReady] = useState(false);
   const [budgets, setBudgets] = useState<DepartmentBudgetDetail[]>([]);
   const [requisitions, setRequisitions] = useState<
     DepartmentQuotationListItem[]
@@ -91,6 +109,29 @@ export function DepartmentPage() {
 
   useEffect(() => {
     let active = true;
+    listDepartmentBudgetYears()
+      .then((years) => {
+        if (!active) return;
+        setYearChoices(buildYearOptions(years));
+        const selected = Number(budgetYear);
+        if (years.length > 0 && !years.includes(selected)) {
+          setBudgetYear(String(Math.max(...years)));
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+      })
+      .finally(() => {
+        if (active) setYearReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!yearReady) return;
+    let active = true;
     setLoadingBudgets(true);
     listDepartmentBudgetReport({ data: { budgetYear: Number(budgetYear) } })
       .then((rows) => {
@@ -110,7 +151,7 @@ export function DepartmentPage() {
     return () => {
       active = false;
     };
-  }, [budgetYear]);
+  }, [budgetYear, yearReady]);
 
   useEffect(() => {
     let active = true;
@@ -152,13 +193,9 @@ export function DepartmentPage() {
   const handleExport = async (type: "opex" | "capex") => {
     try {
       if (type === "opex") {
-        await exportOpexExcel(toExportRows(opexRows), Number(budgetYear));
+        await exportOpexExcel(opexRows, Number(budgetYear));
       } else {
-        await exportCapexExcel(
-          toExportRows(capexRows),
-          Number(budgetYear),
-          CAPEX_CATEGORIES,
-        );
+        await exportCapexExcel(capexRows, Number(budgetYear), CAPEX_CATEGORIES);
       }
       toast.success("Excel file downloaded.");
     } catch {
@@ -166,6 +203,14 @@ export function DepartmentPage() {
     }
   };
 
+  const opexItemCount = opexRows.reduce(
+    (sum, row) => sum + Math.max(row.items.length, 1),
+    0,
+  );
+  const capexItemCount = capexRows.reduce(
+    (sum, row) => sum + Math.max(row.items.length, 1),
+    0,
+  );
   const opexTotal = opexRows.reduce((sum, row) => sum + row.amount, 0);
   const capexTotal = capexRows.reduce((sum, row) => sum + row.amount, 0);
   const requisitionTotal = requisitions.reduce(
@@ -191,7 +236,7 @@ export function DepartmentPage() {
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent>
-                {yearOptions.map((year) => (
+                {yearChoices.map((year) => (
                   <SelectItem key={year} value={String(year)}>
                     FY {year}
                   </SelectItem>
@@ -205,7 +250,7 @@ export function DepartmentPage() {
           <SummaryStat
             label={`OPEX FY ${budgetYear}`}
             value={`RM ${formatRm(opexTotal)}`}
-            hint={`${opexRows.length} line${opexRows.length === 1 ? "" : "s"}`}
+            hint={`${opexItemCount} item${opexItemCount === 1 ? "" : "s"} · ${opexRows.length} line${opexRows.length === 1 ? "" : "s"}`}
             icon={ArrowDownLeft}
             active={view === "opex"}
             onClick={() => setView("opex")}
@@ -213,7 +258,7 @@ export function DepartmentPage() {
           <SummaryStat
             label={`CAPEX FY ${budgetYear}`}
             value={`RM ${formatRm(capexTotal)}`}
-            hint={`${capexRows.length} line${capexRows.length === 1 ? "" : "s"}`}
+            hint={`${capexItemCount} item${capexItemCount === 1 ? "" : "s"} · ${capexRows.length} line${capexRows.length === 1 ? "" : "s"}`}
             icon={ArrowUpRight}
             active={view === "capex"}
             onClick={() => setView("capex")}
@@ -257,7 +302,7 @@ export function DepartmentPage() {
                   <LoadingState message="Loading OPEX ledger…" />
                 ) : opexRows.length === 0 ? (
                   <EmptyState
-                    message="No OPEX lines for this year yet."
+                    message="No OPEX lines for this year. Check the FY selector matches the year you used when submitting."
                     maximized={maximized}
                   />
                 ) : (
@@ -289,7 +334,7 @@ export function DepartmentPage() {
                   <LoadingState message="Loading CAPEX ledger…" />
                 ) : capexRows.length === 0 ? (
                   <EmptyState
-                    message="No CAPEX lines for this year yet."
+                    message="No CAPEX lines for this year. Check the FY selector matches the year you used when submitting."
                     maximized={maximized}
                   />
                 ) : (
@@ -475,6 +520,13 @@ function EmptyState({
   );
 }
 
+function formatOpexItemBreakdown(items: DepartmentBudgetItem[]) {
+  return items.map((item) => {
+    const name = item.itemName?.trim() || "Item";
+    return `${name} — ${item.quantity} × RM ${formatRm(item.costPerUnit)} = RM ${formatRm(item.amount)}`;
+  });
+}
+
 function OpexTable({
   rows,
   total,
@@ -510,41 +562,56 @@ function OpexTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            <tr key={row.id} className="align-top odd:bg-background even:bg-ivory/40">
-              <td className="border border-foreground/15 px-3 py-3 text-center tabular-nums">
-                {index + 1}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-center font-medium tabular-nums">
-                {row.code}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3">
-                {row.activity || "—"}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-center">
-                {formatMonth(row.targetMonths)}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
-                {row.objective || "—"}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
-                {row.justification}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-right font-medium tabular-nums">
-                {formatRm(row.amount)}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-center">
-                <span
-                  className={cn(
-                    "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
-                    statusTone(row.status),
+          {rows.map((row, index) => {
+            const items = fallbackItems(row);
+            const itemLines = formatOpexItemBreakdown(items);
+
+            return (
+              <tr
+                key={row.id}
+                className="align-top odd:bg-background even:bg-ivory/40"
+              >
+                <td className="border border-foreground/15 px-3 py-3 text-center tabular-nums">
+                  {index + 1}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-center font-medium tabular-nums">
+                  {row.code}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3">
+                  {row.activity || "—"}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-center">
+                  {formatMonth(row.targetMonths)}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
+                  {row.objective || "—"}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
+                  <p>{row.justification}</p>
+                  {itemLines.length > 0 && (
+                    <ul className="mt-2 space-y-1 border-t border-foreground/10 pt-2 text-xs text-foreground/75">
+                      {itemLines.map((line, itemIndex) => (
+                        <li key={`${row.id}-item-${itemIndex}`}>{line}</li>
+                      ))}
+                    </ul>
                   )}
-                >
-                  {row.status}
-                </span>
-              </td>
-            </tr>
-          ))}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-right font-medium tabular-nums">
+                  {formatRm(row.amount)}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-center">
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                      statusTone(row.status),
+                    )}
+                  >
+                    {row.status}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
         <tfoot>
           <tr className="bg-[#ebe6dc] font-medium">
@@ -629,53 +696,58 @@ function CapexTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            <tr key={row.id} className="align-top odd:bg-background even:bg-ivory/40">
-              <td className="border border-foreground/15 px-3 py-3 text-center tabular-nums">
-                {index + 1}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-center">
-                {CAPEX_CATEGORIES[row.code] || row.code}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 font-medium">
-                {row.itemName || "—"}
-                <p className="mt-1 text-xs font-normal text-foreground/50">
-                  {row.code}
-                </p>
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
-                {row.justification}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-center">
-                {formatMonth(row.targetMonths)}
-              </td>
-              <td className="border border-foreground/15 bg-amber-50/60 px-3 py-3 text-center tabular-nums">
-                {row.quantity ?? "—"}
-              </td>
-              <td className="border border-foreground/15 bg-amber-50/60 px-3 py-3 text-right tabular-nums">
-                {row.costPerUnit == null ? "—" : formatRm(row.costPerUnit)}
-              </td>
-              <td className="border border-foreground/15 bg-amber-50/60 px-3 py-3 text-right font-medium tabular-nums">
-                {formatRm(row.amount)}
-              </td>
-              <td className="border border-foreground/15 bg-stone-50 px-3 py-3 whitespace-pre-wrap">
-                {row.effectIfNotApproved || "—"}
-              </td>
-              <td className="border border-foreground/15 bg-stone-50 px-3 py-3 whitespace-pre-wrap">
-                {row.alternative || "—"}
-              </td>
-              <td className="border border-foreground/15 px-3 py-3 text-center">
-                <span
-                  className={cn(
-                    "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
-                    statusTone(row.status),
-                  )}
-                >
-                  {row.status}
-                </span>
-              </td>
-            </tr>
-          ))}
+          {rows
+            .flatMap((row) => fallbackItems(row).map((item) => ({ row, item })))
+            .map(({ row, item }, index) => (
+              <tr
+                key={`${row.id}-${item.id}`}
+                className="align-top odd:bg-background even:bg-ivory/40"
+              >
+                <td className="border border-foreground/15 px-3 py-3 text-center tabular-nums">
+                  {index + 1}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-center">
+                  {CAPEX_CATEGORIES[row.code] || row.code}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 font-medium">
+                  {item.itemName || "—"}
+                  <p className="mt-1 text-xs font-normal text-foreground/50">
+                    {row.code}
+                  </p>
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
+                  {row.justification}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-center">
+                  {formatMonth(row.targetMonths)}
+                </td>
+                <td className="border border-foreground/15 bg-amber-50/60 px-3 py-3 text-center tabular-nums">
+                  {item.quantity}
+                </td>
+                <td className="border border-foreground/15 bg-amber-50/60 px-3 py-3 text-right tabular-nums">
+                  {formatRm(item.costPerUnit)}
+                </td>
+                <td className="border border-foreground/15 bg-amber-50/60 px-3 py-3 text-right font-medium tabular-nums">
+                  {formatRm(item.amount)}
+                </td>
+                <td className="border border-foreground/15 bg-stone-50 px-3 py-3 whitespace-pre-wrap">
+                  {row.effectIfNotApproved || "—"}
+                </td>
+                <td className="border border-foreground/15 bg-stone-50 px-3 py-3 whitespace-pre-wrap">
+                  {row.alternative || "—"}
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 text-center">
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                      statusTone(row.status),
+                    )}
+                  >
+                    {row.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
         </tbody>
         <tfoot>
           <tr className="bg-amber-50 font-medium">

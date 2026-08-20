@@ -45,6 +45,54 @@ export type BudgetDetail = {
   isMine: boolean;
 };
 
+const budgetItemSelect = `
+         (SELECT bi.item_name
+          FROM budget_items bi
+          WHERE bi.budget_id = yb.budget_id
+          ORDER BY bi.budget_item_id ASC
+          LIMIT 1) AS item_name,
+         (SELECT bi.quantity
+          FROM budget_items bi
+          WHERE bi.budget_id = yb.budget_id
+          ORDER BY bi.budget_item_id ASC
+          LIMIT 1) AS quantity,
+         (SELECT bi.cost_per_unit
+          FROM budget_items bi
+          WHERE bi.budget_id = yb.budget_id
+          ORDER BY bi.budget_item_id ASC
+          LIMIT 1) AS cost_per_unit,`;
+
+async function replaceBudgetItems(
+  queryFn: (
+    sql: string,
+    params?: unknown[],
+  ) => Promise<unknown>,
+  budgetId: number,
+  items: Array<{
+    itemName?: string | null;
+    quantity: number;
+    costPerUnit: number;
+    budgetAmount: number;
+  }>,
+  fallbackItemName?: string | null,
+) {
+  await queryFn(`DELETE FROM budget_items WHERE budget_id = ?`, [budgetId]);
+  for (const item of items) {
+    await queryFn(
+      `INSERT INTO budget_items
+        (budget_id, item_name, quantity, cost_per_unit, budget_amount)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        budgetId,
+        item.itemName ?? fallbackItemName ?? null,
+        item.quantity,
+        item.costPerUnit,
+        item.budgetAmount,
+      ],
+    );
+  }
+}
+
 type BudgetRow = {
   budget_id: number;
   budget_year: number;
@@ -99,14 +147,24 @@ function formatBudgetDate(value: Date | string) {
 const SUBMIT_STATUS_ID = 11;
 const APPROVED_BUDGET_STATUS_ID = 12;
 
+const priceItemSchema = z.object({
+  quantity: z.number().int().positive(),
+  costPerUnit: z.number().positive(),
+  budgetAmount: z.number().positive(),
+});
+
+const opexPriceItemSchema = priceItemSchema.extend({
+  itemName: z.string().trim().min(1),
+});
+
 const opexLineSchema = z.object({
   code: z.string().trim().min(1),
   activity: z.string().trim().min(1),
   targetMonths: z.string().trim().max(7).optional(),
   objective: z.string().trim().min(1),
   justification: z.string().trim().min(1),
-  budgetAmount: z.number().positive(),
   remarks: z.string().trim().optional(),
+  items: z.array(opexPriceItemSchema).min(1),
 });
 
 const capexLineSchema = z.object({
@@ -114,12 +172,12 @@ const capexLineSchema = z.object({
   itemName: z.string().trim().min(1),
   justification: z.string().trim().min(1),
   targetMonths: z.string().trim().max(7).optional(),
-  quantity: z.number().int().positive(),
-  costPerUnit: z.number().positive(),
-  budgetAmount: z.number().positive(),
   effectIfNotApproved: z.string().trim().optional(),
   alternative: z.string().trim().optional(),
   remarks: z.string().trim().optional(),
+  items: z.array(priceItemSchema).length(1, {
+    message: "Each CAPEX budget can only have one item.",
+  }),
 });
 
 const submitSchema = z
@@ -158,11 +216,42 @@ export const submitYearlyBudget = createServerFn({ method: "POST" })
     const conn = await getConnection();
     const budgetYear = data.budgetYear ?? new Date().getFullYear();
     const insertedIds: number[] = [];
+    let itemCount = 0;
+
+    const insertItems = async (
+      budgetId: number,
+      items: Array<{
+        itemName?: string | null;
+        quantity: number;
+        costPerUnit: number;
+        budgetAmount: number;
+      }>,
+      fallbackItemName?: string | null,
+    ) => {
+      for (const item of items) {
+        await conn.query(
+          `INSERT INTO budget_items
+            (budget_id, item_name, quantity, cost_per_unit, budget_amount)
+           VALUES (?, ?, ?, ?, ?)`,
+          [
+            budgetId,
+            item.itemName ?? fallbackItemName ?? null,
+            item.quantity,
+            item.costPerUnit,
+            item.budgetAmount,
+          ],
+        );
+        itemCount += 1;
+      }
+    };
 
     try {
       await conn.beginTransaction();
 
       for (const line of data.opex) {
+        const first = line.items[0];
+        if (!first) continue;
+        const total = line.items.reduce((sum, item) => sum + item.budgetAmount, 0);
         const [result] = await conn.query<ResultSetHeader>(
           `INSERT INTO yearly_budgets
             (created_by, budget_year, status_id, budget_type, code, activity,
@@ -177,43 +266,61 @@ export const submitYearlyBudget = createServerFn({ method: "POST" })
             line.targetMonths || null,
             line.objective,
             line.justification,
-            line.budgetAmount,
+            total,
             line.remarks || null,
           ],
         );
         insertedIds.push(result.insertId);
+        await insertItems(
+          result.insertId,
+          line.items.map((item) => ({
+            itemName: item.itemName,
+            quantity: item.quantity,
+            costPerUnit: item.costPerUnit,
+            budgetAmount: item.budgetAmount,
+          })),
+        );
       }
 
       for (const line of data.capex) {
+        const first = line.items[0];
+        if (!first) continue;
+        const total = line.items.reduce((sum, item) => sum + item.budgetAmount, 0);
         const [result] = await conn.query<ResultSetHeader>(
           `INSERT INTO yearly_budgets
-            (created_by, budget_year, status_id, budget_type, code, item_name,
-             target_months, justification, quantity, cost_per_unit, budget_amount,
+            (created_by, budget_year, status_id, budget_type, code,
+             target_months, justification, budget_amount,
              effect_if_not_approved, alternative, remarks)
-           VALUES (?, ?, ?, 'CAPEX', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, 'CAPEX', ?, ?, ?, ?, ?, ?, ?)`,
           [
             user.userId,
             budgetYear,
             SUBMIT_STATUS_ID,
             line.code,
-            line.itemName,
             line.targetMonths || null,
             line.justification,
-            line.quantity,
-            line.costPerUnit,
-            line.budgetAmount,
+            total,
             line.effectIfNotApproved || null,
             line.alternative || null,
             line.remarks || null,
           ],
         );
         insertedIds.push(result.insertId);
+        await insertItems(
+          result.insertId,
+          line.items.map((item) => ({
+            quantity: item.quantity,
+            costPerUnit: item.costPerUnit,
+            budgetAmount: item.budgetAmount,
+          })),
+          line.itemName,
+        );
       }
 
       await conn.commit();
       return {
         budgetIds: insertedIds,
-        count: insertedIds.length,
+        count: itemCount,
         budgetYear,
       };
     } catch (error) {
@@ -240,7 +347,11 @@ export const listMyBudgets = createServerFn({ method: "GET" })
          yb.budget_type,
          yb.code,
          yb.activity,
-         yb.item_name,
+         (SELECT bi.item_name
+          FROM budget_items bi
+          WHERE bi.budget_id = yb.budget_id
+          ORDER BY bi.budget_item_id ASC
+          LIMIT 1) AS item_name,
          yb.budget_amount,
          yb.created_at,
          yb.created_by,
@@ -289,12 +400,10 @@ export const getMyBudget = createServerFn({ method: "GET" })
          yb.budget_type,
          yb.code,
          yb.activity,
-         yb.item_name,
+         ${budgetItemSelect}
          yb.target_months,
          yb.objective,
          yb.justification,
-         yb.quantity,
-         yb.cost_per_unit,
          yb.budget_amount,
          yb.effect_if_not_approved,
          yb.alternative,
@@ -405,12 +514,10 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
          yb.budget_type,
          yb.code,
          yb.activity,
-         yb.item_name,
+         ${budgetItemSelect}
          yb.target_months,
          yb.objective,
          yb.justification,
-         yb.quantity,
-         yb.cost_per_unit,
          yb.budget_amount,
          yb.effect_if_not_approved,
          yb.alternative,
@@ -482,11 +589,8 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
         `UPDATE yearly_budgets
          SET status_id = ?,
              code = ?,
-             item_name = ?,
              target_months = ?,
              justification = ?,
-             quantity = ?,
-             cost_per_unit = ?,
              budget_amount = ?,
              effect_if_not_approved = ?,
              alternative = ?,
@@ -496,11 +600,8 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
         [
           nextStatusId,
           data.code,
-          data.itemName,
           data.targetMonths || null,
           data.justification,
-          data.quantity,
-          data.costPerUnit,
           data.budgetAmount,
           data.effectIfNotApproved || null,
           data.alternative || null,
@@ -508,6 +609,18 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
           data.budgetId,
           user.userId,
         ],
+      );
+      await replaceBudgetItems(
+        query,
+        data.budgetId,
+        [
+          {
+            quantity: data.quantity,
+            costPerUnit: data.costPerUnit,
+            budgetAmount: data.budgetAmount,
+          },
+        ],
+        data.itemName,
       );
     }
 
@@ -518,12 +631,10 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
          yb.budget_type,
          yb.code,
          yb.activity,
-         yb.item_name,
+         ${budgetItemSelect}
          yb.target_months,
          yb.objective,
          yb.justification,
-         yb.quantity,
-         yb.cost_per_unit,
          yb.budget_amount,
          yb.effect_if_not_approved,
          yb.alternative,
@@ -680,12 +791,10 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
          yb.budget_type,
          yb.code,
          yb.activity,
-         yb.item_name,
+         ${budgetItemSelect}
          yb.target_months,
          yb.objective,
          yb.justification,
-         yb.quantity,
-         yb.cost_per_unit,
          yb.budget_amount,
          yb.effect_if_not_approved,
          yb.alternative,
@@ -728,12 +837,9 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
              budget_type = 'CAPEX',
              code = ?,
              activity = NULL,
-             item_name = ?,
              target_months = ?,
              objective = NULL,
              justification = ?,
-             quantity = ?,
-             cost_per_unit = ?,
              budget_amount = ?,
              effect_if_not_approved = ?,
              alternative = ?,
@@ -743,11 +849,8 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
         [
           SUBMIT_STATUS_ID,
           data.code,
-          data.itemName,
           data.targetMonths || null,
           data.justification,
-          data.quantity,
-          data.costPerUnit,
           data.budgetAmount,
           data.effectIfNotApproved || null,
           data.alternative || null,
@@ -755,6 +858,18 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
           data.budgetId,
           user.userId,
         ],
+      );
+      await replaceBudgetItems(
+        query,
+        data.budgetId,
+        [
+          {
+            quantity: data.quantity,
+            costPerUnit: data.costPerUnit,
+            budgetAmount: data.budgetAmount,
+          },
+        ],
+        data.itemName,
       );
     } else {
       if (row.budget_type !== "CAPEX") {
@@ -767,12 +882,9 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
              budget_type = 'OPEX',
              code = ?,
              activity = ?,
-             item_name = NULL,
              target_months = ?,
              objective = ?,
              justification = ?,
-             quantity = NULL,
-             cost_per_unit = NULL,
              budget_amount = ?,
              effect_if_not_approved = NULL,
              alternative = NULL,
@@ -792,6 +904,7 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
           user.userId,
         ],
       );
+      await query(`DELETE FROM budget_items WHERE budget_id = ?`, [data.budgetId]);
     }
 
     const updatedRows = await query<BudgetRow[]>(
@@ -801,12 +914,10 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
          yb.budget_type,
          yb.code,
          yb.activity,
-         yb.item_name,
+         ${budgetItemSelect}
          yb.target_months,
          yb.objective,
          yb.justification,
-         yb.quantity,
-         yb.cost_per_unit,
          yb.budget_amount,
          yb.effect_if_not_approved,
          yb.alternative,

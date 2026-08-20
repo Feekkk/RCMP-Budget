@@ -424,6 +424,11 @@ export function HodDashboard() {
   const spendChange = percentChange(thisMonthSpent, lastMonthSpent);
   const pendingCount = rows.filter((row) => row.status === "Pending").length;
 
+  const codeBudgets = dashboardStats?.codeBudgets ?? [];
+  const previewCodeBudgets = codeBudgets.slice(0, 5);
+  const totalCodeBudget = dashboardStats?.totalCodeBudget ?? 0;
+  const budgetYear = dashboardStats?.budgetYear ?? new Date().getFullYear();
+
   const cashflowHint = statsLoading
     ? "Loading this year’s budget…"
     : remaining >= 0
@@ -501,7 +506,7 @@ export function HodDashboard() {
       : "0000";
 
   const chartMax = niceMax(
-    Math.max(...monthlySpend.map((item) => item.amount), 0),
+    Math.max(...previewCodeBudgets.map((item) => item.amount), 0),
   );
   const chartTicks = [0, 0.25, 0.5, 0.75, 1].map((part) => chartMax * part);
 
@@ -661,15 +666,15 @@ export function HodDashboard() {
                     <MaskedAmount
                       loading={statsLoading}
                       revealed={moneyRevealed}
-                      value={formatRm(thisMonthSpent)}
+                      value={formatRm(totalCodeBudget)}
                     />
                   </p>
                   <p className="mt-1 text-xs text-foreground/50">
-                    {spendChange == null
-                      ? "Department spend this month"
-                      : spendChange >= 0
-                        ? `The department spent ${spendChange}% more than last month`
-                        : `The department spent ${Math.abs(spendChange)}% less than last month`}
+                    {statsLoading
+                      ? "Loading budget by account code…"
+                      : codeBudgets.length === 0
+                        ? `No department budget for FY ${budgetYear} yet`
+                        : `FY ${budgetYear} · ${codeBudgets.length} account code${codeBudgets.length === 1 ? "" : "s"}`}
                   </p>
                 </div>
                 <Link
@@ -697,27 +702,53 @@ export function HodDashboard() {
                   ))}
                 </div>
                 <div className="space-y-3">
-                  {monthlySpend.map((item) => {
-                    const width =
-                      chartMax > 0
-                        ? Math.max(4, (item.amount / chartMax) * 100)
-                        : 4;
-                    return (
-                      <div key={item.month} className="flex items-center gap-3">
-                        <span className="w-8 shrink-0 text-xs text-foreground/50">
-                          {item.month}
-                        </span>
-                        <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-ivory">
-                          <div
-                            className="h-full rounded-full bg-lime transition-all duration-500"
-                            style={{
-                              width: statsLoading ? "30%" : `${width}%`,
-                            }}
-                          />
+                  {previewCodeBudgets.length === 0 ? (
+                    <p className="text-sm text-foreground/45">
+                      Open Full Stats to see the full department breakdown.
+                    </p>
+                  ) : (
+                    previewCodeBudgets.map((item) => {
+                      const width =
+                        chartMax > 0
+                          ? Math.max(4, (item.amount / chartMax) * 100)
+                          : 4;
+                      return (
+                        <div
+                          key={`${item.budgetType}-${item.code}`}
+                          className="flex items-center gap-3"
+                        >
+                          <span
+                            className="w-20 shrink-0 truncate text-xs font-medium tabular-nums text-foreground/70"
+                            title={item.code}
+                          >
+                            {item.code}
+                          </span>
+                          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-ivory">
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-all duration-500",
+                                item.budgetType === "CAPEX"
+                                  ? "bg-amber-400"
+                                  : "bg-lime",
+                              )}
+                              style={{
+                                width: statsLoading ? "30%" : `${width}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="w-16 shrink-0 text-right text-xs tabular-nums text-foreground/55">
+                            {moneyRevealed ? compactRm(item.amount) : "••••"}
+                          </span>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
+                  {codeBudgets.length > previewCodeBudgets.length && (
+                    <p className="text-xs text-foreground/40">
+                      +{codeBudgets.length - previewCodeBudgets.length} more in
+                      Full Stats
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

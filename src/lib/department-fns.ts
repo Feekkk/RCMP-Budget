@@ -7,6 +7,14 @@ const userOnly = roleMiddleware("User");
 
 export type DepartmentBudgetStatus = "Pending" | "Approved" | "Rejected";
 
+export type DepartmentBudgetItem = {
+  id: number;
+  itemName: string | null;
+  quantity: number;
+  costPerUnit: number;
+  amount: number;
+};
+
 export type DepartmentBudgetDetail = {
   id: number;
   budgetYear: number;
@@ -20,6 +28,7 @@ export type DepartmentBudgetDetail = {
   quantity: number | null;
   costPerUnit: number | null;
   amount: number;
+  items: DepartmentBudgetItem[];
   effectIfNotApproved: string | null;
   alternative: string | null;
   remarks: string | null;
@@ -48,12 +57,9 @@ type BudgetRow = {
   budget_type: string;
   code: string;
   activity: string | null;
-  item_name: string | null;
   target_months: string | null;
   objective: string | null;
   justification: string;
-  quantity: number | null;
-  cost_per_unit: string | number | null;
   budget_amount: string | number;
   effect_if_not_approved: string | null;
   alternative: string | null;
@@ -64,6 +70,15 @@ type BudgetRow = {
   requester_email: string;
   department: string | null;
   designation: string | null;
+};
+
+type BudgetItemRow = {
+  budget_item_id: number;
+  budget_id: number;
+  item_name: string | null;
+  quantity: number;
+  cost_per_unit: string | number;
+  budget_amount: string | number;
 };
 
 type QuotationRow = {
@@ -113,20 +128,35 @@ function formatTitle(firstItem: string | null, itemCount: number) {
   return `${firstItem} + ${itemCount - 1} more`;
 }
 
-function toBudgetDetail(row: BudgetRow): DepartmentBudgetDetail {
+function toBudgetItem(row: BudgetItemRow): DepartmentBudgetItem {
+  return {
+    id: row.budget_item_id,
+    itemName: row.item_name,
+    quantity: Number(row.quantity),
+    costPerUnit: Number(row.cost_per_unit),
+    amount: Number(row.budget_amount),
+  };
+}
+
+function toBudgetDetail(
+  row: BudgetRow,
+  items: DepartmentBudgetItem[],
+): DepartmentBudgetDetail {
+  const first = items[0] ?? null;
   return {
     id: row.budget_id,
     budgetYear: Number(row.budget_year),
     budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
     code: row.code,
     activity: row.activity,
-    itemName: row.item_name,
+    itemName: first?.itemName ?? null,
     targetMonths: row.target_months,
     objective: row.objective,
     justification: row.justification,
-    quantity: row.quantity == null ? null : Number(row.quantity),
-    costPerUnit: row.cost_per_unit == null ? null : Number(row.cost_per_unit),
+    quantity: first?.quantity ?? null,
+    costPerUnit: first?.costPerUnit ?? null,
     amount: Number(row.budget_amount),
+    items,
     effectIfNotApproved: row.effect_if_not_approved,
     alternative: row.alternative,
     remarks: row.remarks,
@@ -140,7 +170,20 @@ function toBudgetDetail(row: BudgetRow): DepartmentBudgetDetail {
   };
 }
 
-function departmentScope(user: AuthUser) {
+function departmentBudgetScope(user: AuthUser) {
+  if (user.departmentId != null) {
+    return {
+      filter: "AND (u.department_id = ? OR yb.created_by = ?)",
+      params: [user.departmentId, user.userId] as unknown[],
+    };
+  }
+  return {
+    filter: "AND yb.created_by = ?",
+    params: [user.userId] as unknown[],
+  };
+}
+
+function departmentQuotationScope(user: AuthUser) {
   if (user.departmentId != null) {
     return {
       filter: "AND u.department_id = ?",
@@ -152,6 +195,25 @@ function departmentScope(user: AuthUser) {
     params: [user.userId] as unknown[],
   };
 }
+
+export const listDepartmentBudgetYears = createServerFn({ method: "GET" })
+  .middleware([userOnly])
+  .handler(async ({ context }): Promise<number[]> => {
+    const { user } = context;
+    const { query } = await import("@/server/db");
+    const scope = departmentBudgetScope(user);
+    const rows = await query<{ budget_year: number }[]>(
+      `SELECT DISTINCT yb.budget_year
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       WHERE qs.status_name NOT LIKE '%rejected%'
+       ${scope.filter}
+       ORDER BY yb.budget_year DESC`,
+      scope.params,
+    );
+    return rows.map((row) => Number(row.budget_year));
+  });
 
 export const listDepartmentBudgetReport = createServerFn({ method: "GET" })
   .validator(
@@ -165,7 +227,7 @@ export const listDepartmentBudgetReport = createServerFn({ method: "GET" })
 
     const { query } = await import("@/server/db");
     const budgetYear = data.budgetYear ?? new Date().getFullYear();
-    const scope = departmentScope(user);
+    const scope = departmentBudgetScope(user);
     const params: unknown[] = [budgetYear, ...scope.params];
 
     const rows = await query<BudgetRow[]>(
@@ -175,12 +237,9 @@ export const listDepartmentBudgetReport = createServerFn({ method: "GET" })
          yb.budget_type,
          yb.code,
          yb.activity,
-         yb.item_name,
          yb.target_months,
          yb.objective,
          yb.justification,
-         yb.quantity,
-         yb.cost_per_unit,
          yb.budget_amount,
          yb.effect_if_not_approved,
          yb.alternative,
@@ -202,7 +261,34 @@ export const listDepartmentBudgetReport = createServerFn({ method: "GET" })
       params,
     );
 
-    return rows.map(toBudgetDetail);
+    if (rows.length === 0) return [];
+
+    const budgetIds = rows.map((row) => row.budget_id);
+    const placeholders = budgetIds.map(() => "?").join(", ");
+    const itemRows = await query<BudgetItemRow[]>(
+      `SELECT
+         budget_item_id,
+         budget_id,
+         item_name,
+         quantity,
+         cost_per_unit,
+         budget_amount
+       FROM budget_items
+       WHERE budget_id IN (${placeholders})
+       ORDER BY budget_id ASC, budget_item_id ASC`,
+      budgetIds,
+    );
+
+    const itemsByBudget = new Map<number, DepartmentBudgetItem[]>();
+    for (const item of itemRows) {
+      const list = itemsByBudget.get(item.budget_id) ?? [];
+      list.push(toBudgetItem(item));
+      itemsByBudget.set(item.budget_id, list);
+    }
+
+    return rows.map((row) =>
+      toBudgetDetail(row, itemsByBudget.get(row.budget_id) ?? []),
+    );
   });
 
 export const listDepartmentQuotations = createServerFn({
@@ -213,7 +299,7 @@ export const listDepartmentQuotations = createServerFn({
     const { user } = context;
 
     const { query } = await import("@/server/db");
-    const scope = departmentScope(user);
+    const scope = departmentQuotationScope(user);
 
     const rows = await query<QuotationRow[]>(
       `SELECT
