@@ -487,11 +487,6 @@ export function UserDashboard() {
                   FY {dashboardStats?.budgetYear ?? new Date().getFullYear()}
                 </p>
               </div>
-              {(dashboardStats?.pendingCount ?? 0) > 0 && (
-                <span className="shrink-0 rounded-full bg-lime px-2.5 py-1 text-xs font-medium text-lime-foreground">
-                  + {dashboardStats?.pendingCount}
-                </span>
-              )}
             </div>
           </div>
 
