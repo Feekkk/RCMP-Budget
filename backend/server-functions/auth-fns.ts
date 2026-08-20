@@ -37,6 +37,13 @@ export const login = createServerFn({ method: "POST" })
       })
       .safeParse(input);
     if (!parsed.success) {
+      const fields = parsed.error.flatten().fieldErrors;
+      if (fields.staffId?.length) {
+        throw new Error("Staff ID is invalid. Enter a valid number and try again.");
+      }
+      if (fields.password?.length) {
+        throw new Error("Password is required. Enter your password and try again.");
+      }
       throw new Error("Enter your staff ID and password. Please try again.");
     }
     return parsed.data;
@@ -58,12 +65,12 @@ export const login = createServerFn({ method: "POST" })
 
     const row = rows[0];
     if (!row) {
-      throw new Error("Staff ID or password is wrong. Check and try again.");
+      throw new Error("Staff ID not found. Check your ID and try again.");
     }
 
     const ok = await bcrypt.compare(data.password, row.password_hash);
     if (!ok) {
-      throw new Error("Staff ID or password is wrong. Check and try again.");
+      throw new Error("Password is wrong. Check your password and try again.");
     }
 
     const user = toAuthUser(row);
