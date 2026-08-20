@@ -62,6 +62,9 @@ const CAPEX_CODES = [
   { value: "200-0500", label: "200-0500 : IT & AUDIO VISUAL" },
 ] as const;
 
+const currentYear = new Date().getFullYear();
+const yearOptions = [currentYear - 1, currentYear, currentYear + 1];
+
 type OpexItem = {
   id: number;
   code: string;
@@ -102,6 +105,34 @@ function capexCodeLabel(code: string) {
   return CAPEX_CODES.find((entry) => entry.value === code)?.label ?? code;
 }
 
+function BudgetYearField({
+  id,
+  value,
+  onValueChange,
+}: {
+  id: string;
+  value: string;
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>Budget for</Label>
+      <Select value={value} onValueChange={onValueChange}>
+        <SelectTrigger id={id} className="h-12 rounded-xl">
+          <SelectValue placeholder="Select year" />
+        </SelectTrigger>
+        <SelectContent>
+          {yearOptions.map((year) => (
+            <SelectItem key={year} value={String(year)}>
+              FY {year}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export function BudgetFormPage() {
   const navigate = useNavigate();
   const [opexItems, setOpexItems] = useState<OpexItem[]>([]);
@@ -109,6 +140,7 @@ export function BudgetFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [formEnabled, setFormEnabled] = useState(true);
+  const [budgetYear, setBudgetYear] = useState(String(currentYear));
 
   const [opexCode, setOpexCode] = useState("");
   const [opexActivity, setOpexActivity] = useState("");
@@ -248,7 +280,7 @@ export function BudgetFormPage() {
     try {
       const result = await submitYearlyBudget({
         data: {
-          budgetYear: new Date().getFullYear(),
+          budgetYear: Number(budgetYear),
           opex: opexItems.map((item) => ({
             code: item.code,
             activity: item.activity,
@@ -345,6 +377,14 @@ export function BudgetFormPage() {
                   CAPEX
                 </TabsTrigger>
               </TabsList>
+
+              <div className="mt-6 max-w-xs">
+                <BudgetYearField
+                  id="budget-year"
+                  value={budgetYear}
+                  onValueChange={setBudgetYear}
+                />
+              </div>
 
               <TabsContent value="opex" className="mt-6">
                 <form onSubmit={addOpex} className="space-y-5">
@@ -597,7 +637,10 @@ export function BudgetFormPage() {
 
           <div className="sticky top-8 self-start flex h-fit flex-col rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-2xl">Your request</h2>
+              <div>
+                <h2 className="font-display text-2xl">Your request</h2>
+                <p className="mt-1 text-sm text-foreground/50">FY {budgetYear}</p>
+              </div>
               <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-lime px-2 text-sm font-medium text-lime-foreground tabular-nums">
                 {opexItems.length + capexItems.length}
               </span>
