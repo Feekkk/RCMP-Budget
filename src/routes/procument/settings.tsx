@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SystemSettingsPage } from "@/components/system-settings-page";
-import { Sidebar } from "@/procument/sidebar";
+import { Sidebar } from "@/features/procument/sidebar";
 
 export const Route = createFileRoute("/procument/settings")({
   head: () => ({

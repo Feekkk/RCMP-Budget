@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SystemSettingsPage } from "@/components/system-settings-page";
-import { Sidebar } from "@/ceo/sidebar";
+import { Sidebar } from "@/features/ceo/sidebar";
 
 export const Route = createFileRoute("/ceo/settings")({
   head: () => ({

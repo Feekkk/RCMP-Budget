@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { BudgetFormPage } from "@/user/budgetForm";
+import { BudgetFormPage } from "@/features/user/budgetForm";
 
 export const Route = createFileRoute("/user/budget")({
   head: () => ({

@@ -36,5 +36,11 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    files: ["backend/core/session.ts"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
   eslintPluginPrettier,
 );

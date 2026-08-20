@@ -7,7 +7,7 @@ import {
   updateSystemSetting,
   type DepartmentStaffMember,
   type SystemSetting,
-} from "@/lib/settings-fns";
+} from "@backend/server-functions/settings-fns";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 

@@ -1,10 +1,10 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type UserConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
 
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ command, mode }): UserConfig => {
   const allEnv = loadEnv(mode, process.cwd(), "");
   Object.assign(process.env, allEnv);
 
@@ -24,7 +24,6 @@ export default defineConfig(({ command, mode }) => {
           environments: {
             client: { define: { "process.env.NODE_ENV": JSON.stringify("development") } },
           },
-          esbuild: { keepNames: true },
         }
       : {}),
     css: { transformer: "lightningcss" },
@@ -36,6 +35,7 @@ export default defineConfig(({ command, mode }) => {
       tsconfigPaths: true,
       alias: {
         "@": `${process.cwd()}/src`,
+        "@backend": `${process.cwd()}/backend`,
       },
       dedupe: [
         "react",
@@ -63,7 +63,7 @@ export default defineConfig(({ command, mode }) => {
         importProtection: {
           behavior: "error",
           client: {
-            files: ["**/server/**"],
+            files: ["**/backend/core/**", "**/backend/runtime/**"],
             specifiers: ["server-only"],
           },
         },

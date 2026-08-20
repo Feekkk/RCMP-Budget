@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CeoDashboard } from "@/ceo/dashboard";
+import { CeoDashboard } from "@/features/ceo/dashboard";
 
 export const Route = createFileRoute("/ceo/")({
   head: () => ({

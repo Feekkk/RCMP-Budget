@@ -1,10 +1,6 @@
-import {
-  createStart,
-  createMiddleware,
-  createCsrfMiddleware,
-} from "@tanstack/react-start";
+import { createStart, createMiddleware, createCsrfMiddleware } from "@tanstack/react-start";
 
-import { renderErrorPage } from "./lib/error-page";
+import { renderErrorPage } from "@backend/runtime/error-page";
 
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HodDashboard } from "@/hod/dashboard";
+import { HodDashboard } from "@/features/hod/dashboard";
 
 export const Route = createFileRoute("/hod/")({
   head: () => ({

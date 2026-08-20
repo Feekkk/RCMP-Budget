@@ -1,0 +1,2055 @@
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useNavigate } from "@tanstack/react-router";
+import {
+  Plus,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Search,
+  FileText,
+  ClipboardPen,
+  FileSpreadsheet,
+  ChevronDown,
+  Paperclip,
+  Trash2,
+  X,
+  Wallet,
+  Receipt,
+  ArrowUpRight,
+  ArrowDownLeft,
+  ArrowRightLeft,
+  type LucideIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Sidebar } from "./sidebar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import {
+  getMyQuotation,
+  listMyQuotations,
+  type QuotationDetail,
+  type QuotationListItem,
+} from "@backend/server-functions/quotation-fns";
+import {
+  getMyBudget,
+  listMyBudgets,
+  resubmitYearlyBudget,
+  deleteYearlyBudget,
+  transferYearlyBudget,
+  type BudgetDetail,
+  type BudgetListItem,
+} from "@backend/server-functions/budget-fns";
+import { isYearlyBudgetFormEnabled } from "@backend/server-functions/settings-fns";
+import {
+  generatePurchaseRequisition,
+  type PurchaseRequisitionFormat,
+} from "@backend/server-functions/prf-generator";
+import { generateRequestForQuotation } from "@backend/server-functions/rfq-generator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+function downloadPurchaseRequisitionFile(result: {
+  fileName: string;
+  data: string;
+}) {
+  const bytes = Uint8Array.from(atob(result.data), (char) =>
+    char.charCodeAt(0),
+  );
+  const blob = new Blob([bytes], {
+    type: result.fileName.endsWith(".pdf")
+      ? "application/pdf"
+      : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = result.fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+type Status = "Pending" | "Approved" | "Rejected";
+
+const statusConfig: Record<Status, { icon: LucideIcon; tone: string }> = {
+  Pending: { icon: Clock, tone: "text-amber-600 bg-amber-100" },
+  Approved: { icon: CheckCircle2, tone: "text-emerald-700 bg-emerald-100" },
+  Rejected: { icon: XCircle, tone: "text-red-600 bg-red-100" },
+};
+
+const filters = ["All", "Pending", "Approved", "Rejected"] as const;
+
+function formatRm(value: number) {
+  return `RM ${value.toLocaleString("en-MY", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function StatusPill({ status }: { status: Status }) {
+  const { icon: Icon, tone } = statusConfig[status];
+  return (
+    <span
+      className={cn(
+        "inline-flex w-28 items-center justify-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
+        tone,
+      )}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {status}
+    </span>
+  );
+}
+
+export function HistoryPage() {
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<"quotations" | "budgets">("quotations");
+  const [filter, setFilter] = useState<(typeof filters)[number]>("All");
+  const [query, setQuery] = useState("");
+  const [quotations, setQuotations] = useState<QuotationListItem[]>([]);
+  const [budgets, setBudgets] = useState<BudgetListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedQuotationId, setSelectedQuotationId] = useState<number | null>(
+    null,
+  );
+  const [selectedBudgetId, setSelectedBudgetId] = useState<number | null>(null);
+  const [quotationDetail, setQuotationDetail] =
+    useState<QuotationDetail | null>(null);
+  const [budgetDetail, setBudgetDetail] = useState<BudgetDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [generatingPrfId, setGeneratingPrfId] = useState<number | null>(null);
+  const [budgetFormEnabled, setBudgetFormEnabled] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([listMyQuotations(), listMyBudgets()])
+      .then(([quotationRows, budgetRows]) => {
+        if (!active) return;
+        setQuotations(quotationRows);
+        setBudgets(budgetRows);
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not load your history. Refresh and try again.",
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    isYearlyBudgetFormEnabled()
+      .then((enabled) => {
+        if (active) setBudgetFormEnabled(enabled);
+      })
+      .catch(() => {
+        if (active) setBudgetFormEnabled(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedQuotationId == null) {
+      setQuotationDetail(null);
+      return;
+    }
+
+    let active = true;
+    setDetailLoading(true);
+    getMyQuotation({ data: { quotationId: selectedQuotationId } })
+      .then((row) => {
+        if (active) setQuotationDetail(row);
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not open this quotation. Try again.",
+        );
+        setSelectedQuotationId(null);
+      })
+      .finally(() => {
+        if (active) setDetailLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedQuotationId]);
+
+  useEffect(() => {
+    if (selectedBudgetId == null) {
+      setBudgetDetail(null);
+      return;
+    }
+
+    let active = true;
+    setDetailLoading(true);
+    getMyBudget({ data: { budgetId: selectedBudgetId } })
+      .then((row) => {
+        if (active) setBudgetDetail(row);
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not open this budget. Try again.",
+        );
+        setSelectedBudgetId(null);
+      })
+      .finally(() => {
+        if (active) setDetailLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedBudgetId]);
+
+  const visibleQuotations = useMemo(
+    () =>
+      quotations.filter(
+        (req) =>
+          (filter === "All" || req.status === filter) &&
+          `QT-${req.id} ${req.title}`
+            .toLowerCase()
+            .includes(query.toLowerCase().trim()),
+      ),
+    [quotations, filter, query],
+  );
+
+  const visibleBudgets = useMemo(
+    () =>
+      budgets.filter(
+        (row) =>
+          (filter === "All" || row.status === filter) &&
+          `YB-${row.id} ${row.title} ${row.code} ${row.budgetType} ${row.budgetYear} ${row.createdByEmail}`
+            .toLowerCase()
+            .includes(query.toLowerCase().trim()),
+      ),
+    [budgets, filter, query],
+  );
+
+  const currentYear = new Date().getFullYear();
+  const quotationTotal = quotations.reduce((sum, row) => sum + row.amount, 0);
+  const budgetTotal = budgets.reduce((sum, row) => sum + row.amount, 0);
+  const requestedOpex = budgets
+    .filter(
+      (row) => row.budgetYear === currentYear && row.budgetType === "OPEX",
+    )
+    .reduce((sum, row) => sum + row.amount, 0);
+  const requestedCapex = budgets
+    .filter(
+      (row) => row.budgetYear === currentYear && row.budgetType === "CAPEX",
+    )
+    .reduce((sum, row) => sum + row.amount, 0);
+
+  const generateRfq = async (id: number) => {
+    const toastId = toast.loading(`Generating RFQ for QT-${id}…`);
+    try {
+      const result = await generateRequestForQuotation({
+        data: { quotationId: id },
+      });
+      downloadPurchaseRequisitionFile(result);
+      toast.success(`RFQ for QT-${id} downloaded.`, { id: toastId });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Could not generate RFQ for QT-${id}. Try again.`,
+        { id: toastId },
+      );
+    }
+  };
+
+  const generatePrf = async (id: number, format: PurchaseRequisitionFormat) => {
+    if (generatingPrfId != null) return;
+    setGeneratingPrfId(id);
+    const toastId = toast.loading(`Generating PRF for QT-${id}…`);
+    try {
+      const result = await generatePurchaseRequisition({
+        data: { quotationId: id, format },
+      });
+      downloadPurchaseRequisitionFile(result);
+      toast.success(`PRF for QT-${id} downloaded.`, { id: toastId });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Could not generate PRF for QT-${id}. Try again.`,
+        { id: toastId },
+      );
+    } finally {
+      setGeneratingPrfId(null);
+    }
+  };
+
+  const closeDetail = () => {
+    setSelectedQuotationId(null);
+    setSelectedBudgetId(null);
+    setQuotationDetail(null);
+    setBudgetDetail(null);
+  };
+
+  return (
+    <div className="flex h-screen flex-col overflow-hidden bg-ivory text-foreground md:flex-row">
+      <Sidebar />
+
+      <main className="flex-1 overflow-y-auto p-6 md:p-12">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="font-display text-4xl">History</h1>
+            <p className="mt-2 text-sm text-foreground/60">
+              Track your quotations and yearly budgets in one place.
+            </p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full bg-lime px-6 py-3 text-sm font-medium text-lime-foreground transition hover:brightness-95"
+              >
+                <Plus className="h-4 w-4" />
+                New request
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() => void navigate({ to: "/user/quotation" })}
+              >
+                Request quotation
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!budgetFormEnabled}
+                onSelect={() => {
+                  if (!budgetFormEnabled) {
+                    toast.error(
+                      "Yearly budget submissions are closed. Try again later.",
+                    );
+                    return;
+                  }
+                  void navigate({ to: "/user/budget" });
+                }}
+              >
+                Yearly budget
+                {!budgetFormEnabled ? " (Closed)" : ""}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard
+            icon={Receipt}
+            label="Quotations"
+            value={String(quotations.length)}
+            hint={formatRm(quotationTotal)}
+          />
+          <SummaryCard
+            icon={Wallet}
+            label="Budget lines"
+            value={String(budgets.length)}
+            hint={formatRm(budgetTotal)}
+            featured
+          />
+          <SummaryCard
+            icon={ArrowDownLeft}
+            label="Requested OPEX"
+            value={formatRm(requestedOpex)}
+            hint={`FY ${currentYear}`}
+          />
+          <SummaryCard
+            icon={ArrowUpRight}
+            label="Requested CAPEX"
+            value={formatRm(requestedCapex)}
+            hint={`FY ${currentYear}`}
+          />
+        </div>
+
+        <div className="mt-6 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
+          <Tabs
+            value={tab}
+            onValueChange={(value) => {
+              setTab(value as "quotations" | "budgets");
+              setFilter("All");
+              setQuery("");
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <TabsList className="h-auto rounded-full border border-foreground/10 bg-ivory p-1">
+                <TabsTrigger
+                  value="quotations"
+                  className="rounded-full px-4 py-2 data-[state=active]:bg-background"
+                >
+                  Quotations
+                  <span className="ml-2 rounded-full bg-foreground/5 px-2 py-0.5 text-xs tabular-nums">
+                    {quotations.length}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="budgets"
+                  className="rounded-full px-4 py-2 data-[state=active]:bg-background"
+                >
+                  Yearly budgets
+                  <span className="ml-2 rounded-full bg-foreground/5 px-2 py-0.5 text-xs tabular-nums">
+                    {budgets.length}
+                  </span>
+                </TabsTrigger>
+              </TabsList>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-foreground/40" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={
+                    tab === "quotations"
+                      ? "Search quotations"
+                      : "Search budgets"
+                  }
+                  className="h-11 rounded-full pl-11"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center gap-1 rounded-full border border-foreground/10 p-1 w-fit">
+              {filters.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setFilter(option)}
+                  className={cn(
+                    "rounded-full px-4 py-2 text-sm font-medium transition",
+                    filter === option
+                      ? "bg-foreground text-background"
+                      : "text-foreground/60 hover:text-foreground",
+                  )}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+
+            <TabsContent value="quotations" className="mt-4">
+              {loading ? (
+                <EmptyState message="Loading quotations…" />
+              ) : visibleQuotations.length === 0 ? (
+                <EmptyState
+                  message={
+                    quotations.length === 0
+                      ? "No quotations yet. Submit your first request."
+                      : "No quotations match your filters."
+                  }
+                />
+              ) : (
+                <ul className="divide-y divide-foreground/10">
+                  {visibleQuotations.map((row) => (
+                    <li key={row.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedQuotationId(row.id)}
+                        className="flex w-full flex-wrap items-center justify-between gap-4 py-4 text-left transition hover:bg-ivory/60"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-ivory px-2.5 py-0.5 text-[11px] font-medium tracking-wide text-foreground/60 uppercase">
+                              Quotation
+                            </span>
+                            <p className="truncate text-sm font-medium">
+                              {row.title}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-xs text-foreground/50">
+                            QT-{row.id} · {row.itemCount} item
+                            {row.itemCount === 1 ? "" : "s"} · Submitted{" "}
+                            {row.date}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-medium tabular-nums">
+                            {formatRm(row.amount)}
+                          </span>
+                          <StatusPill status={row.status} />
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </TabsContent>
+
+            <TabsContent value="budgets" className="mt-4">
+              {loading ? (
+                <EmptyState message="Loading your budgets…" />
+              ) : visibleBudgets.length === 0 ? (
+                <EmptyState
+                  message={
+                    budgets.length === 0
+                      ? "No budgets yet. Submit a yearly budget request."
+                      : "No budgets match your filters."
+                  }
+                />
+              ) : (
+                <ul className="divide-y divide-foreground/10">
+                  {visibleBudgets.map((row) => (
+                    <li key={row.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBudgetId(row.id)}
+                        className="flex w-full flex-wrap items-center justify-between gap-4 py-4 text-left transition hover:bg-ivory/60"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={cn(
+                                "rounded-full px-2.5 py-0.5 text-[11px] font-medium tracking-wide uppercase",
+                                row.budgetType === "OPEX"
+                                  ? "bg-sky-100 text-sky-800"
+                                  : "bg-amber-100 text-amber-800",
+                              )}
+                            >
+                              {row.budgetType}
+                            </span>
+                            <p className="truncate text-sm font-medium">
+                              {row.title}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-xs text-foreground/50">
+                            YB-{row.id} · FY {row.budgetYear} · {row.code}
+                            {" · "}
+                            {row.isMine ? "You" : row.createdByEmail}
+                            {" · "}
+                            {row.date}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-medium tabular-nums">
+                            {formatRm(row.amount)}
+                          </span>
+                          <StatusPill status={row.status} />
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      </main>
+
+      {selectedQuotationId != null &&
+        createPortal(
+          <DetailOverlay onClose={closeDetail}>
+            {detailLoading || !quotationDetail ? (
+              <p className="py-12 text-center text-sm text-foreground/50">
+                Loading quotation details
+              </p>
+            ) : (
+              <QuotationDetailCard
+                detail={quotationDetail}
+                onClose={closeDetail}
+                onGenerateRfq={() => void generateRfq(quotationDetail.id)}
+                onGeneratePrf={(format) =>
+                  void generatePrf(quotationDetail.id, format)
+                }
+                generatingPrf={generatingPrfId === quotationDetail.id}
+              />
+            )}
+          </DetailOverlay>,
+          document.body,
+        )}
+
+      {selectedBudgetId != null &&
+        createPortal(
+          <DetailOverlay onClose={closeDetail}>
+            {detailLoading || !budgetDetail ? (
+              <p className="py-12 text-center text-sm text-foreground/50">
+                Loading budget details
+              </p>
+            ) : (
+              <BudgetDetailCard
+                key={`${budgetDetail.id}-${budgetDetail.budgetType}`}
+                detail={budgetDetail}
+                formEnabled={budgetFormEnabled}
+                onClose={closeDetail}
+                onResubmitted={(updated) => {
+                  setBudgetDetail(updated);
+                  setBudgets((prev) =>
+                    prev.map((row) =>
+                      row.id === updated.id
+                        ? {
+                            ...row,
+                            budgetType: updated.budgetType,
+                            title:
+                              updated.budgetType === "CAPEX"
+                                ? updated.itemName || row.title
+                                : updated.activity || row.title,
+                            code: updated.code,
+                            amount: updated.amount,
+                            status: updated.status,
+                            statusName: updated.statusName,
+                          }
+                        : row,
+                    ),
+                  );
+                }}
+                onDeleted={(budgetId) => {
+                  setBudgets((prev) => prev.filter((row) => row.id !== budgetId));
+                  closeDetail();
+                }}
+              />
+            )}
+          </DetailOverlay>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+function SummaryCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  featured,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  hint: string;
+  featured?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-[1.5rem] p-5 shadow-card transition hover:-translate-y-0.5",
+        featured ? "bg-lime text-lime-foreground" : "bg-background",
+      )}
+    >
+      <Icon
+        className={cn(
+          "absolute -right-3 -bottom-3 h-20 w-20 -rotate-12 transition group-hover:rotate-0",
+          featured ? "text-lime-foreground/10" : "text-foreground/5",
+        )}
+      />
+      <div className="flex items-center gap-2.5">
+        <span
+          className={cn(
+            "flex h-9 w-9 items-center justify-center rounded-full",
+            featured
+              ? "bg-lime-foreground/10"
+              : "bg-lime text-lime-foreground",
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        <p
+          className={cn(
+            "text-sm font-medium",
+            featured ? "text-lime-foreground/70" : "text-foreground/60",
+          )}
+        >
+          {label}
+        </p>
+      </div>
+      <p className="relative mt-3 font-display text-3xl tabular-nums">{value}</p>
+      <p
+        className={cn(
+          "relative mt-1 text-xs",
+          featured ? "text-lime-foreground/60" : "text-foreground/50",
+        )}
+      >
+        {hint}
+      </p>
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-foreground/15 py-14 text-center">
+      <p className="text-sm text-foreground/50">{message}</p>
+    </div>
+  );
+}
+
+function DetailOverlay({
+  children,
+  onClose,
+}: {
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/20 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[1.5rem] bg-background p-6 shadow-card md:p-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function QuotationDetailCard({
+  detail,
+  onClose,
+  onGenerateRfq,
+  onGeneratePrf,
+  generatingPrf,
+}: {
+  detail: QuotationDetail;
+  onClose: () => void;
+  onGenerateRfq: () => void;
+  onGeneratePrf: (format: PurchaseRequisitionFormat) => void;
+  generatingPrf: boolean;
+}) {
+  const { icon: StatusIcon, tone } = statusConfig[detail.status];
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+            Quotation detail
+          </p>
+          <h2 className="mt-1 font-display text-3xl">QT-{detail.id}</h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            Submitted {detail.date}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+          >
+            <StatusIcon className="h-3.5 w-3.5" />
+            {detail.status}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close details"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/50 transition hover:bg-ivory hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl bg-ivory p-4">
+          <p className="text-xs text-foreground/50">Items</p>
+          <p className="mt-1 font-display text-2xl tabular-nums">
+            {detail.items.length}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-ivory p-4">
+          <p className="text-xs text-foreground/50">Attachments</p>
+          <p className="mt-1 font-display text-2xl tabular-nums">
+            {detail.attachments.length}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-ivory p-4">
+          <p className="text-xs text-foreground/50">Total</p>
+          <p className="mt-1 font-display text-2xl tabular-nums">
+            {formatRm(detail.amount)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <h3 className="font-display text-xl">Items</h3>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-foreground/10 text-left text-xs text-foreground/50">
+                <th className="py-3 font-medium">Item</th>
+                <th className="py-3 text-right font-medium">Qty</th>
+                <th className="py-3 text-right font-medium">Unit price</th>
+                <th className="py-3 text-right font-medium">Line total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-foreground/10">
+              {detail.items.map((item) => (
+                <tr key={item.id}>
+                  <td className="py-3">
+                    <p className="font-medium">{item.name}</p>
+                    {item.description && (
+                      <p className="mt-0.5 text-xs text-foreground/50">
+                        {item.description}
+                      </p>
+                    )}
+                  </td>
+                  <td className="py-3 text-right tabular-nums">{item.quantity}</td>
+                  <td className="py-3 text-right tabular-nums">
+                    {formatRm(item.price)}
+                  </td>
+                  <td className="py-3 text-right font-medium tabular-nums">
+                    {formatRm(item.price * item.quantity)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {detail.attachments.length > 0 && (
+        <div className="mt-8">
+          <h3 className="font-display text-xl">Attachments</h3>
+          <ul className="mt-3 space-y-2">
+            {detail.attachments.map((file) => (
+              <li
+                key={file.id}
+                className="flex items-center gap-2 rounded-xl bg-ivory px-4 py-3 text-sm"
+              >
+                <Paperclip className="h-4 w-4 shrink-0 text-foreground/50" />
+                <span className="truncate">{file.name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(detail.statusName === "approved_hod" ||
+        detail.statusName === "approved_ceo" ||
+        detail.statusName === "completed") && (
+        <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
+          <button
+            type="button"
+            onClick={onGenerateRfq}
+            className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory"
+          >
+            <FileText className="h-4 w-4" />
+            Generate RFQ
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={generatingPrf}
+                className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ClipboardPen className="h-4 w-4" />
+                {generatingPrf ? "Generating…" : "Generate PRF"}
+                <ChevronDown className="h-4 w-4 text-foreground/50" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="z-[110]">
+              <DropdownMenuItem onClick={() => onGeneratePrf("pdf")}>
+                <FileText className="h-4 w-4" />
+                PDF (.pdf)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onGeneratePrf("xlsx")}>
+                <FileSpreadsheet className="h-4 w-4" />
+                Excel (.xlsx)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BudgetDetailCard({
+  detail,
+  formEnabled,
+  onClose,
+  onResubmitted,
+  onDeleted,
+}: {
+  detail: BudgetDetail;
+  formEnabled: boolean;
+  onClose: () => void;
+  onResubmitted: (detail: BudgetDetail) => void;
+  onDeleted: (budgetId: number) => void;
+}) {
+  const { icon: StatusIcon, tone } = statusConfig[detail.status];
+  const isCapex = detail.budgetType === "CAPEX";
+  const canEdit = detail.isMine && formEnabled;
+  const canDelete =
+    (detail.status === "Pending" || detail.status === "Rejected") &&
+    detail.isMine;
+  const canTransfer =
+    detail.status === "Pending" && detail.isMine && formEnabled;
+  const isResubmit = detail.status === "Rejected";
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [code, setCode] = useState(detail.code);
+  const [activity, setActivity] = useState(detail.activity ?? "");
+  const [itemName, setItemName] = useState(detail.itemName ?? "");
+  const [targetMonths, setTargetMonths] = useState(detail.targetMonths ?? "");
+  const [objective, setObjective] = useState(detail.objective ?? "");
+  const [justification, setJustification] = useState(detail.justification);
+  const [quantity, setQuantity] = useState(detail.quantity ?? 1);
+  const [costPerUnit, setCostPerUnit] = useState(
+    detail.costPerUnit == null ? "" : String(detail.costPerUnit),
+  );
+  const [budgetAmount, setBudgetAmount] = useState(String(detail.amount));
+  const [effectIfNotApproved, setEffectIfNotApproved] = useState(
+    detail.effectIfNotApproved ?? "",
+  );
+  const [alternative, setAlternative] = useState(detail.alternative ?? "");
+  const [remarks, setRemarks] = useState(detail.remarks ?? "");
+
+  const unitValue = Number(costPerUnit) || 0;
+  const capexEstimated = unitValue * quantity;
+  const codeOptions = isCapex ? CAPEX_CODES : OPEX_CODES;
+
+  useEffect(() => {
+    if (detail.status !== "Pending") {
+      setTransferOpen(false);
+    }
+  }, [detail.status]);
+
+  const resetForm = () => {
+    setCode(detail.code);
+    setActivity(detail.activity ?? "");
+    setItemName(detail.itemName ?? "");
+    setTargetMonths(detail.targetMonths ?? "");
+    setObjective(detail.objective ?? "");
+    setJustification(detail.justification);
+    setQuantity(detail.quantity ?? 1);
+    setCostPerUnit(
+      detail.costPerUnit == null ? "" : String(detail.costPerUnit),
+    );
+    setBudgetAmount(String(detail.amount));
+    setEffectIfNotApproved(detail.effectIfNotApproved ?? "");
+    setAlternative(detail.alternative ?? "");
+    setRemarks(detail.remarks ?? "");
+  };
+
+  const startEdit = () => {
+    resetForm();
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    resetForm();
+    setEditing(false);
+  };
+
+  const closeTransfer = () => {
+    if (transferring) return;
+    setTransferOpen(false);
+  };
+
+  const handleTransfer = async (payload: TransferBudgetInput) => {
+    if (transferring || !canTransfer) return;
+    setTransferring(true);
+    const toastId = toast.loading(
+      `Transferring YB-${detail.id} to ${payload.targetType}…`,
+    );
+    try {
+      const updated = await transferYearlyBudget({
+        data: { budgetId: detail.id, ...payload },
+      });
+      onResubmitted(updated);
+      setTransferOpen(false);
+      toast.success(`YB-${detail.id} transferred to ${payload.targetType}`, {
+        id: toastId,
+        description: "Still waiting for HOD review.",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not transfer this budget. Try again.",
+        { id: toastId },
+      );
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  const handleResubmit = async () => {
+    if (saving) return;
+
+    if (isCapex) {
+      if (!code || !itemName.trim() || !justification.trim() || unitValue <= 0) {
+        toast.error("Fill in item, justification, and cost, then try again.");
+        return;
+      }
+    } else {
+      const amount = Number(budgetAmount) || 0;
+      if (
+        !code ||
+        !activity.trim() ||
+        !objective.trim() ||
+        !justification.trim() ||
+        amount <= 0
+      ) {
+        toast.error("Fill in the required fields, then try again.");
+        return;
+      }
+    }
+
+    setSaving(true);
+    const toastId = toast.loading(
+      isResubmit
+        ? `Resubmitting YB-${detail.id}…`
+        : `Saving YB-${detail.id}…`,
+    );
+    try {
+      const updated = isCapex
+        ? await resubmitYearlyBudget({
+            data: {
+              budgetId: detail.id,
+              budgetType: "CAPEX",
+              code,
+              itemName: itemName.trim(),
+              justification: justification.trim(),
+              targetMonths: targetMonths || undefined,
+              quantity,
+              costPerUnit: unitValue,
+              budgetAmount: capexEstimated,
+              effectIfNotApproved: effectIfNotApproved.trim() || undefined,
+              alternative: alternative.trim() || undefined,
+              remarks: remarks.trim() || undefined,
+            },
+          })
+        : await resubmitYearlyBudget({
+            data: {
+              budgetId: detail.id,
+              budgetType: "OPEX",
+              code,
+              activity: activity.trim(),
+              targetMonths: targetMonths || undefined,
+              objective: objective.trim(),
+              justification: justification.trim(),
+              budgetAmount: Number(budgetAmount),
+              remarks: remarks.trim() || undefined,
+            },
+          });
+      onResubmitted(updated);
+      setEditing(false);
+      toast.success(
+        isResubmit
+          ? `YB-${detail.id} resubmitted`
+          : `YB-${detail.id} updated`,
+        {
+          id: toastId,
+          description: isResubmit
+            ? "It is pending HOD review again."
+            : detail.status === "Approved"
+              ? "The approved details were saved."
+              : "Still waiting for HOD review.",
+        },
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not save this budget. Try again.",
+        { id: toastId },
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (deleting || !canDelete) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+
+    setDeleting(true);
+    const toastId = toast.loading(
+      isResubmit ? `Removing YB-${detail.id}…` : `Deleting YB-${detail.id}…`,
+    );
+    try {
+      await deleteYearlyBudget({ data: { budgetId: detail.id } });
+      toast.success(
+        isResubmit ? `YB-${detail.id} removed` : `YB-${detail.id} deleted`,
+        {
+          id: toastId,
+          description: "This budget request has been removed.",
+        },
+      );
+      onDeleted(detail.id);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not delete this budget. Try again.",
+        { id: toastId },
+      );
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+            Yearly budget · {detail.budgetType}
+          </p>
+          <h2 className="mt-1 font-display text-3xl">YB-{detail.id}</h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            FY {detail.budgetYear} · Submitted {detail.date}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+          >
+            <StatusIcon className="h-3.5 w-3.5" />
+            {detail.status}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close details"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/50 transition hover:bg-ivory hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="mt-6 space-y-4">
+          <DetailField label="Submitted by" value={detail.createdByEmail} />
+          <DetailField label="Department" value={detail.department || "—"} />
+          {detail.rejectRemarks && (
+            <DetailField
+              label="Rejection remarks"
+              value={detail.rejectRemarks}
+            />
+          )}
+
+          <div className="space-y-2">
+            <Label>{isCapex ? "Category" : "Code"}</Label>
+            <Select value={code} onValueChange={setCode} disabled={saving}>
+              <SelectTrigger className="h-11 rounded-xl">
+                <SelectValue placeholder="Select code" />
+              </SelectTrigger>
+              <SelectContent>
+                {codeOptions.map((entry) => (
+                  <SelectItem key={entry.value} value={entry.value}>
+                    {entry.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {isCapex ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="edit-item">Item</Label>
+                <Input
+                  id="edit-item"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  disabled={saving}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-justification">Justification</Label>
+                <Textarea
+                  id="edit-justification"
+                  value={justification}
+                  onChange={(e) => setJustification(e.target.value)}
+                  disabled={saving}
+                  className="min-h-20 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-target-months">Target months</Label>
+                <Input
+                  id="edit-target-months"
+                  type="month"
+                  value={targetMonths}
+                  onChange={(e) => setTargetMonths(e.target.value)}
+                  disabled={saving}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-quantity">Quantity</Label>
+                  <Input
+                    id="edit-quantity"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={quantity}
+                    onChange={(e) =>
+                      setQuantity(Math.max(1, Number(e.target.value) || 1))
+                    }
+                    disabled={saving}
+                    className="h-11 rounded-xl tabular-nums"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-unit">Estimated cost per unit (RM)</Label>
+                  <Input
+                    id="edit-unit"
+                    inputMode="decimal"
+                    value={costPerUnit}
+                    onChange={(e) =>
+                      setCostPerUnit(e.target.value.replace(/[^\d.]/g, ""))
+                    }
+                    disabled={saving}
+                    className="h-11 rounded-xl tabular-nums"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Estimated price</Label>
+                <div className="flex h-11 items-center rounded-xl border border-foreground/10 bg-ivory px-4 font-display text-xl tabular-nums">
+                  {formatRm(capexEstimated)}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-effect">
+                  Effect if budget not approved
+                </Label>
+                <Textarea
+                  id="edit-effect"
+                  value={effectIfNotApproved}
+                  onChange={(e) => setEffectIfNotApproved(e.target.value)}
+                  disabled={saving}
+                  className="min-h-20 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-alternative">
+                  Alternative more cost-effective
+                </Label>
+                <Textarea
+                  id="edit-alternative"
+                  value={alternative}
+                  onChange={(e) => setAlternative(e.target.value)}
+                  disabled={saving}
+                  className="min-h-20 rounded-xl"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="edit-activity">
+                  Activities / Programme / Event
+                </Label>
+                <Input
+                  id="edit-activity"
+                  value={activity}
+                  onChange={(e) => setActivity(e.target.value)}
+                  disabled={saving}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-opex-months">Target months</Label>
+                <Input
+                  id="edit-opex-months"
+                  type="month"
+                  value={targetMonths}
+                  onChange={(e) => setTargetMonths(e.target.value)}
+                  disabled={saving}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-objective">Objectives</Label>
+                <Textarea
+                  id="edit-objective"
+                  value={objective}
+                  onChange={(e) => setObjective(e.target.value)}
+                  disabled={saving}
+                  className="min-h-20 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-opex-justification">Justifications</Label>
+                <Textarea
+                  id="edit-opex-justification"
+                  value={justification}
+                  onChange={(e) => setJustification(e.target.value)}
+                  disabled={saving}
+                  className="min-h-20 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-budget">OPEX budget (RM)</Label>
+                <Input
+                  id="edit-budget"
+                  inputMode="decimal"
+                  value={budgetAmount}
+                  onChange={(e) =>
+                    setBudgetAmount(e.target.value.replace(/[^\d.]/g, ""))
+                  }
+                  disabled={saving}
+                  className="h-11 rounded-xl tabular-nums"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-remarks">Remarks</Label>
+            <Input
+              id="edit-remarks"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              disabled={saving}
+              className="h-11 rounded-xl"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
+            <button
+              type="button"
+              onClick={() => void handleResubmit()}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+            >
+              {saving
+                ? isResubmit
+                  ? "Resubmitting…"
+                  : "Saving…"
+                : isResubmit
+                  ? "Resubmit"
+                  : "Save changes"}
+            </button>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-foreground/60 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <dl className="mt-6 space-y-4">
+            <DetailField label="Submitted by" value={detail.createdByEmail} />
+            <DetailField
+              label="Department"
+              value={detail.department || "—"}
+            />
+            <DetailField
+              label={isCapex ? "Category" : "Code"}
+              value={budgetCodeLabel(detail.code, detail.budgetType)}
+            />
+            {isCapex ? (
+              <>
+                <DetailField label="Item" value={detail.itemName || "—"} />
+                <DetailField
+                  label="Justification"
+                  value={detail.justification}
+                />
+                <DetailField
+                  label="Target months"
+                  value={formatTargetMonth(detail.targetMonths)}
+                />
+                <DetailField
+                  label="Quantity"
+                  value={
+                    detail.quantity == null ? "—" : String(detail.quantity)
+                  }
+                />
+                <DetailField
+                  label="Estimated cost per unit"
+                  value={
+                    detail.costPerUnit == null
+                      ? "—"
+                      : formatRm(detail.costPerUnit)
+                  }
+                />
+                <DetailField
+                  label="Estimated price"
+                  value={formatRm(detail.amount)}
+                />
+                <DetailField
+                  label="Effect if budget not approved"
+                  value={detail.effectIfNotApproved || "—"}
+                />
+                <DetailField
+                  label="Alternative more cost-effective"
+                  value={detail.alternative || "—"}
+                />
+              </>
+            ) : (
+              <>
+                <DetailField
+                  label="Activities / Programme / Event"
+                  value={detail.activity || "—"}
+                />
+                <DetailField
+                  label="Target months"
+                  value={formatTargetMonth(detail.targetMonths)}
+                />
+                <DetailField
+                  label="Objectives"
+                  value={detail.objective || "—"}
+                />
+                <DetailField
+                  label="Justifications"
+                  value={detail.justification}
+                />
+                <DetailField
+                  label="OPEX budget"
+                  value={formatRm(detail.amount)}
+                />
+              </>
+            )}
+            <DetailField label="Remarks" value={detail.remarks || "—"} />
+            {detail.status === "Rejected" && detail.rejectRemarks && (
+              <DetailField
+                label="Rejection remarks"
+                value={detail.rejectRemarks}
+              />
+            )}
+          </dl>
+
+          {detail.isMine && !formEnabled && (
+            <div className="mt-8 border-t border-foreground/10 pt-6">
+              <p className="text-sm text-foreground/50">
+                Yearly budget submissions are closed. You can edit this again
+                when your admin reopens them.
+              </p>
+            </div>
+          )}
+
+          {canEdit || canDelete || canTransfer ? (
+            <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={startEdit}
+                  disabled={deleting || transferring}
+                  className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory disabled:opacity-50"
+                >
+                  <ClipboardPen className="h-4 w-4" />
+                  Edit form
+                </button>
+              )}
+              {canTransfer && (
+                <button
+                  type="button"
+                  onClick={() => setTransferOpen(true)}
+                  disabled={deleting || transferring}
+                  className="group inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-5 py-2.5 text-sm font-medium text-sky-800 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-100 hover:shadow-md disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none"
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-200/70 text-sky-700">
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                  </span>
+                  Transfer
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={() => void handleDelete()}
+                  disabled={deleting || transferring}
+                  className="inline-flex items-center gap-2 rounded-full border border-red-200 px-5 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deleting
+                    ? isResubmit
+                      ? "Removing…"
+                      : "Deleting…"
+                    : confirmDelete
+                      ? isResubmit
+                        ? "Confirm remove"
+                        : "Confirm delete"
+                      : isResubmit
+                        ? "Remove"
+                        : "Delete"}
+                </button>
+              )}
+              {canDelete && confirmDelete && !deleting && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-foreground/60 transition hover:bg-ivory hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          ) : null}
+        </>
+      )}
+
+      {transferOpen &&
+        createPortal(
+          <DetailOverlay onClose={closeTransfer}>
+            <TransferBudgetCard
+              detail={detail}
+              transferring={transferring}
+              onClose={closeTransfer}
+              onTransfer={(payload) => void handleTransfer(payload)}
+            />
+          </DetailOverlay>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+type TransferBudgetInput =
+  | {
+      targetType: "CAPEX";
+      code: (typeof CAPEX_CODES)[number]["value"];
+      itemName: string;
+      justification: string;
+      targetMonths?: string;
+      quantity: number;
+      costPerUnit: number;
+      budgetAmount: number;
+      effectIfNotApproved?: string;
+      alternative?: string;
+      remarks?: string;
+    }
+  | {
+      targetType: "OPEX";
+      code: (typeof OPEX_CODES)[number]["value"];
+      activity: string;
+      objective: string;
+      justification: string;
+      targetMonths?: string;
+      budgetAmount: number;
+      remarks?: string;
+    };
+
+function TransferBudgetCard({
+  detail,
+  transferring,
+  onClose,
+  onTransfer,
+}: {
+  detail: BudgetDetail;
+  transferring: boolean;
+  onClose: () => void;
+  onTransfer: (payload: TransferBudgetInput) => void;
+}) {
+  const targetType = detail.budgetType === "OPEX" ? "CAPEX" : "OPEX";
+  const sourceType = detail.budgetType;
+
+  const [capexCode, setCapexCode] = useState<
+    (typeof CAPEX_CODES)[number]["value"] | ""
+  >("");
+  const [opexCode, setOpexCode] = useState<
+    (typeof OPEX_CODES)[number]["value"] | ""
+  >("");
+  const [itemName, setItemName] = useState(detail.activity ?? "");
+  const [activity, setActivity] = useState(detail.itemName ?? "");
+  const [objective, setObjective] = useState(detail.objective ?? "");
+  const [justification, setJustification] = useState(detail.justification);
+  const [targetMonths, setTargetMonths] = useState(detail.targetMonths ?? "");
+  const [quantity, setQuantity] = useState(1);
+  const [costPerUnit, setCostPerUnit] = useState(
+    detail.amount > 0 ? String(detail.amount) : "",
+  );
+  const [budgetAmount, setBudgetAmount] = useState(
+    detail.amount > 0 ? String(detail.amount) : "",
+  );
+  const [effectIfNotApproved, setEffectIfNotApproved] = useState("");
+  const [alternative, setAlternative] = useState("");
+  const [remarks, setRemarks] = useState(detail.remarks ?? "");
+
+  const unitValue = Number(costPerUnit) || 0;
+  const estimatedPrice = quantity * unitValue;
+  const opexBudgetValue = Number(budgetAmount) || 0;
+
+  const submitTransfer = () => {
+    if (targetType === "CAPEX") {
+      if (!capexCode) {
+        toast.error("Choose a CAPEX code to continue.");
+        return;
+      }
+      if (!itemName.trim()) {
+        toast.error("Enter the item name to continue.");
+        return;
+      }
+      if (!justification.trim()) {
+        toast.error("Add a justification to continue.");
+        return;
+      }
+      if (unitValue <= 0) {
+        toast.error("Enter a cost per unit above zero.");
+        return;
+      }
+      onTransfer({
+        targetType: "CAPEX",
+        code: capexCode,
+        itemName: itemName.trim(),
+        justification: justification.trim(),
+        targetMonths: targetMonths || undefined,
+        quantity,
+        costPerUnit: unitValue,
+        budgetAmount: estimatedPrice,
+        effectIfNotApproved: effectIfNotApproved.trim() || undefined,
+        alternative: alternative.trim() || undefined,
+        remarks: remarks.trim() || undefined,
+      });
+      return;
+    }
+
+    if (!opexCode) {
+      toast.error("Choose an OPEX code to continue.");
+      return;
+    }
+    if (!activity.trim()) {
+      toast.error("Enter the activity to continue.");
+      return;
+    }
+    if (!objective.trim()) {
+      toast.error("Add the objectives to continue.");
+      return;
+    }
+    if (!justification.trim()) {
+      toast.error("Add a justification to continue.");
+      return;
+    }
+    if (opexBudgetValue <= 0) {
+      toast.error("Enter a budget amount above zero.");
+      return;
+    }
+    onTransfer({
+      targetType: "OPEX",
+      code: opexCode,
+      activity: activity.trim(),
+      objective: objective.trim(),
+      justification: justification.trim(),
+      targetMonths: targetMonths || undefined,
+      budgetAmount: opexBudgetValue,
+      remarks: remarks.trim() || undefined,
+    });
+  };
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+            Transfer to {targetType}
+          </p>
+          <h2 className="mt-1 font-display text-3xl">YB-{detail.id}</h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            From {sourceType} · {formatRm(detail.amount)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={transferring}
+          aria-label="Close transfer form"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground/50 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-ivory p-4">
+        <p className="text-xs text-foreground/50">
+          Current {sourceType} {sourceType === "OPEX" ? "activity" : "item"}
+        </p>
+        <p className="mt-1 text-sm font-medium">
+          {sourceType === "OPEX"
+            ? detail.activity || "—"
+            : detail.itemName || "—"}
+        </p>
+        <p className="mt-0.5 text-xs text-foreground/50">
+          {budgetCodeLabel(detail.code, sourceType)}
+        </p>
+      </div>
+
+      <div className="mt-6 space-y-4">
+        {targetType === "CAPEX" ? (
+          <>
+            <div className="space-y-2">
+              <Label>CAPEX code</Label>
+              <Select
+                value={capexCode}
+                onValueChange={(value) =>
+                  setCapexCode(value as (typeof CAPEX_CODES)[number]["value"])
+                }
+                disabled={transferring}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select CAPEX code" />
+                </SelectTrigger>
+                <SelectContent className="z-[110]">
+                  {CAPEX_CODES.map((entry) => (
+                    <SelectItem key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-item-${detail.id}`}>Item</Label>
+              <Input
+                id={`transfer-item-${detail.id}`}
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                placeholder="e.g. Laboratory microscope"
+                disabled={transferring}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-justification-${detail.id}`}>
+                Justification
+              </Label>
+              <Textarea
+                id={`transfer-justification-${detail.id}`}
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                placeholder="Why this item is needed"
+                disabled={transferring}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-target-${detail.id}`}>
+                Target months
+              </Label>
+              <Input
+                id={`transfer-target-${detail.id}`}
+                type="month"
+                value={targetMonths}
+                onChange={(e) => setTargetMonths(e.target.value)}
+                disabled={transferring}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`transfer-qty-${detail.id}`}>Quantity</Label>
+                <Input
+                  id={`transfer-qty-${detail.id}`}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={quantity}
+                  onChange={(e) =>
+                    setQuantity(Math.max(1, Number(e.target.value) || 1))
+                  }
+                  disabled={transferring}
+                  className="h-11 rounded-xl tabular-nums"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`transfer-unit-${detail.id}`}>
+                  Cost per unit (RM)
+                </Label>
+                <Input
+                  id={`transfer-unit-${detail.id}`}
+                  inputMode="decimal"
+                  value={costPerUnit}
+                  onChange={(e) =>
+                    setCostPerUnit(e.target.value.replace(/[^\d.]/g, ""))
+                  }
+                  placeholder="0.00"
+                  disabled={transferring}
+                  className="h-11 rounded-xl tabular-nums"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-ivory px-4 py-3">
+              <p className="text-xs text-foreground/50">Estimated price</p>
+              <p className="mt-1 font-display text-2xl tabular-nums">
+                {formatRm(estimatedPrice)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-effect-${detail.id}`}>
+                Effect if not approved
+              </Label>
+              <Textarea
+                id={`transfer-effect-${detail.id}`}
+                value={effectIfNotApproved}
+                onChange={(e) => setEffectIfNotApproved(e.target.value)}
+                placeholder="Optional"
+                disabled={transferring}
+                className="min-h-16 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-alt-${detail.id}`}>Alternative</Label>
+              <Textarea
+                id={`transfer-alt-${detail.id}`}
+                value={alternative}
+                onChange={(e) => setAlternative(e.target.value)}
+                placeholder="Optional"
+                disabled={transferring}
+                className="min-h-16 rounded-xl"
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label>OPEX code</Label>
+              <Select
+                value={opexCode}
+                onValueChange={(value) =>
+                  setOpexCode(value as (typeof OPEX_CODES)[number]["value"])
+                }
+                disabled={transferring}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select OPEX code" />
+                </SelectTrigger>
+                <SelectContent className="z-[110]">
+                  {OPEX_CODES.map((entry) => (
+                    <SelectItem key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-activity-${detail.id}`}>
+                Activities / Programme / Event
+              </Label>
+              <Input
+                id={`transfer-activity-${detail.id}`}
+                value={activity}
+                onChange={(e) => setActivity(e.target.value)}
+                placeholder="e.g. Annual maintenance"
+                disabled={transferring}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-objective-${detail.id}`}>
+                Objectives
+              </Label>
+              <Textarea
+                id={`transfer-objective-${detail.id}`}
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                placeholder="What this budget aims to achieve"
+                disabled={transferring}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-justification-${detail.id}`}>
+                Justification
+              </Label>
+              <Textarea
+                id={`transfer-justification-${detail.id}`}
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                placeholder="Why this budget is needed"
+                disabled={transferring}
+                className="min-h-20 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-target-${detail.id}`}>
+                Target months
+              </Label>
+              <Input
+                id={`transfer-target-${detail.id}`}
+                type="month"
+                value={targetMonths}
+                onChange={(e) => setTargetMonths(e.target.value)}
+                disabled={transferring}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`transfer-budget-${detail.id}`}>
+                OPEX budget (RM)
+              </Label>
+              <Input
+                id={`transfer-budget-${detail.id}`}
+                inputMode="decimal"
+                value={budgetAmount}
+                onChange={(e) =>
+                  setBudgetAmount(e.target.value.replace(/[^\d.]/g, ""))
+                }
+                placeholder="0.00"
+                disabled={transferring}
+                className="h-11 rounded-xl tabular-nums"
+              />
+            </div>
+          </>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor={`transfer-remarks-${detail.id}`}>Remarks</Label>
+          <Input
+            id={`transfer-remarks-${detail.id}`}
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            placeholder="Optional"
+            disabled={transferring}
+            className="h-11 rounded-xl"
+          />
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-wrap items-center gap-2.5 border-t border-foreground/10 pt-6">
+        <button
+          type="button"
+          onClick={submitTransfer}
+          disabled={transferring}
+          className="group inline-flex items-center gap-2 rounded-full bg-sky-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-sky-700 hover:shadow-md disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none"
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20">
+            <ArrowRightLeft className="h-3.5 w-3.5" />
+          </span>
+          {transferring
+            ? "Transferring…"
+            : `Confirm transfer to ${targetType}`}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={transferring}
+          className="rounded-full px-4 py-2.5 text-sm text-foreground/50 transition hover:bg-ivory hover:text-foreground disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const OPEX_CODES = [
+  {
+    value: "926-0000",
+    label: "926-0000 LEASE LINE FOR IT SYSTEM (926-000/23121)",
+  },
+  {
+    value: "916-0000",
+    label: "916-0000 EQUIP. RENTAL (916-000/24501) - Photocopy machine include SST 8%",
+  },
+  {
+    value: "918-0001",
+    label: "918-0001 RENTAL - LAPTOP/PC (918-0001/24602)",
+  },
+  {
+    value: "999-1003",
+    label: "999-1003 PRINTING EXP-METER READING (999-1003/27101)",
+  },
+  {
+    value: "992-0000",
+    label: "992-0000 IT & AUDIO VISUAL - EXPENSES (992-000/27809)",
+  },
+  {
+    value: "923-0000",
+    label: "923-0000 IT & AUDIO-REPAIR & MAINTENANCE (923-000/28503)",
+  },
+  {
+    value: "945-0000",
+    label: "945-0000 PROFESSIONAL FEES (945-000/29106)",
+  },
+] as const;
+
+const CAPEX_CODES = [
+  { value: "200-1100", label: "200-1100 : RENOVATION" },
+  { value: "200-1000", label: "200-1000 : OFFICE EQUIPMENT" },
+  { value: "200-0500", label: "200-0500 : IT & AUDIO VISUAL" },
+] as const;
+
+function formatTargetMonth(value: string | null) {
+  if (!value) return "—";
+  const [year, month] = value.split("-");
+  if (!year || !month) return value;
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+}
+
+function budgetCodeLabel(code: string, budgetType: "OPEX" | "CAPEX") {
+  const labels: Record<string, string> =
+    budgetType === "CAPEX"
+      ? {
+          "200-1100": "200-1100 : Renovation",
+          "200-1000": "200-1000 : Office equipment",
+          "200-0500": "200-0500 : IT & audio visual",
+        }
+      : {
+          "926-0000": "926-0000 Lease line for IT system",
+          "916-0000": "916-0000 Equip. rental",
+          "918-0001": "918-0001 Rental - laptop/PC",
+          "999-1003": "999-1003 Printing exp-meter reading",
+          "992-0000": "992-0000 IT & audio visual - expenses",
+          "923-0000": "923-0000 IT & audio-repair & maintenance",
+        };
+  return labels[code] ?? code;
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+        {label}
+      </dt>
+      <dd className="mt-1 whitespace-pre-wrap text-sm text-foreground/80">
+        {value}
+      </dd>
+    </div>
+  );
+}

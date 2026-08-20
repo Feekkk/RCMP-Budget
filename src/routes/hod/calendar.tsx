@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CalendarPage } from "@/hod/calendar";
+import { CalendarPage } from "@/features/hod/calendar";
 
 export const Route = createFileRoute("/hod/calendar")({
   head: () => ({

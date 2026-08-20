@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ProcumentDashboard } from "@/procument/dashboard";
+import { ProcumentDashboard } from "@/features/procument/dashboard";
 
 export const Route = createFileRoute("/procument/")({
   head: () => ({

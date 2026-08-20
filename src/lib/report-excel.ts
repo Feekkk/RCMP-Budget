@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import type { HodBudgetDetail } from "@/lib/hod-budget-fns";
+import type { HodBudgetDetail } from "@backend/server-functions/hod-budget-fns";
 
 const UNIVERSITY =
   "UNIVERSITI KUALA LUMPUR ROYAL COLLEGE OF MEDICINE PERAK (UniKL RCMP)";

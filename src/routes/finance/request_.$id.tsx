@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { RequestDetailPage } from "@/finance/request-detail";
+import { RequestDetailPage } from "@/features/finance/request-detail";
 
 export const Route = createFileRoute("/finance/request_/$id")({
   head: ({ params }) => ({

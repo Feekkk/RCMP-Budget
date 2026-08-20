@@ -5,7 +5,7 @@ import { Wordmark } from "@/components/landing/Nav";
 import { Underline } from "@/components/landing/Underline";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { login } from "@/lib/auth-fns";
+import { login } from "@backend/server-functions/auth-fns";
 import { homeForRole } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({

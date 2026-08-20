@@ -1,5 +1,5 @@
 import { redirect } from "@tanstack/react-router";
-import { getCurrentUser } from "@/lib/auth-fns";
+import { getCurrentUser } from "@backend/server-functions/auth-fns";
 import { homeForRole, type RoleName } from "@/lib/auth";
 
 export function requireRole(role: RoleName) {

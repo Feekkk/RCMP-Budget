@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { HodReportPage } from "@/hod/report";
+import { HodReportPage } from "@/features/hod/report";
 
 export const Route = createFileRoute("/hod/reports")({
   head: () => ({

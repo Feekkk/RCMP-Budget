@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SystemSettingsPage } from "@/components/system-settings-page";
-import { Sidebar } from "@/finance/sidebar";
+import { Sidebar } from "@/features/finance/sidebar";
 
 export const Route = createFileRoute("/finance/settings")({
   head: () => ({
