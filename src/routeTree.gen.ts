@@ -29,6 +29,7 @@ import { Route as UserCalendarRouteImport } from './routes/user/calendar'
 import { Route as UserBudgetRouteImport } from './routes/user/budget'
 import { Route as ProcumentSettingsRouteImport } from './routes/procument/settings'
 import { Route as ProcumentQuotationsRouteImport } from './routes/procument/quotations'
+import { Route as ProcumentManageVendorRouteImport } from './routes/procument/manage-vendor'
 import { Route as HodSettingsRouteImport } from './routes/hod/settings'
 import { Route as HodReportsRouteImport } from './routes/hod/reports'
 import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
@@ -137,6 +138,11 @@ const ProcumentQuotationsRoute = ProcumentQuotationsRouteImport.update({
   path: '/quotations',
   getParentRoute: () => ProcumentRouteRoute,
 } as any)
+const ProcumentManageVendorRoute = ProcumentManageVendorRouteImport.update({
+  id: '/manage-vendor',
+  path: '/manage-vendor',
+  getParentRoute: () => ProcumentRouteRoute,
+} as any)
 const HodSettingsRoute = HodSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
+  '/procument/manage-vendor': typeof ProcumentManageVendorRoute
   '/procument/quotations': typeof ProcumentQuotationsRoute
   '/procument/settings': typeof ProcumentSettingsRoute
   '/user/budget': typeof UserBudgetRoute
@@ -211,6 +218,7 @@ export interface FileRoutesByTo {
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
+  '/procument/manage-vendor': typeof ProcumentManageVendorRoute
   '/procument/quotations': typeof ProcumentQuotationsRoute
   '/procument/settings': typeof ProcumentSettingsRoute
   '/user/budget': typeof UserBudgetRoute
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
+  '/procument/manage-vendor': typeof ProcumentManageVendorRoute
   '/procument/quotations': typeof ProcumentQuotationsRoute
   '/procument/settings': typeof ProcumentSettingsRoute
   '/user/budget': typeof UserBudgetRoute
@@ -272,6 +281,7 @@ export interface FileRouteTypes {
     | '/hod/calendar'
     | '/hod/reports'
     | '/hod/settings'
+    | '/procument/manage-vendor'
     | '/procument/quotations'
     | '/procument/settings'
     | '/user/budget'
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/hod/calendar'
     | '/hod/reports'
     | '/hod/settings'
+    | '/procument/manage-vendor'
     | '/procument/quotations'
     | '/procument/settings'
     | '/user/budget'
@@ -325,6 +336,7 @@ export interface FileRouteTypes {
     | '/hod/calendar'
     | '/hod/reports'
     | '/hod/settings'
+    | '/procument/manage-vendor'
     | '/procument/quotations'
     | '/procument/settings'
     | '/user/budget'
@@ -493,6 +505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProcumentQuotationsRouteImport
       parentRoute: typeof ProcumentRouteRoute
     }
+    '/procument/manage-vendor': {
+      id: '/procument/manage-vendor'
+      path: '/manage-vendor'
+      fullPath: '/procument/manage-vendor'
+      preLoaderRoute: typeof ProcumentManageVendorRouteImport
+      parentRoute: typeof ProcumentRouteRoute
+    }
     '/hod/settings': {
       id: '/hod/settings'
       path: '/settings'
@@ -596,12 +615,14 @@ const HodRouteRouteWithChildren = HodRouteRoute._addFileChildren(
 )
 
 interface ProcumentRouteRouteChildren {
+  ProcumentManageVendorRoute: typeof ProcumentManageVendorRoute
   ProcumentQuotationsRoute: typeof ProcumentQuotationsRoute
   ProcumentSettingsRoute: typeof ProcumentSettingsRoute
   ProcumentIndexRoute: typeof ProcumentIndexRoute
 }
 
 const ProcumentRouteRouteChildren: ProcumentRouteRouteChildren = {
+  ProcumentManageVendorRoute: ProcumentManageVendorRoute,
   ProcumentQuotationsRoute: ProcumentQuotationsRoute,
   ProcumentSettingsRoute: ProcumentSettingsRoute,
   ProcumentIndexRoute: ProcumentIndexRoute,

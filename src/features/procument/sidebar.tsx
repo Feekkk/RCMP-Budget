@@ -2,6 +2,7 @@ import { Link, type LinkProps } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   ClipboardList,
+  Building2,
   Settings,
   LogOut,
   type LucideIcon,
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils";
 const items: { label: string; icon: LucideIcon; to?: LinkProps["to"] }[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/procument" },
   { label: "Quotations", icon: ClipboardList, to: "/procument/quotations" },
+  { label: "Manage Vendor", icon: Building2, to: "/procument/manage-vendor" },
   { label: "Settings", icon: Settings, to: "/procument/settings" },
 ];
 
