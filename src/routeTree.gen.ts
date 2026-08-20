@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VendorInviteRouteImport } from './routes/vendor-invite'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as UserRouteRouteImport } from './routes/user/route'
 import { Route as ProcumentRouteRouteImport } from './routes/procument/route'
@@ -38,6 +39,11 @@ import { Route as FinanceRequestRouteImport } from './routes/finance/request'
 import { Route as CeoSettingsRouteImport } from './routes/ceo/settings'
 import { Route as FinanceRequestIdRouteImport } from './routes/finance/request_.$id'
 
+const VendorInviteRoute = VendorInviteRouteImport.update({
+  id: '/vendor-invite',
+  path: '/vendor-invite',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/procument': typeof ProcumentRouteRouteWithChildren
   '/user': typeof UserRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/vendor-invite': typeof VendorInviteRoute
   '/ceo/settings': typeof CeoSettingsRoute
   '/finance/request': typeof FinanceRequestRoute
   '/finance/settings': typeof FinanceSettingsRoute
@@ -212,6 +219,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/vendor-invite': typeof VendorInviteRoute
   '/ceo/settings': typeof CeoSettingsRoute
   '/finance/request': typeof FinanceRequestRoute
   '/finance/settings': typeof FinanceSettingsRoute
@@ -243,6 +251,7 @@ export interface FileRoutesById {
   '/procument': typeof ProcumentRouteRouteWithChildren
   '/user': typeof UserRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/vendor-invite': typeof VendorInviteRoute
   '/ceo/settings': typeof CeoSettingsRoute
   '/finance/request': typeof FinanceRequestRoute
   '/finance/settings': typeof FinanceSettingsRoute
@@ -275,6 +284,7 @@ export interface FileRouteTypes {
     | '/procument'
     | '/user'
     | '/login'
+    | '/vendor-invite'
     | '/ceo/settings'
     | '/finance/request'
     | '/finance/settings'
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/vendor-invite'
     | '/ceo/settings'
     | '/finance/request'
     | '/finance/settings'
@@ -330,6 +341,7 @@ export interface FileRouteTypes {
     | '/procument'
     | '/user'
     | '/login'
+    | '/vendor-invite'
     | '/ceo/settings'
     | '/finance/request'
     | '/finance/settings'
@@ -361,10 +373,18 @@ export interface RootRouteChildren {
   ProcumentRouteRoute: typeof ProcumentRouteRouteWithChildren
   UserRouteRoute: typeof UserRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  VendorInviteRoute: typeof VendorInviteRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/vendor-invite': {
+      id: '/vendor-invite'
+      path: '/vendor-invite'
+      fullPath: '/vendor-invite'
+      preLoaderRoute: typeof VendorInviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -664,6 +684,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProcumentRouteRoute: ProcumentRouteRouteWithChildren,
   UserRouteRoute: UserRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  VendorInviteRoute: VendorInviteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
