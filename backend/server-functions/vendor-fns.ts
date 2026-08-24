@@ -14,6 +14,7 @@ export type VendorListItem = {
   contact: string;
   email: string;
   phone: string;
+  departments: DepartmentOption[];
 };
 
 export type DepartmentOption = {
@@ -183,6 +184,10 @@ async function listDepartmentOptions(): Promise<DepartmentOption[]> {
   }));
 }
 
+export const listDepartments = createServerFn({ method: "GET" })
+  .middleware([procumentOnly])
+  .handler(async (): Promise<DepartmentOption[]> => listDepartmentOptions());
+
 export const listVendors = createServerFn({ method: "GET" })
   .middleware([procumentOnly])
   .handler(async (): Promise<VendorListItem[]> => {
@@ -193,6 +198,33 @@ export const listVendors = createServerFn({ method: "GET" })
        ORDER BY vendor_name ASC`,
     );
 
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const vendorIds = rows.map((row) => row.vendor_id);
+    const departmentRows = await query<
+      Array<{
+        vendor_id: number;
+        department_id: number;
+        department_name: string;
+      }>
+    >(
+      `SELECT vd.vendor_id, d.department_id, d.department_name
+       FROM vendor_departments vd
+       INNER JOIN departments d ON d.department_id = vd.department_id
+       WHERE vd.vendor_id IN (?)
+       ORDER BY d.department_name ASC`,
+      [vendorIds],
+    );
+
+    const departmentsByVendor = new Map<number, DepartmentOption[]>();
+    for (const row of departmentRows) {
+      const list = departmentsByVendor.get(row.vendor_id) ?? [];
+      list.push({ id: row.department_id, name: row.department_name });
+      departmentsByVendor.set(row.vendor_id, list);
+    }
+
     return rows.map((row) => ({
       id: row.vendor_id,
       name: row.vendor_name,
@@ -200,7 +232,121 @@ export const listVendors = createServerFn({ method: "GET" })
       contact: row.contact_name,
       email: row.email,
       phone: row.phone,
+      departments: departmentsByVendor.get(row.vendor_id) ?? [],
     }));
+  });
+
+export const updateVendor = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const parsed = z
+      .object({
+        vendorId: z.number().int().positive(),
+        vendorName: z.string().trim().min(1),
+        category: z.string().trim().min(1),
+        contactName: z.string().trim().min(1),
+        email: emailSchema,
+        phone: z.string().trim().min(1),
+        departmentIds: z.array(z.number().int().positive()).min(1),
+      })
+      .safeParse(input);
+
+    if (!parsed.success) {
+      throw new Error("Fill in all required fields, then try again.");
+    }
+
+    return {
+      ...parsed.data,
+      email: parsed.data.email.toLowerCase(),
+    };
+  })
+  .middleware([procumentOnly])
+  .handler(async ({ data }): Promise<VendorListItem> => {
+    const { getConnection } = await import("@backend/core/db");
+    const conn = await getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      const [existingRows] = await conn.query(
+        `SELECT vendor_id FROM vendors WHERE vendor_id = ? LIMIT 1`,
+        [data.vendorId],
+      );
+      if (!(existingRows as Array<{ vendor_id: number }>)[0]) {
+        throw new Error("That vendor was not found. Refresh and try again.");
+      }
+
+      const [emailRows] = await conn.query(
+        `SELECT vendor_id FROM vendors WHERE email = ? AND vendor_id <> ? LIMIT 1`,
+        [data.email, data.vendorId],
+      );
+      if ((emailRows as Array<{ vendor_id: number }>)[0]) {
+        throw new Error("That email is already used by another vendor.");
+      }
+
+      const uniqueDepartmentIds = [...new Set(data.departmentIds)];
+      const [departmentRows] = await conn.query(
+        `SELECT department_id
+         FROM departments
+         WHERE department_id IN (?)`,
+        [uniqueDepartmentIds],
+      );
+      const departmentIdRows = departmentRows as Array<{ department_id: number }>;
+      if (departmentIdRows.length !== uniqueDepartmentIds.length) {
+        throw new Error("One or more departments are invalid. Refresh and try again.");
+      }
+
+      await conn.query(
+        `UPDATE vendors
+         SET vendor_name = ?, category = ?, contact_name = ?, email = ?, phone = ?
+         WHERE vendor_id = ?`,
+        [
+          data.vendorName,
+          data.category,
+          data.contactName,
+          data.email,
+          data.phone,
+          data.vendorId,
+        ],
+      );
+
+      await conn.query(`DELETE FROM vendor_departments WHERE vendor_id = ?`, [data.vendorId]);
+
+      for (const departmentId of uniqueDepartmentIds) {
+        await conn.query(
+          `INSERT INTO vendor_departments (vendor_id, department_id)
+           VALUES (?, ?)`,
+          [data.vendorId, departmentId],
+        );
+      }
+
+      const [departmentNameRows] = await conn.query(
+        `SELECT d.department_id, d.department_name
+         FROM departments d
+         WHERE d.department_id IN (?)
+         ORDER BY d.department_name ASC`,
+        [uniqueDepartmentIds],
+      );
+
+      await conn.commit();
+
+      return {
+        id: data.vendorId,
+        name: data.vendorName,
+        category: data.category,
+        contact: data.contactName,
+        email: data.email,
+        phone: data.phone,
+        departments: (departmentNameRows as DepartmentRow[]).map((row) => ({
+          id: row.department_id,
+          name: row.department_name,
+        })),
+      };
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
   });
 
 export const createVendorInvite = createServerFn({ method: "POST" })
