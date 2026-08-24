@@ -1,4 +1,5 @@
-import { Link, type LinkProps } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, type LinkProps } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -7,8 +8,11 @@ import {
   LogOut,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Wordmark } from "@/components/landing/Nav";
 import { cn } from "@/lib/utils";
+import { getCurrentUser, logout } from "@backend/server-functions/auth-fns";
+import type { AuthUser } from "@/lib/auth";
 
 const items: { label: string; icon: LucideIcon; to?: LinkProps["to"] }[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/procument" },
@@ -22,6 +26,39 @@ const itemClass =
 const inactiveClass = "text-foreground/60 hover:bg-ivory hover:text-foreground";
 
 export function Sidebar() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getCurrentUser()
+      .then((row) => {
+        if (active) setUser(row);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const initial =
+    user?.email?.trim()?.charAt(0)?.toUpperCase() ||
+    user?.roleName?.charAt(0) ||
+    "?";
+  const subtitle = [user?.roleName, user?.department].filter(Boolean).join(" · ");
+
+  const onLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      toast.error("Could not sign out. Please try again.");
+      return;
+    }
+    await navigate({ to: "/login" });
+  };
+
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-foreground/10 bg-background p-6">
       <Wordmark />
@@ -52,20 +89,21 @@ export function Sidebar() {
       <div className="border-t border-foreground/10 pt-4">
         <div className="flex items-center gap-3 px-2">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-lime font-display text-base text-lime-foreground">
-            R
+            {initial}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">Rina Aziz</p>
-            <p className="truncate text-xs text-foreground/50">Procument Department</p>
+            <p className="truncate text-sm font-medium">{user?.email ?? "Signed out"}</p>
+            <p className="truncate text-xs text-foreground/50">{subtitle || "—"}</p>
           </div>
-          <Link
-            to="/login"
+          <button
+            type="button"
             aria-label="Log out"
             title="Log out"
+            onClick={() => void onLogout()}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground/60 transition hover:bg-ivory hover:text-foreground"
           >
             <LogOut className="h-4 w-4" />
-          </Link>
+          </button>
         </div>
       </div>
     </aside>
