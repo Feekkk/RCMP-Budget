@@ -340,10 +340,8 @@ export function HistoryPage() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onSelect={() => void navigate({ to: "/user/quotation" })}
-              >
-                Request quotation
+              <DropdownMenuItem disabled>
+                Request quotation (Closed)
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!budgetFormEnabled}

@@ -1,11 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
 import { z } from "zod";
-import type { ResultSetHeader } from "mysql2";
 import { authMiddleware } from "@backend/core/middleware";
-
-const SUBMIT_STATUS_ID = 1;
 
 const attachmentSchema = z.object({
   name: z.string().min(1),
@@ -21,65 +16,11 @@ const itemSchema = z.object({
   attachment: attachmentSchema.optional(),
 });
 
-function uploadsRoot() {
-  return resolve(process.cwd(), "uploads");
-}
-
-function safeFileName(name: string) {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
 export const submitQuotation = createServerFn({ method: "POST" })
   .validator(z.object({ items: z.array(itemSchema).min(1) }))
   .middleware([authMiddleware])
-  .handler(async ({ data, context }) => {
-    const { user } = context;
-
-    const { getConnection } = await import("@backend/core/db");
-    const conn = await getConnection();
-
-    try {
-      await conn.beginTransaction();
-
-      const [quotationResult] = await conn.query<ResultSetHeader>(
-        `INSERT INTO quotations (user_id, status_id) VALUES (?, ?)`,
-        [user.userId, SUBMIT_STATUS_ID],
-      );
-      const quotationId = quotationResult.insertId;
-
-      for (const item of data.items) {
-        await conn.query(
-          `INSERT INTO quotations_items
-            (quotation_id, item_name, item_description, item_quantity, item_price)
-           VALUES (?, ?, ?, ?, ?)`,
-          [quotationId, item.name, item.details || "", item.quantity, item.pricePerUnit],
-        );
-
-        if (item.attachment) {
-          const dir = join(uploadsRoot(), "quotations", String(quotationId));
-          await mkdir(dir, { recursive: true });
-          const fileName = `${Date.now()}-${safeFileName(item.attachment.name)}`;
-          const absolutePath = join(dir, fileName);
-          const relativePath = `uploads/quotations/${quotationId}/${fileName}`;
-          await writeFile(absolutePath, Buffer.from(item.attachment.data, "base64"));
-
-          await conn.query(
-            `INSERT INTO quotations_attachments
-              (quotation_id, attachment_name, attachment_path)
-             VALUES (?, ?, ?)`,
-            [quotationId, item.attachment.name, relativePath],
-          );
-        }
-      }
-
-      await conn.commit();
-      return { quotationId };
-    } catch (error) {
-      await conn.rollback();
-      throw error;
-    } finally {
-      conn.release();
-    }
+  .handler(async () => {
+    throw new Error("Quotation requests are closed. Use yearly budget instead.");
   });
 
 export type QuotationListItem = {

@@ -425,10 +425,8 @@ export function UserDashboard() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onSelect={() => void navigate({ to: "/user/quotation" })}
-              >
-                Request Quotation
+              <DropdownMenuItem disabled>
+                Request Quotation (Closed)
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!budgetFormEnabled}

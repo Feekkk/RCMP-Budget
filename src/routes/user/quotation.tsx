@@ -1,7 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { QuotationPage } from "@/features/user/quotation";
 
 export const Route = createFileRoute("/user/quotation")({
+  beforeLoad: () => {
+    throw redirect({ to: "/user" });
+  },
   head: () => ({
     meta: [
       { title: "Request Quotation — Budget Tracker" },
