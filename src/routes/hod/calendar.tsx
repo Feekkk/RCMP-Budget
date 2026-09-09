@@ -1,15 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { CalendarPage } from "@/features/hod/calendar";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/hod/calendar")({
-  head: () => ({
-    meta: [
-      { title: "Calendar — Budget Tracker" },
-      {
-        name: "description",
-        content: "Track department quotations and yearly budgets by date.",
-      },
-    ],
-  }),
-  component: CalendarPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/hod" });
+  },
+  component: () => null,
 });
