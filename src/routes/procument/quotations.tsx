@@ -7,7 +7,7 @@ export const Route = createFileRoute("/procument/quotations")({
       { title: "Quotations — Budget Tracker" },
       {
         name: "description",
-        content: "Review and attach vendor quotes for open procurement requests.",
+        content: "Review submitted quotation requests waiting for procurement.",
       },
     ],
   }),
