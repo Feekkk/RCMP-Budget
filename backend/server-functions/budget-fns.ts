@@ -26,6 +26,14 @@ export type BudgetListItem = {
   isMine: boolean;
 };
 
+export type BudgetItem = {
+  id: number;
+  itemName: string | null;
+  quantity: number;
+  costPerUnit: number;
+  amount: number;
+};
+
 export type BudgetDetail = {
   id: number;
   budgetRef: string;
@@ -40,6 +48,7 @@ export type BudgetDetail = {
   quantity: number | null;
   costPerUnit: number | null;
   amount: number;
+  items: BudgetItem[];
   effectIfNotApproved: string | null;
   alternative: string | null;
   remarks: string | null;
@@ -97,6 +106,15 @@ async function replaceBudgetItems(
   }
 }
 
+type BudgetItemRow = {
+  budget_item_id: number;
+  budget_id: number;
+  item_name: string | null;
+  quantity: number;
+  cost_per_unit: string | number;
+  budget_amount: string | number;
+};
+
 type BudgetRow = {
   budget_id: number;
   budget_ref?: string | null;
@@ -150,8 +168,23 @@ function formatBudgetDate(value: Date | string) {
   };
 }
 
-function toBudgetDetail(row: BudgetRow, userId: number): BudgetDetail {
+function toBudgetItem(row: BudgetItemRow): BudgetItem {
+  return {
+    id: row.budget_item_id,
+    itemName: row.item_name,
+    quantity: Number(row.quantity),
+    costPerUnit: Number(row.cost_per_unit),
+    amount: Number(row.budget_amount),
+  };
+}
+
+function toBudgetDetail(
+  row: BudgetRow,
+  userId: number,
+  items: BudgetItem[] = [],
+): BudgetDetail {
   const { date } = formatBudgetDate(row.created_at);
+  const first = items[0];
   return {
     id: row.budget_id,
     budgetRef: row.budget_ref || `YB-${row.budget_id}`,
@@ -159,13 +192,16 @@ function toBudgetDetail(row: BudgetRow, userId: number): BudgetDetail {
     budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
     code: row.code,
     activity: row.activity,
-    itemName: row.item_name,
+    itemName: first?.itemName ?? row.item_name,
     targetMonths: row.target_months,
     objective: row.objective,
     justification: row.justification,
-    quantity: row.quantity == null ? null : Number(row.quantity),
-    costPerUnit: row.cost_per_unit == null ? null : Number(row.cost_per_unit),
+    quantity: first?.quantity ?? (row.quantity == null ? null : Number(row.quantity)),
+    costPerUnit:
+      first?.costPerUnit ??
+      (row.cost_per_unit == null ? null : Number(row.cost_per_unit)),
     amount: Number(row.budget_amount),
+    items,
     effectIfNotApproved: row.effect_if_not_approved,
     alternative: row.alternative,
     remarks: row.remarks,
@@ -177,6 +213,39 @@ function toBudgetDetail(row: BudgetRow, userId: number): BudgetDetail {
     department: row.department,
     isMine: row.created_by === userId,
   };
+}
+
+async function loadBudgetItems(
+  queryFn: (sql: string, params?: unknown[]) => Promise<BudgetItemRow[]>,
+  budgetId: number,
+): Promise<BudgetItem[]> {
+  const itemRows = await queryFn(
+    `SELECT
+       budget_item_id,
+       budget_id,
+       item_name,
+       quantity,
+       cost_per_unit,
+       budget_amount
+     FROM budget_items
+     WHERE budget_id = ?
+     ORDER BY budget_item_id ASC`,
+    [budgetId],
+  );
+  return itemRows.map(toBudgetItem);
+}
+
+async function toBudgetDetailLoaded(
+  queryFn: (sql: string, params?: unknown[]) => Promise<unknown>,
+  row: BudgetRow,
+  userId: number,
+): Promise<BudgetDetail> {
+  const items = await loadBudgetItems(
+    async (sql, params) =>
+      (await queryFn(sql, params)) as BudgetItemRow[],
+    row.budget_id,
+  );
+  return toBudgetDetail(row, userId, items);
 }
 
 const budgetDetailSelect = `
@@ -480,7 +549,7 @@ export const getMyBudget = createServerFn({ method: "GET" })
       throw new Error("Budget not found. Refresh the page and try again.");
     }
 
-    return toBudgetDetail(row, user.userId);
+    return toBudgetDetailLoaded(query, row, user.userId);
   });
 
 export const resubmitYearlyBudget = createServerFn({ method: "POST" })
@@ -495,6 +564,7 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
         objective: z.string().trim().min(1),
         justification: z.string().trim().min(1),
         remarks: z.string().trim().optional(),
+        itemNames: z.array(z.string().trim().min(1)).optional(),
       }),
       z.object({
         budgetId: z.number().int().positive(),
@@ -584,6 +654,22 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
           user.userId,
         ],
       );
+      const existingItems = await loadBudgetItems(query, data.budgetId);
+      if (existingItems.length > 0) {
+        if (!data.itemNames || data.itemNames.length !== existingItems.length) {
+          throw new Error("Item names do not match this request. Refresh and try again.");
+        }
+        await replaceBudgetItems(
+          query,
+          data.budgetId,
+          existingItems.map((item, index) => ({
+            itemName: data.itemNames![index],
+            quantity: item.quantity,
+            costPerUnit: item.costPerUnit,
+            budgetAmount: item.amount,
+          })),
+        );
+      }
     } else {
       await query(
         `UPDATE yearly_budgets
@@ -647,7 +733,7 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
       newValues: budgetSnapshot(updated),
     });
 
-    return toBudgetDetail(updated, user.userId);
+    return toBudgetDetailLoaded(query, updated, user.userId);
   });
 
 export const deleteYearlyBudget = createServerFn({ method: "POST" })
@@ -890,7 +976,7 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
       newValues: budgetSnapshot(updated),
     });
 
-    return toBudgetDetail(updated, user.userId);
+    return toBudgetDetailLoaded(query, updated, user.userId);
   });
 
 export const updateApprovedYearlyBudget = createServerFn({ method: "POST" })
@@ -899,7 +985,7 @@ export const updateApprovedYearlyBudget = createServerFn({ method: "POST" })
       z.object({
         budgetId: z.number().int().positive(),
         budgetType: z.literal("OPEX"),
-        budgetAmount: z.number().positive(),
+        items: z.array(opexPriceItemSchema).min(1),
         remarks: z.string().trim().min(1),
       }),
       z.object({
@@ -934,10 +1020,6 @@ export const updateApprovedYearlyBudget = createServerFn({ method: "POST" })
       throw new Error("Budget not found. Refresh the page and try again.");
     }
 
-    if (mapBudgetStatus(row.status_name) !== "Approved") {
-      throw new Error("Only approved budgets can change amount. Refresh and try again.");
-    }
-
     if (
       (data.budgetType === "OPEX" && row.budget_type !== "OPEX") ||
       (data.budgetType === "CAPEX" && row.budget_type !== "CAPEX")
@@ -946,17 +1028,28 @@ export const updateApprovedYearlyBudget = createServerFn({ method: "POST" })
     }
 
     const oldValues = budgetSnapshot(row);
+    const nextAmount =
+      data.budgetType === "OPEX"
+        ? data.items.reduce((sum, item) => sum + item.budgetAmount, 0)
+        : data.budgetAmount;
+
+    await query(
+      `UPDATE yearly_budgets SET budget_amount = ? WHERE budget_id = ? AND created_by = ?`,
+      [nextAmount, data.budgetId, user.userId],
+    );
 
     if (data.budgetType === "OPEX") {
-      await query(
-        `UPDATE yearly_budgets SET budget_amount = ? WHERE budget_id = ? AND created_by = ?`,
-        [data.budgetAmount, data.budgetId, user.userId],
+      await replaceBudgetItems(
+        query,
+        data.budgetId,
+        data.items.map((item) => ({
+          itemName: item.itemName,
+          quantity: item.quantity,
+          costPerUnit: item.costPerUnit,
+          budgetAmount: item.budgetAmount,
+        })),
       );
     } else {
-      await query(
-        `UPDATE yearly_budgets SET budget_amount = ? WHERE budget_id = ? AND created_by = ?`,
-        [data.budgetAmount, data.budgetId, user.userId],
-      );
       await query(
         `UPDATE budget_items
          SET quantity = ?, cost_per_unit = ?, budget_amount = ?
@@ -997,5 +1090,5 @@ export const updateApprovedYearlyBudget = createServerFn({ method: "POST" })
       newValues: budgetSnapshot(updated),
     });
 
-    return toBudgetDetail(updated, user.userId);
+    return toBudgetDetailLoaded(query, updated, user.userId);
   });

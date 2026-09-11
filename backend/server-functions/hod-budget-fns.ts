@@ -924,8 +924,6 @@ export const updateHodBudget = createServerFn({ method: "POST" })
       throw new Error("Rejected budgets cannot be edited.");
     }
 
-    const isApproved = mapStatus(row.status_name) === "Approved";
-
     if (
       (data.budgetType === "OPEX" && row.budget_type !== "OPEX") ||
       (data.budgetType === "CAPEX" && row.budget_type !== "CAPEX")
@@ -933,12 +931,19 @@ export const updateHodBudget = createServerFn({ method: "POST" })
       throw new Error("Budget type cannot be changed. Refresh and try again.");
     }
 
+    const existingByBudget = await loadBudgetItems(
+      async (sql, params) =>
+        (await query(sql, params)) as unknown as BudgetItemRow[],
+      [data.budgetId],
+    );
+    const existingItems = existingByBudget.get(data.budgetId) ?? [];
+
     if (data.budgetType === "CAPEX") {
-      const quantity = isApproved ? Number(row.quantity) || 1 : data.quantity;
-      const costPerUnit = isApproved
-        ? Number(row.cost_per_unit) || 0
-        : data.costPerUnit;
-      const budgetAmount = isApproved ? Number(row.budget_amount) : data.budgetAmount;
+      const first = existingItems[0];
+      const quantity = first?.quantity ?? Number(row.quantity) || 1;
+      const costPerUnit =
+        first?.costPerUnit ?? Number(row.cost_per_unit) || 0;
+      const budgetAmount = first?.amount ?? Number(row.budget_amount);
 
       await query(
         `UPDATE yearly_budgets
@@ -970,31 +975,13 @@ export const updateHodBudget = createServerFn({ method: "POST" })
         },
       ]);
     } else {
-      const existingItems = isApproved
-        ? (
-            await loadBudgetItems(
-              async (sql, params) =>
-                (await query(sql, params)) as unknown as BudgetItemRow[],
-              [data.budgetId],
-            )
-          ).get(data.budgetId) ?? []
-        : [];
-      const items = isApproved
-        ? existingItems.map((item, index) => ({
-            itemName: data.items[index]?.itemName ?? item.itemName,
-            quantity: item.quantity,
-            costPerUnit: item.costPerUnit,
-            budgetAmount: item.amount,
-          }))
-        : data.items.map((item) => ({
-            itemName: item.itemName,
-            quantity: item.quantity,
-            costPerUnit: item.costPerUnit,
-            budgetAmount: item.budgetAmount,
-          }));
-      const opexTotal = isApproved
-        ? Number(row.budget_amount)
-        : items.reduce((sum, item) => sum + item.budgetAmount, 0);
+      const items = existingItems.map((item, index) => ({
+        itemName: data.items[index]?.itemName ?? item.itemName,
+        quantity: item.quantity,
+        costPerUnit: item.costPerUnit,
+        budgetAmount: item.amount,
+      }));
+      const opexTotal = Number(row.budget_amount);
 
       await query(
         `UPDATE yearly_budgets
@@ -1017,7 +1004,9 @@ export const updateHodBudget = createServerFn({ method: "POST" })
           data.budgetId,
         ],
       );
-      await replaceBudgetItems(query, data.budgetId, items);
+      if (items.length > 0) {
+        await replaceBudgetItems(query, data.budgetId, items);
+      }
     }
 
     return finishHodMutation(query, row, user.userId, "edit", data.remarks);
@@ -1139,7 +1128,7 @@ export const updateHodApprovedBudget = createServerFn({ method: "POST" })
       z.object({
         budgetId: z.number().int().positive(),
         budgetType: z.literal("OPEX"),
-        budgetAmount: z.number().positive(),
+        items: z.array(hodOpexPriceItemSchema).min(1),
         remarks: z.string().trim().min(1),
       }),
       z.object({
@@ -1202,10 +1191,6 @@ export const updateHodApprovedBudget = createServerFn({ method: "POST" })
       throw new Error("Budget not found. Refresh the list and try again.");
     }
 
-    if (mapStatus(row.status_name) !== "Approved") {
-      throw new Error("Only approved budgets can change amount. Refresh and try again.");
-    }
-
     if (
       (data.budgetType === "OPEX" && row.budget_type !== "OPEX") ||
       (data.budgetType === "CAPEX" && row.budget_type !== "CAPEX")
@@ -1213,16 +1198,28 @@ export const updateHodApprovedBudget = createServerFn({ method: "POST" })
       throw new Error("Budget type cannot be changed. Refresh and try again.");
     }
 
+    const nextAmount =
+      data.budgetType === "OPEX"
+        ? data.items.reduce((sum, item) => sum + item.budgetAmount, 0)
+        : data.budgetAmount;
+
+    await query(`UPDATE yearly_budgets SET budget_amount = ? WHERE budget_id = ?`, [
+      nextAmount,
+      data.budgetId,
+    ]);
+
     if (data.budgetType === "OPEX") {
-      await query(`UPDATE yearly_budgets SET budget_amount = ? WHERE budget_id = ?`, [
-        data.budgetAmount,
+      await replaceBudgetItems(
+        query,
         data.budgetId,
-      ]);
+        data.items.map((item) => ({
+          itemName: item.itemName,
+          quantity: item.quantity,
+          costPerUnit: item.costPerUnit,
+          budgetAmount: item.budgetAmount,
+        })),
+      );
     } else {
-      await query(`UPDATE yearly_budgets SET budget_amount = ? WHERE budget_id = ?`, [
-        data.budgetAmount,
-        data.budgetId,
-      ]);
       await query(
         `UPDATE budget_items
          SET quantity = ?, cost_per_unit = ?, budget_amount = ?

@@ -641,7 +641,7 @@ export function HodReportPage() {
       setUpdateBudgetRow(null);
       toast.success(`${budgetLabel(id)} amount updated`, {
         id: toastId,
-        description: "The approved amount was saved.",
+        description: "The amount was saved. Status did not change.",
       });
     } catch (error) {
       toast.error(
@@ -1000,6 +1000,7 @@ export function HodReportPage() {
               amount={updateBudgetRow.amount}
               quantity={updateBudgetRow.quantity}
               costPerUnit={updateBudgetRow.costPerUnit}
+              items={updateBudgetRow.items}
               saving={reviewingKey === `yb-${updateBudgetRow.id}`}
               onClose={() => setUpdateBudgetRow(null)}
               onSave={(payload) =>
@@ -1271,18 +1272,16 @@ function BudgetActions({
           </button>
         </>
       )}
-      {row.status === "Approved" && (
-        <button
-          type="button"
-          onClick={onUpdateBudget}
-          disabled={reviewing}
-          aria-label="Update budget"
-          title="Update budget"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-lime/70 text-lime-foreground transition hover:brightness-95 disabled:opacity-50"
-        >
-          <Wallet className="h-3.5 w-3.5" />
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onUpdateBudget}
+        disabled={reviewing}
+        aria-label="Update budget"
+        title="Update budget"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-lime/70 text-lime-foreground transition hover:brightness-95 disabled:opacity-50"
+      >
+        <Wallet className="h-3.5 w-3.5" />
+      </button>
       <button
         type="button"
         onClick={onEdit}
@@ -1837,7 +1836,7 @@ function EditBudgetCard({
   onSave: (payload: EditBudgetInput) => void;
 }) {
   const isCapex = detail.budgetType === "CAPEX";
-  const lockAmounts = detail.status === "Approved";
+  const lockAmounts = true;
   const [capexCode, setCapexCode] = useState<
     (typeof CAPEX_CODES)[number]["value"] | ""
   >(
@@ -2060,6 +2059,9 @@ function EditBudgetCard({
               <p className="mt-1 font-display text-2xl tabular-nums">
                 RM {formatRm(lockAmounts ? detail.amount : estimatedPrice)}
               </p>
+              <p className="mt-1 text-xs text-foreground/50">
+                Use Update budget to change quantity, unit cost, or amount.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor={`edit-effect-${detail.id}`}>
@@ -2160,13 +2162,17 @@ function EditBudgetCard({
               />
             </div>
             <div className="space-y-2">
-              <Label>Cost items</Label>
+              <Label>Items</Label>
               <HodOpexItemsEditor
                 rows={opexCostRows}
                 onChange={setOpexCostRows}
                 disabled={reviewing}
                 lockAmounts={lockAmounts}
               />
+              <p className="text-xs text-foreground/50">
+                Item names can be edited here. Use Update budget to change
+                quantity, unit cost, or add items.
+              </p>
             </div>
           </>
         )}

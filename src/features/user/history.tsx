@@ -952,7 +952,7 @@ function BudgetDetailCard({
     detail.isMine;
   const canTransfer =
     detail.status === "Pending" && detail.isMine && formEnabled;
-  const canUpdateBudget = detail.isMine && detail.status === "Approved";
+  const canUpdateBudget = detail.isMine;
   const isResubmit = detail.status === "Rejected";
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -978,6 +978,9 @@ function BudgetDetailCard({
   );
   const [alternative, setAlternative] = useState(detail.alternative ?? "");
   const [remarks, setRemarks] = useState(detail.remarks ?? "");
+  const [opexItemNames, setOpexItemNames] = useState(
+    () => detail.items.map((item) => item.itemName ?? ""),
+  );
 
   const unitValue = Number(costPerUnit) || 0;
   const codeOptions = isCapex ? CAPEX_CODES : OPEX_CODES;
@@ -1003,6 +1006,7 @@ function BudgetDetailCard({
     setEffectIfNotApproved(detail.effectIfNotApproved ?? "");
     setAlternative(detail.alternative ?? "");
     setRemarks(detail.remarks ?? "");
+    setOpexItemNames(detail.items.map((item) => item.itemName ?? ""));
   };
 
   const startEdit = () => {
@@ -1037,7 +1041,7 @@ function BudgetDetailCard({
       setUpdateOpen(false);
       toast.success(`${detail.budgetRef} amount updated`, {
         id: toastId,
-        description: "The approved amount was saved.",
+        description: "The amount was saved. Status did not change.",
       });
     } catch (error) {
       toast.error(
@@ -1095,6 +1099,13 @@ function BudgetDetailCard({
     ) {
       toast.error("Fill in the required fields, then try again.");
       return;
+    } else if (
+      detail.items.length > 0 &&
+      (opexItemNames.length !== detail.items.length ||
+        opexItemNames.some((name) => !name.trim()))
+    ) {
+      toast.error("Name every item, then try again.");
+      return;
     }
 
     setSaving(true);
@@ -1128,6 +1139,7 @@ function BudgetDetailCard({
               objective: objective.trim(),
               justification: justification.trim(),
               remarks: remarks.trim() || undefined,
+              itemNames: opexItemNames.map((name) => name.trim()),
             },
           });
       onResubmitted(updated);
@@ -1140,9 +1152,7 @@ function BudgetDetailCard({
           id: toastId,
           description: isResubmit
             ? "It is pending HOD review again."
-            : detail.status === "Approved"
-              ? "The approved details were saved."
-              : "Still waiting for HOD review.",
+            : "Details were saved. Amounts were not changed.",
         },
       );
     } catch (error) {
@@ -1375,12 +1385,51 @@ function BudgetDetailCard({
                 />
               </div>
               <div className="flex flex-col gap-2">
+                <Label>Items</Label>
+                {detail.items.length > 0 ? (
+                  <ul className="overflow-hidden rounded-xl border border-foreground/10">
+                    {detail.items.map((item, index) => (
+                      <li
+                        key={item.id}
+                        className="flex flex-col gap-2 border-b border-foreground/8 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-3"
+                      >
+                        <Input
+                          value={opexItemNames[index] ?? ""}
+                          onChange={(e) =>
+                            setOpexItemNames((prev) =>
+                              prev.map((name, i) =>
+                                i === index ? e.target.value : name,
+                              ),
+                            )
+                          }
+                          placeholder={`Item ${index + 1}`}
+                          disabled={saving}
+                          className="h-10 rounded-lg"
+                        />
+                        <p className="shrink-0 text-sm text-foreground/55 tabular-nums">
+                          {item.quantity} × {formatRm(item.costPerUnit)} ={" "}
+                          {formatRm(item.amount)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="flex h-11 items-center rounded-xl border border-foreground/10 bg-ivory px-4 text-sm text-foreground/50">
+                    No items on this request
+                  </div>
+                )}
+                <p className="text-xs text-foreground/50">
+                  Item names can be edited here. Use Update budget to change
+                  quantity or cost.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
                 <Label>OPEX budget (RM)</Label>
                 <div className="flex h-11 items-center rounded-xl border border-foreground/10 bg-ivory px-4 font-display text-xl tabular-nums">
                   {formatRm(detail.amount)}
                 </div>
                 <p className="text-xs text-foreground/50">
-                  Use Update budget to change the amount on an approved line.
+                  Use Update budget to change quantity, unit cost, or amount.
                 </p>
               </div>
             </>
@@ -1490,6 +1539,35 @@ function BudgetDetailCard({
                   label="Justifications"
                   value={detail.justification}
                 />
+                {detail.items.length > 0 ? (
+                  <div>
+                    <dt className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+                      Items
+                    </dt>
+                    <dd className="mt-2 overflow-hidden rounded-xl border border-foreground/10">
+                      <ul className="divide-y divide-foreground/8">
+                        {detail.items.map((item) => (
+                          <li
+                            key={item.id}
+                            className="flex items-start justify-between gap-3 px-4 py-3"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">
+                                {item.itemName || "Untitled item"}
+                              </p>
+                              <p className="mt-0.5 text-xs text-foreground/50">
+                                {item.quantity} × {formatRm(item.costPerUnit)}
+                              </p>
+                            </div>
+                            <p className="shrink-0 text-sm font-semibold tabular-nums">
+                              {formatRm(item.amount)}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </dd>
+                  </div>
+                ) : null}
                 <DetailField
                   label="OPEX budget"
                   value={formatRm(detail.amount)}
@@ -1508,8 +1586,8 @@ function BudgetDetailCard({
           {detail.isMine && !formEnabled && (
             <div className="mt-8 border-t border-foreground/10 pt-6">
               <p className="text-sm text-foreground/50">
-                Yearly budget submissions are closed. You can edit this again
-                when your admin reopens them.
+                Yearly budget submissions are closed. You can still update
+                amounts. Edit opens again when your admin reopens them.
               </p>
             </div>
           )}
@@ -1609,6 +1687,7 @@ function BudgetDetailCard({
               amount={detail.amount}
               quantity={detail.quantity}
               costPerUnit={detail.costPerUnit}
+              items={detail.items}
               saving={updating}
               onClose={closeUpdate}
               onSave={(payload) => void handleUpdateBudget(payload)}
