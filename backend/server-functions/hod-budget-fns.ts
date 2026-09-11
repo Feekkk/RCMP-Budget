@@ -940,9 +940,9 @@ export const updateHodBudget = createServerFn({ method: "POST" })
 
     if (data.budgetType === "CAPEX") {
       const first = existingItems[0];
-      const quantity = first?.quantity ?? Number(row.quantity) || 1;
+      const quantity = first?.quantity ?? (Number(row.quantity) || 1);
       const costPerUnit =
-        first?.costPerUnit ?? Number(row.cost_per_unit) || 0;
+        first?.costPerUnit ?? (Number(row.cost_per_unit) || 0);
       const budgetAmount = first?.amount ?? Number(row.budget_amount);
 
       await query(
