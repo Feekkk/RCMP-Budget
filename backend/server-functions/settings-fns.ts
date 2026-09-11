@@ -17,7 +17,6 @@ type SettingRow = {
   setting_value: number;
 };
 
-const adminOnly = roleMiddleware("HOD", "Finance", "Procument", "CEO");
 const hodOnly = roleMiddleware("HOD");
 
 function toSetting(row: SettingRow): SystemSetting {
@@ -30,7 +29,7 @@ function toSetting(row: SettingRow): SystemSetting {
 }
 
 export const listSystemSettings = createServerFn({ method: "GET" })
-  .middleware([adminOnly])
+  .middleware([hodOnly])
   .handler(async (): Promise<SystemSetting[]> => {
     const { query } = await import("@backend/core/db");
     const rows = await query<SettingRow[]>(
@@ -55,7 +54,7 @@ export const updateSystemSetting = createServerFn({ method: "POST" })
     }
     return parsed.data;
   })
-  .middleware([adminOnly])
+  .middleware([hodOnly])
   .handler(async ({ data }): Promise<SystemSetting> => {
     const { query } = await import("@backend/core/db");
     const existing = await query<SettingRow[]>(

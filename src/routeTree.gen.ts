@@ -9,42 +9,23 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VendorInviteRouteImport } from './routes/vendor-invite'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as UserRouteRouteImport } from './routes/user/route'
-import { Route as ProcumentRouteRouteImport } from './routes/procument/route'
 import { Route as HodRouteRouteImport } from './routes/hod/route'
-import { Route as FinanceRouteRouteImport } from './routes/finance/route'
-import { Route as CeoRouteRouteImport } from './routes/ceo/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UserIndexRouteImport } from './routes/user/index'
-import { Route as ProcumentIndexRouteImport } from './routes/procument/index'
 import { Route as HodIndexRouteImport } from './routes/hod/index'
-import { Route as FinanceIndexRouteImport } from './routes/finance/index'
-import { Route as CeoIndexRouteImport } from './routes/ceo/index'
 import { Route as UserQuotationRouteImport } from './routes/user/quotation'
 import { Route as UserProfileRouteImport } from './routes/user/profile'
 import { Route as UserHistoryRouteImport } from './routes/user/history'
 import { Route as UserDepartmentRouteImport } from './routes/user/department'
 import { Route as UserCalendarRouteImport } from './routes/user/calendar'
 import { Route as UserBudgetRouteImport } from './routes/user/budget'
-import { Route as ProcumentSettingsRouteImport } from './routes/procument/settings'
-import { Route as ProcumentQuotationsRouteImport } from './routes/procument/quotations'
-import { Route as ProcumentManageVendorRouteImport } from './routes/procument/manage-vendor'
 import { Route as HodSettingsRouteImport } from './routes/hod/settings'
 import { Route as HodReportsRouteImport } from './routes/hod/reports'
 import { Route as HodLogsRouteImport } from './routes/hod/logs'
 import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
-import { Route as FinanceSettingsRouteImport } from './routes/finance/settings'
-import { Route as FinanceRequestRouteImport } from './routes/finance/request'
-import { Route as CeoSettingsRouteImport } from './routes/ceo/settings'
-import { Route as FinanceRequestIdRouteImport } from './routes/finance/request_.$id'
 
-const VendorInviteRoute = VendorInviteRouteImport.update({
-  id: '/vendor-invite',
-  path: '/vendor-invite',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -55,24 +36,9 @@ const UserRouteRoute = UserRouteRouteImport.update({
   path: '/user',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProcumentRouteRoute = ProcumentRouteRouteImport.update({
-  id: '/procument',
-  path: '/procument',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const HodRouteRoute = HodRouteRouteImport.update({
   id: '/hod',
   path: '/hod',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FinanceRouteRoute = FinanceRouteRouteImport.update({
-  id: '/finance',
-  path: '/finance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CeoRouteRoute = CeoRouteRouteImport.update({
-  id: '/ceo',
-  path: '/ceo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -85,25 +51,10 @@ const UserIndexRoute = UserIndexRouteImport.update({
   path: '/',
   getParentRoute: () => UserRouteRoute,
 } as any)
-const ProcumentIndexRoute = ProcumentIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ProcumentRouteRoute,
-} as any)
 const HodIndexRoute = HodIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => HodRouteRoute,
-} as any)
-const FinanceIndexRoute = FinanceIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => FinanceRouteRoute,
-} as any)
-const CeoIndexRoute = CeoIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => CeoRouteRoute,
 } as any)
 const UserQuotationRoute = UserQuotationRouteImport.update({
   id: '/quotation',
@@ -135,21 +86,6 @@ const UserBudgetRoute = UserBudgetRouteImport.update({
   path: '/budget',
   getParentRoute: () => UserRouteRoute,
 } as any)
-const ProcumentSettingsRoute = ProcumentSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => ProcumentRouteRoute,
-} as any)
-const ProcumentQuotationsRoute = ProcumentQuotationsRouteImport.update({
-  id: '/quotations',
-  path: '/quotations',
-  getParentRoute: () => ProcumentRouteRoute,
-} as any)
-const ProcumentManageVendorRoute = ProcumentManageVendorRouteImport.update({
-  id: '/manage-vendor',
-  path: '/manage-vendor',
-  getParentRoute: () => ProcumentRouteRoute,
-} as any)
 const HodSettingsRoute = HodSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -170,233 +106,124 @@ const HodCalendarRoute = HodCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => HodRouteRoute,
 } as any)
-const FinanceSettingsRoute = FinanceSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => FinanceRouteRoute,
-} as any)
-const FinanceRequestRoute = FinanceRequestRouteImport.update({
-  id: '/request',
-  path: '/request',
-  getParentRoute: () => FinanceRouteRoute,
-} as any)
-const CeoSettingsRoute = CeoSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => CeoRouteRoute,
-} as any)
-const FinanceRequestIdRoute = FinanceRequestIdRouteImport.update({
-  id: '/request_/$id',
-  path: '/request/$id',
-  getParentRoute: () => FinanceRouteRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/ceo': typeof CeoRouteRouteWithChildren
-  '/finance': typeof FinanceRouteRouteWithChildren
   '/hod': typeof HodRouteRouteWithChildren
-  '/procument': typeof ProcumentRouteRouteWithChildren
   '/user': typeof UserRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/vendor-invite': typeof VendorInviteRoute
-  '/ceo/settings': typeof CeoSettingsRoute
-  '/finance/request': typeof FinanceRequestRoute
-  '/finance/settings': typeof FinanceSettingsRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/logs': typeof HodLogsRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
-  '/procument/manage-vendor': typeof ProcumentManageVendorRoute
-  '/procument/quotations': typeof ProcumentQuotationsRoute
-  '/procument/settings': typeof ProcumentSettingsRoute
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/department': typeof UserDepartmentRoute
   '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
-  '/ceo/': typeof CeoIndexRoute
-  '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
-  '/procument/': typeof ProcumentIndexRoute
   '/user/': typeof UserIndexRoute
-  '/finance/request/$id': typeof FinanceRequestIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/vendor-invite': typeof VendorInviteRoute
-  '/ceo/settings': typeof CeoSettingsRoute
-  '/finance/request': typeof FinanceRequestRoute
-  '/finance/settings': typeof FinanceSettingsRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/logs': typeof HodLogsRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
-  '/procument/manage-vendor': typeof ProcumentManageVendorRoute
-  '/procument/quotations': typeof ProcumentQuotationsRoute
-  '/procument/settings': typeof ProcumentSettingsRoute
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/department': typeof UserDepartmentRoute
   '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
-  '/ceo': typeof CeoIndexRoute
-  '/finance': typeof FinanceIndexRoute
   '/hod': typeof HodIndexRoute
-  '/procument': typeof ProcumentIndexRoute
   '/user': typeof UserIndexRoute
-  '/finance/request/$id': typeof FinanceRequestIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/ceo': typeof CeoRouteRouteWithChildren
-  '/finance': typeof FinanceRouteRouteWithChildren
   '/hod': typeof HodRouteRouteWithChildren
-  '/procument': typeof ProcumentRouteRouteWithChildren
   '/user': typeof UserRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/vendor-invite': typeof VendorInviteRoute
-  '/ceo/settings': typeof CeoSettingsRoute
-  '/finance/request': typeof FinanceRequestRoute
-  '/finance/settings': typeof FinanceSettingsRoute
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/logs': typeof HodLogsRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
-  '/procument/manage-vendor': typeof ProcumentManageVendorRoute
-  '/procument/quotations': typeof ProcumentQuotationsRoute
-  '/procument/settings': typeof ProcumentSettingsRoute
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/department': typeof UserDepartmentRoute
   '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
-  '/ceo/': typeof CeoIndexRoute
-  '/finance/': typeof FinanceIndexRoute
   '/hod/': typeof HodIndexRoute
-  '/procument/': typeof ProcumentIndexRoute
   '/user/': typeof UserIndexRoute
-  '/finance/request_/$id': typeof FinanceRequestIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/ceo'
-    | '/finance'
     | '/hod'
-    | '/procument'
     | '/user'
     | '/login'
-    | '/vendor-invite'
-    | '/ceo/settings'
-    | '/finance/request'
-    | '/finance/settings'
     | '/hod/calendar'
     | '/hod/logs'
     | '/hod/reports'
     | '/hod/settings'
-    | '/procument/manage-vendor'
-    | '/procument/quotations'
-    | '/procument/settings'
     | '/user/budget'
     | '/user/calendar'
     | '/user/department'
     | '/user/history'
     | '/user/profile'
     | '/user/quotation'
-    | '/ceo/'
-    | '/finance/'
     | '/hod/'
-    | '/procument/'
     | '/user/'
-    | '/finance/request/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
-    | '/vendor-invite'
-    | '/ceo/settings'
-    | '/finance/request'
-    | '/finance/settings'
     | '/hod/calendar'
     | '/hod/logs'
     | '/hod/reports'
     | '/hod/settings'
-    | '/procument/manage-vendor'
-    | '/procument/quotations'
-    | '/procument/settings'
     | '/user/budget'
     | '/user/calendar'
     | '/user/department'
     | '/user/history'
     | '/user/profile'
     | '/user/quotation'
-    | '/ceo'
-    | '/finance'
     | '/hod'
-    | '/procument'
     | '/user'
-    | '/finance/request/$id'
   id:
     | '__root__'
     | '/'
-    | '/ceo'
-    | '/finance'
     | '/hod'
-    | '/procument'
     | '/user'
     | '/login'
-    | '/vendor-invite'
-    | '/ceo/settings'
-    | '/finance/request'
-    | '/finance/settings'
     | '/hod/calendar'
     | '/hod/logs'
     | '/hod/reports'
     | '/hod/settings'
-    | '/procument/manage-vendor'
-    | '/procument/quotations'
-    | '/procument/settings'
     | '/user/budget'
     | '/user/calendar'
     | '/user/department'
     | '/user/history'
     | '/user/profile'
     | '/user/quotation'
-    | '/ceo/'
-    | '/finance/'
     | '/hod/'
-    | '/procument/'
     | '/user/'
-    | '/finance/request_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CeoRouteRoute: typeof CeoRouteRouteWithChildren
-  FinanceRouteRoute: typeof FinanceRouteRouteWithChildren
   HodRouteRoute: typeof HodRouteRouteWithChildren
-  ProcumentRouteRoute: typeof ProcumentRouteRouteWithChildren
   UserRouteRoute: typeof UserRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
-  VendorInviteRoute: typeof VendorInviteRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/vendor-invite': {
-      id: '/vendor-invite'
-      path: '/vendor-invite'
-      fullPath: '/vendor-invite'
-      preLoaderRoute: typeof VendorInviteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -411,32 +238,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/procument': {
-      id: '/procument'
-      path: '/procument'
-      fullPath: '/procument'
-      preLoaderRoute: typeof ProcumentRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/hod': {
       id: '/hod'
       path: '/hod'
       fullPath: '/hod'
       preLoaderRoute: typeof HodRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/finance': {
-      id: '/finance'
-      path: '/finance'
-      fullPath: '/finance'
-      preLoaderRoute: typeof FinanceRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ceo': {
-      id: '/ceo'
-      path: '/ceo'
-      fullPath: '/ceo'
-      preLoaderRoute: typeof CeoRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -453,33 +259,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserIndexRouteImport
       parentRoute: typeof UserRouteRoute
     }
-    '/procument/': {
-      id: '/procument/'
-      path: '/'
-      fullPath: '/procument/'
-      preLoaderRoute: typeof ProcumentIndexRouteImport
-      parentRoute: typeof ProcumentRouteRoute
-    }
     '/hod/': {
       id: '/hod/'
       path: '/'
       fullPath: '/hod/'
       preLoaderRoute: typeof HodIndexRouteImport
       parentRoute: typeof HodRouteRoute
-    }
-    '/finance/': {
-      id: '/finance/'
-      path: '/'
-      fullPath: '/finance/'
-      preLoaderRoute: typeof FinanceIndexRouteImport
-      parentRoute: typeof FinanceRouteRoute
-    }
-    '/ceo/': {
-      id: '/ceo/'
-      path: '/'
-      fullPath: '/ceo/'
-      preLoaderRoute: typeof CeoIndexRouteImport
-      parentRoute: typeof CeoRouteRoute
     }
     '/user/quotation': {
       id: '/user/quotation'
@@ -523,27 +308,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserBudgetRouteImport
       parentRoute: typeof UserRouteRoute
     }
-    '/procument/settings': {
-      id: '/procument/settings'
-      path: '/settings'
-      fullPath: '/procument/settings'
-      preLoaderRoute: typeof ProcumentSettingsRouteImport
-      parentRoute: typeof ProcumentRouteRoute
-    }
-    '/procument/quotations': {
-      id: '/procument/quotations'
-      path: '/quotations'
-      fullPath: '/procument/quotations'
-      preLoaderRoute: typeof ProcumentQuotationsRouteImport
-      parentRoute: typeof ProcumentRouteRoute
-    }
-    '/procument/manage-vendor': {
-      id: '/procument/manage-vendor'
-      path: '/manage-vendor'
-      fullPath: '/procument/manage-vendor'
-      preLoaderRoute: typeof ProcumentManageVendorRouteImport
-      parentRoute: typeof ProcumentRouteRoute
-    }
     '/hod/settings': {
       id: '/hod/settings'
       path: '/settings'
@@ -572,68 +336,8 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HodCalendarRouteImport
       parentRoute: typeof HodRouteRoute
     }
-    '/finance/settings': {
-      id: '/finance/settings'
-      path: '/settings'
-      fullPath: '/finance/settings'
-      preLoaderRoute: typeof FinanceSettingsRouteImport
-      parentRoute: typeof FinanceRouteRoute
-    }
-    '/finance/request': {
-      id: '/finance/request'
-      path: '/request'
-      fullPath: '/finance/request'
-      preLoaderRoute: typeof FinanceRequestRouteImport
-      parentRoute: typeof FinanceRouteRoute
-    }
-    '/ceo/settings': {
-      id: '/ceo/settings'
-      path: '/settings'
-      fullPath: '/ceo/settings'
-      preLoaderRoute: typeof CeoSettingsRouteImport
-      parentRoute: typeof CeoRouteRoute
-    }
-    '/finance/request_/$id': {
-      id: '/finance/request_/$id'
-      path: '/request/$id'
-      fullPath: '/finance/request/$id'
-      preLoaderRoute: typeof FinanceRequestIdRouteImport
-      parentRoute: typeof FinanceRouteRoute
-    }
   }
 }
-
-interface CeoRouteRouteChildren {
-  CeoSettingsRoute: typeof CeoSettingsRoute
-  CeoIndexRoute: typeof CeoIndexRoute
-}
-
-const CeoRouteRouteChildren: CeoRouteRouteChildren = {
-  CeoSettingsRoute: CeoSettingsRoute,
-  CeoIndexRoute: CeoIndexRoute,
-}
-
-const CeoRouteRouteWithChildren = CeoRouteRoute._addFileChildren(
-  CeoRouteRouteChildren,
-)
-
-interface FinanceRouteRouteChildren {
-  FinanceRequestRoute: typeof FinanceRequestRoute
-  FinanceSettingsRoute: typeof FinanceSettingsRoute
-  FinanceIndexRoute: typeof FinanceIndexRoute
-  FinanceRequestIdRoute: typeof FinanceRequestIdRoute
-}
-
-const FinanceRouteRouteChildren: FinanceRouteRouteChildren = {
-  FinanceRequestRoute: FinanceRequestRoute,
-  FinanceSettingsRoute: FinanceSettingsRoute,
-  FinanceIndexRoute: FinanceIndexRoute,
-  FinanceRequestIdRoute: FinanceRequestIdRoute,
-}
-
-const FinanceRouteRouteWithChildren = FinanceRouteRoute._addFileChildren(
-  FinanceRouteRouteChildren,
-)
 
 interface HodRouteRouteChildren {
   HodCalendarRoute: typeof HodCalendarRoute
@@ -653,24 +357,6 @@ const HodRouteRouteChildren: HodRouteRouteChildren = {
 
 const HodRouteRouteWithChildren = HodRouteRoute._addFileChildren(
   HodRouteRouteChildren,
-)
-
-interface ProcumentRouteRouteChildren {
-  ProcumentManageVendorRoute: typeof ProcumentManageVendorRoute
-  ProcumentQuotationsRoute: typeof ProcumentQuotationsRoute
-  ProcumentSettingsRoute: typeof ProcumentSettingsRoute
-  ProcumentIndexRoute: typeof ProcumentIndexRoute
-}
-
-const ProcumentRouteRouteChildren: ProcumentRouteRouteChildren = {
-  ProcumentManageVendorRoute: ProcumentManageVendorRoute,
-  ProcumentQuotationsRoute: ProcumentQuotationsRoute,
-  ProcumentSettingsRoute: ProcumentSettingsRoute,
-  ProcumentIndexRoute: ProcumentIndexRoute,
-}
-
-const ProcumentRouteRouteWithChildren = ProcumentRouteRoute._addFileChildren(
-  ProcumentRouteRouteChildren,
 )
 
 interface UserRouteRouteChildren {
@@ -699,13 +385,9 @@ const UserRouteRouteWithChildren = UserRouteRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CeoRouteRoute: CeoRouteRouteWithChildren,
-  FinanceRouteRoute: FinanceRouteRouteWithChildren,
   HodRouteRoute: HodRouteRouteWithChildren,
-  ProcumentRouteRoute: ProcumentRouteRouteWithChildren,
   UserRouteRoute: UserRouteRouteWithChildren,
   LoginRoute: LoginRoute,
-  VendorInviteRoute: VendorInviteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

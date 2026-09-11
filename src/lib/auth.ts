@@ -1,6 +1,6 @@
 import type { FileRoutesByTo } from "@/routeTree.gen";
 
-export type RoleName = "User" | "HOD" | "Finance" | "Procument" | "CEO";
+export type RoleName = "User" | "HOD";
 
 export type AuthUser = {
   userId: number;
@@ -16,17 +16,11 @@ export type AuthUser = {
 export const roleHomeById: Partial<Record<number, keyof FileRoutesByTo>> = {
   1: "/user",
   2: "/hod",
-  3: "/finance",
-  4: "/procument",
-  5: "/ceo",
 };
 
 export const roleHome: Partial<Record<RoleName, keyof FileRoutesByTo>> = {
   User: "/user",
   HOD: "/hod",
-  Finance: "/finance",
-  Procument: "/procument",
-  CEO: "/ceo",
 };
 
 export function homeForRole(user: Pick<AuthUser, "roleId" | "roleName">) {
