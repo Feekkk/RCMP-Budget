@@ -33,6 +33,7 @@ import { Route as ProcumentQuotationsRouteImport } from './routes/procument/quot
 import { Route as ProcumentManageVendorRouteImport } from './routes/procument/manage-vendor'
 import { Route as HodSettingsRouteImport } from './routes/hod/settings'
 import { Route as HodReportsRouteImport } from './routes/hod/reports'
+import { Route as HodLogsRouteImport } from './routes/hod/logs'
 import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
 import { Route as FinanceSettingsRouteImport } from './routes/finance/settings'
 import { Route as FinanceRequestRouteImport } from './routes/finance/request'
@@ -159,6 +160,11 @@ const HodReportsRoute = HodReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => HodRouteRoute,
 } as any)
+const HodLogsRoute = HodLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => HodRouteRoute,
+} as any)
 const HodCalendarRoute = HodCalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
@@ -198,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/finance/request': typeof FinanceRequestRoute
   '/finance/settings': typeof FinanceSettingsRoute
   '/hod/calendar': typeof HodCalendarRoute
+  '/hod/logs': typeof HodLogsRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
   '/procument/manage-vendor': typeof ProcumentManageVendorRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByTo {
   '/finance/request': typeof FinanceRequestRoute
   '/finance/settings': typeof FinanceSettingsRoute
   '/hod/calendar': typeof HodCalendarRoute
+  '/hod/logs': typeof HodLogsRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
   '/procument/manage-vendor': typeof ProcumentManageVendorRoute
@@ -256,6 +264,7 @@ export interface FileRoutesById {
   '/finance/request': typeof FinanceRequestRoute
   '/finance/settings': typeof FinanceSettingsRoute
   '/hod/calendar': typeof HodCalendarRoute
+  '/hod/logs': typeof HodLogsRoute
   '/hod/reports': typeof HodReportsRoute
   '/hod/settings': typeof HodSettingsRoute
   '/procument/manage-vendor': typeof ProcumentManageVendorRoute
@@ -289,6 +298,7 @@ export interface FileRouteTypes {
     | '/finance/request'
     | '/finance/settings'
     | '/hod/calendar'
+    | '/hod/logs'
     | '/hod/reports'
     | '/hod/settings'
     | '/procument/manage-vendor'
@@ -315,6 +325,7 @@ export interface FileRouteTypes {
     | '/finance/request'
     | '/finance/settings'
     | '/hod/calendar'
+    | '/hod/logs'
     | '/hod/reports'
     | '/hod/settings'
     | '/procument/manage-vendor'
@@ -346,6 +357,7 @@ export interface FileRouteTypes {
     | '/finance/request'
     | '/finance/settings'
     | '/hod/calendar'
+    | '/hod/logs'
     | '/hod/reports'
     | '/hod/settings'
     | '/procument/manage-vendor'
@@ -546,6 +558,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HodReportsRouteImport
       parentRoute: typeof HodRouteRoute
     }
+    '/hod/logs': {
+      id: '/hod/logs'
+      path: '/logs'
+      fullPath: '/hod/logs'
+      preLoaderRoute: typeof HodLogsRouteImport
+      parentRoute: typeof HodRouteRoute
+    }
     '/hod/calendar': {
       id: '/hod/calendar'
       path: '/calendar'
@@ -618,6 +637,7 @@ const FinanceRouteRouteWithChildren = FinanceRouteRoute._addFileChildren(
 
 interface HodRouteRouteChildren {
   HodCalendarRoute: typeof HodCalendarRoute
+  HodLogsRoute: typeof HodLogsRoute
   HodReportsRoute: typeof HodReportsRoute
   HodSettingsRoute: typeof HodSettingsRoute
   HodIndexRoute: typeof HodIndexRoute
@@ -625,6 +645,7 @@ interface HodRouteRouteChildren {
 
 const HodRouteRouteChildren: HodRouteRouteChildren = {
   HodCalendarRoute: HodCalendarRoute,
+  HodLogsRoute: HodLogsRoute,
   HodReportsRoute: HodReportsRoute,
   HodSettingsRoute: HodSettingsRoute,
   HodIndexRoute: HodIndexRoute,

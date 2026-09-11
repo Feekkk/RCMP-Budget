@@ -2,11 +2,17 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { ResultSetHeader } from "mysql2";
 import { authMiddleware } from "@backend/core/middleware";
+import {
+  budgetSnapshot,
+  insertBudgetActionLog,
+} from "@backend/core/budget-action-log";
+import { nextBudgetRef } from "@backend/core/budget-ref";
 
 export type BudgetStatus = "Pending" | "Approved" | "Rejected";
 
 export type BudgetListItem = {
   id: number;
+  budgetRef: string;
   budgetYear: number;
   budgetType: "OPEX" | "CAPEX";
   title: string;
@@ -22,6 +28,7 @@ export type BudgetListItem = {
 
 export type BudgetDetail = {
   id: number;
+  budgetRef: string;
   budgetYear: number;
   budgetType: "OPEX" | "CAPEX";
   code: string;
@@ -92,6 +99,7 @@ async function replaceBudgetItems(
 
 type BudgetRow = {
   budget_id: number;
+  budget_ref?: string | null;
   budget_year: number;
   budget_type: string;
   code: string;
@@ -111,6 +119,7 @@ type BudgetRow = {
   created_at: Date | string;
   email: string;
   department: string | null;
+  department_id?: number | null;
   created_by: number;
 };
 
@@ -140,6 +149,59 @@ function formatBudgetDate(value: Date | string) {
     createdAt: created.toISOString(),
   };
 }
+
+function toBudgetDetail(row: BudgetRow, userId: number): BudgetDetail {
+  const { date } = formatBudgetDate(row.created_at);
+  return {
+    id: row.budget_id,
+    budgetRef: row.budget_ref || `YB-${row.budget_id}`,
+    budgetYear: Number(row.budget_year),
+    budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+    code: row.code,
+    activity: row.activity,
+    itemName: row.item_name,
+    targetMonths: row.target_months,
+    objective: row.objective,
+    justification: row.justification,
+    quantity: row.quantity == null ? null : Number(row.quantity),
+    costPerUnit: row.cost_per_unit == null ? null : Number(row.cost_per_unit),
+    amount: Number(row.budget_amount),
+    effectIfNotApproved: row.effect_if_not_approved,
+    alternative: row.alternative,
+    remarks: row.remarks,
+    rejectRemarks: row.reject_remarks,
+    date,
+    status: mapBudgetStatus(row.status_name),
+    statusName: row.status_name,
+    createdByEmail: row.email,
+    department: row.department,
+    isMine: row.created_by === userId,
+  };
+}
+
+const budgetDetailSelect = `
+         yb.budget_id,
+         yb.budget_ref,
+         yb.budget_year,
+         yb.budget_type,
+         yb.code,
+         yb.activity,
+         ${budgetItemSelect}
+         yb.target_months,
+         yb.objective,
+         yb.justification,
+         yb.budget_amount,
+         yb.effect_if_not_approved,
+         yb.alternative,
+         yb.remarks,
+         yb.reject_remarks,
+         yb.created_at,
+         yb.created_by,
+         qs.status_name,
+         u.email,
+         u.department_id,
+         d.department_name AS department
+`;
 
 const SUBMIT_STATUS_ID = 11;
 const APPROVED_BUDGET_STATUS_ID = 12;
@@ -247,12 +309,17 @@ export const submitYearlyBudget = createServerFn({ method: "POST" })
         const first = line.items[0];
         if (!first) continue;
         const total = line.items.reduce((sum, item) => sum + item.budgetAmount, 0);
+        const budgetRef = await nextBudgetRef(async (sql, params) => {
+          const [rows] = await conn.query(sql, params);
+          return rows;
+        }, budgetYear, "OPEX");
         const [result] = await conn.query<ResultSetHeader>(
           `INSERT INTO yearly_budgets
-            (created_by, budget_year, status_id, budget_type, code, activity,
+            (budget_ref, created_by, budget_year, status_id, budget_type, code, activity,
              target_months, objective, justification, budget_amount, remarks)
-           VALUES (?, ?, ?, 'OPEX', ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, 'OPEX', ?, ?, ?, ?, ?, ?, ?)`,
           [
+            budgetRef,
             user.userId,
             budgetYear,
             SUBMIT_STATUS_ID,
@@ -281,13 +348,18 @@ export const submitYearlyBudget = createServerFn({ method: "POST" })
         const first = line.items[0];
         if (!first) continue;
         const total = line.items.reduce((sum, item) => sum + item.budgetAmount, 0);
+        const budgetRef = await nextBudgetRef(async (sql, params) => {
+          const [rows] = await conn.query(sql, params);
+          return rows;
+        }, budgetYear, "CAPEX");
         const [result] = await conn.query<ResultSetHeader>(
           `INSERT INTO yearly_budgets
-            (created_by, budget_year, status_id, budget_type, code,
+            (budget_ref, created_by, budget_year, status_id, budget_type, code,
              target_months, justification, budget_amount,
              effect_if_not_approved, alternative, remarks)
-           VALUES (?, ?, ?, 'CAPEX', ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, 'CAPEX', ?, ?, ?, ?, ?, ?, ?)`,
           [
+            budgetRef,
             user.userId,
             budgetYear,
             SUBMIT_STATUS_ID,
@@ -338,6 +410,7 @@ export const listMyBudgets = createServerFn({ method: "GET" })
     const rows = await query<BudgetRow[]>(
       `SELECT
          yb.budget_id,
+         yb.budget_ref,
          yb.budget_year,
          yb.budget_type,
          yb.code,
@@ -366,6 +439,7 @@ export const listMyBudgets = createServerFn({ method: "GET" })
       const { date, createdAt } = formatBudgetDate(row.created_at);
       return {
         id: row.budget_id,
+        budgetRef: row.budget_ref || `YB-${row.budget_id}`,
         budgetYear: Number(row.budget_year),
         budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
         title: budgetTitle(row),
@@ -390,25 +464,7 @@ export const getMyBudget = createServerFn({ method: "GET" })
     const { query } = await import("@backend/core/db");
     const rows = await query<BudgetRow[]>(
       `SELECT
-         yb.budget_id,
-         yb.budget_year,
-         yb.budget_type,
-         yb.code,
-         yb.activity,
-         ${budgetItemSelect}
-         yb.target_months,
-         yb.objective,
-         yb.justification,
-         yb.budget_amount,
-         yb.effect_if_not_approved,
-         yb.alternative,
-         yb.remarks,
-         yb.reject_remarks,
-         yb.created_at,
-         yb.created_by,
-         qs.status_name,
-         u.email,
-         d.department_name AS department
+         ${budgetDetailSelect}
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
@@ -424,31 +480,7 @@ export const getMyBudget = createServerFn({ method: "GET" })
       throw new Error("Budget not found. Refresh the page and try again.");
     }
 
-    const { date } = formatBudgetDate(row.created_at);
-    return {
-      id: row.budget_id,
-      budgetYear: Number(row.budget_year),
-      budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
-      code: row.code,
-      activity: row.activity,
-      itemName: row.item_name,
-      targetMonths: row.target_months,
-      objective: row.objective,
-      justification: row.justification,
-      quantity: row.quantity == null ? null : Number(row.quantity),
-      costPerUnit: row.cost_per_unit == null ? null : Number(row.cost_per_unit),
-      amount: Number(row.budget_amount),
-      effectIfNotApproved: row.effect_if_not_approved,
-      alternative: row.alternative,
-      remarks: row.remarks,
-      rejectRemarks: row.reject_remarks,
-      date,
-      status: mapBudgetStatus(row.status_name),
-      statusName: row.status_name,
-      createdByEmail: row.email,
-      department: row.department,
-      isMine: true,
-    };
+    return toBudgetDetail(row, user.userId);
   });
 
 export const resubmitYearlyBudget = createServerFn({ method: "POST" })
@@ -462,7 +494,6 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
         targetMonths: z.string().trim().max(7).optional(),
         objective: z.string().trim().min(1),
         justification: z.string().trim().min(1),
-        budgetAmount: z.number().positive(),
         remarks: z.string().trim().optional(),
       }),
       z.object({
@@ -472,9 +503,6 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
         itemName: z.string().trim().min(1),
         justification: z.string().trim().min(1),
         targetMonths: z.string().trim().max(7).optional(),
-        quantity: z.number().int().positive(),
-        costPerUnit: z.number().positive(),
-        budgetAmount: z.number().positive(),
         effectIfNotApproved: z.string().trim().optional(),
         alternative: z.string().trim().optional(),
         remarks: z.string().trim().optional(),
@@ -501,25 +529,7 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
     const { query } = await import("@backend/core/db");
     const rows = await query<BudgetRow[]>(
       `SELECT
-         yb.budget_id,
-         yb.budget_year,
-         yb.budget_type,
-         yb.code,
-         yb.activity,
-         ${budgetItemSelect}
-         yb.target_months,
-         yb.objective,
-         yb.justification,
-         yb.budget_amount,
-         yb.effect_if_not_approved,
-         yb.alternative,
-         yb.remarks,
-         yb.reject_remarks,
-         yb.created_at,
-         yb.created_by,
-         qs.status_name,
-         u.email,
-         d.department_name AS department
+         ${budgetDetailSelect}
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
@@ -541,6 +551,7 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
     }
 
     const nextStatusId = status === "Approved" ? APPROVED_BUDGET_STATUS_ID : SUBMIT_STATUS_ID;
+    const oldValues = budgetSnapshot(row);
 
     if (
       (data.budgetType === "OPEX" && row.budget_type !== "OPEX") ||
@@ -558,7 +569,6 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
              target_months = ?,
              objective = ?,
              justification = ?,
-             budget_amount = ?,
              remarks = ?,
              reject_remarks = NULL
          WHERE budget_id = ? AND created_by = ?`,
@@ -569,7 +579,6 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
           data.targetMonths || null,
           data.objective,
           data.justification,
-          data.budgetAmount,
           data.remarks || null,
           data.budgetId,
           user.userId,
@@ -582,7 +591,6 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
              code = ?,
              target_months = ?,
              justification = ?,
-             budget_amount = ?,
              effect_if_not_approved = ?,
              alternative = ?,
              remarks = ?,
@@ -593,7 +601,6 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
           data.code,
           data.targetMonths || null,
           data.justification,
-          data.budgetAmount,
           data.effectIfNotApproved || null,
           data.alternative || null,
           data.remarks || null,
@@ -601,41 +608,19 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
           user.userId,
         ],
       );
-      await replaceBudgetItems(
-        query,
-        data.budgetId,
-        [
-          {
-            quantity: data.quantity,
-            costPerUnit: data.costPerUnit,
-            budgetAmount: data.budgetAmount,
-          },
-        ],
-        data.itemName,
+      await query(
+        `UPDATE budget_items
+         SET item_name = ?
+         WHERE budget_id = ?
+         ORDER BY budget_item_id ASC
+         LIMIT 1`,
+        [data.itemName, data.budgetId],
       );
     }
 
     const updatedRows = await query<BudgetRow[]>(
       `SELECT
-         yb.budget_id,
-         yb.budget_year,
-         yb.budget_type,
-         yb.code,
-         yb.activity,
-         ${budgetItemSelect}
-         yb.target_months,
-         yb.objective,
-         yb.justification,
-         yb.budget_amount,
-         yb.effect_if_not_approved,
-         yb.alternative,
-         yb.remarks,
-         yb.reject_remarks,
-         yb.created_at,
-         yb.created_by,
-         qs.status_name,
-         u.email,
-         d.department_name AS department
+         ${budgetDetailSelect}
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
@@ -650,31 +635,19 @@ export const resubmitYearlyBudget = createServerFn({ method: "POST" })
       throw new Error("Budget was updated, but could not reload. Refresh the page.");
     }
 
-    const { date } = formatBudgetDate(updated.created_at);
-    return {
-      id: updated.budget_id,
-      budgetYear: Number(updated.budget_year),
-      budgetType: updated.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
-      code: updated.code,
-      activity: updated.activity,
-      itemName: updated.item_name,
-      targetMonths: updated.target_months,
-      objective: updated.objective,
-      justification: updated.justification,
-      quantity: updated.quantity == null ? null : Number(updated.quantity),
-      costPerUnit: updated.cost_per_unit == null ? null : Number(updated.cost_per_unit),
-      amount: Number(updated.budget_amount),
-      effectIfNotApproved: updated.effect_if_not_approved,
-      alternative: updated.alternative,
-      remarks: updated.remarks,
-      rejectRemarks: updated.reject_remarks,
-      date,
-      status: mapBudgetStatus(updated.status_name),
-      statusName: updated.status_name,
-      createdByEmail: updated.email,
-      department: updated.department,
-      isMine: updated.created_by === user.userId,
-    };
+    await insertBudgetActionLog(query, {
+      budgetId: data.budgetId,
+      budgetYear: Number(row.budget_year),
+      budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+      action: "edit",
+      actorUserId: user.userId,
+      ownerUserId: row.created_by,
+      ownerDepartmentId: row.department_id ?? null,
+      oldValues,
+      newValues: budgetSnapshot(updated),
+    });
+
+    return toBudgetDetail(updated, user.userId);
   });
 
 export const deleteYearlyBudget = createServerFn({ method: "POST" })
@@ -688,13 +661,13 @@ export const deleteYearlyBudget = createServerFn({ method: "POST" })
     const { user } = context;
 
     const { query } = await import("@backend/core/db");
-    const rows = await query<{ budget_id: number; status_name: string; created_by: number }[]>(
+    const rows = await query<BudgetRow[]>(
       `SELECT
-         yb.budget_id,
-         yb.created_by,
-         qs.status_name
+         ${budgetDetailSelect}
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
        WHERE yb.budget_id = ?
          AND yb.created_by = ?
        LIMIT 1`,
@@ -710,6 +683,18 @@ export const deleteYearlyBudget = createServerFn({ method: "POST" })
     if (status !== "Pending" && status !== "Rejected") {
       throw new Error("Only pending or rejected budgets can be removed. Refresh and try again.");
     }
+
+    await insertBudgetActionLog(query, {
+      budgetId: data.budgetId,
+      budgetYear: Number(row.budget_year),
+      budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+      action: "delete",
+      actorUserId: user.userId,
+      ownerUserId: row.created_by,
+      ownerDepartmentId: row.department_id ?? null,
+      oldValues: budgetSnapshot(row),
+      newValues: null,
+    });
 
     await query(`DELETE FROM yearly_budgets WHERE budget_id = ? AND created_by = ?`, [
       data.budgetId,
@@ -770,25 +755,7 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
     const { query } = await import("@backend/core/db");
     const rows = await query<BudgetRow[]>(
       `SELECT
-         yb.budget_id,
-         yb.budget_year,
-         yb.budget_type,
-         yb.code,
-         yb.activity,
-         ${budgetItemSelect}
-         yb.target_months,
-         yb.objective,
-         yb.justification,
-         yb.budget_amount,
-         yb.effect_if_not_approved,
-         yb.alternative,
-         yb.remarks,
-         yb.reject_remarks,
-         yb.created_at,
-         yb.created_by,
-         qs.status_name,
-         u.email,
-         d.department_name AS department
+         ${budgetDetailSelect}
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
@@ -817,6 +784,7 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
         `UPDATE yearly_budgets
          SET status_id = ?,
              budget_type = 'CAPEX',
+             budget_ref = ?,
              code = ?,
              activity = NULL,
              target_months = ?,
@@ -830,6 +798,7 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
          WHERE budget_id = ? AND created_by = ?`,
         [
           SUBMIT_STATUS_ID,
+          await nextBudgetRef(query, Number(row.budget_year), "CAPEX"),
           data.code,
           data.targetMonths || null,
           data.justification,
@@ -862,6 +831,7 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
         `UPDATE yearly_budgets
          SET status_id = ?,
              budget_type = 'OPEX',
+             budget_ref = ?,
              code = ?,
              activity = ?,
              target_months = ?,
@@ -875,6 +845,7 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
          WHERE budget_id = ? AND created_by = ?`,
         [
           SUBMIT_STATUS_ID,
+          await nextBudgetRef(query, Number(row.budget_year), "OPEX"),
           data.code,
           data.activity,
           data.targetMonths || null,
@@ -891,25 +862,7 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
 
     const updatedRows = await query<BudgetRow[]>(
       `SELECT
-         yb.budget_id,
-         yb.budget_year,
-         yb.budget_type,
-         yb.code,
-         yb.activity,
-         ${budgetItemSelect}
-         yb.target_months,
-         yb.objective,
-         yb.justification,
-         yb.budget_amount,
-         yb.effect_if_not_approved,
-         yb.alternative,
-         yb.remarks,
-         yb.reject_remarks,
-         yb.created_at,
-         yb.created_by,
-         qs.status_name,
-         u.email,
-         d.department_name AS department
+         ${budgetDetailSelect}
        FROM yearly_budgets yb
        INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
        INNER JOIN users u ON u.user_id = yb.created_by
@@ -924,29 +877,125 @@ export const transferYearlyBudget = createServerFn({ method: "POST" })
       throw new Error("Budget was transferred, but could not reload. Refresh the page.");
     }
 
-    const { date } = formatBudgetDate(updated.created_at);
-    return {
-      id: updated.budget_id,
-      budgetYear: Number(updated.budget_year),
-      budgetType: updated.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
-      code: updated.code,
-      activity: updated.activity,
-      itemName: updated.item_name,
-      targetMonths: updated.target_months,
-      objective: updated.objective,
-      justification: updated.justification,
-      quantity: updated.quantity == null ? null : Number(updated.quantity),
-      costPerUnit: updated.cost_per_unit == null ? null : Number(updated.cost_per_unit),
-      amount: Number(updated.budget_amount),
-      effectIfNotApproved: updated.effect_if_not_approved,
-      alternative: updated.alternative,
-      remarks: updated.remarks,
-      rejectRemarks: updated.reject_remarks,
-      date,
-      status: mapBudgetStatus(updated.status_name),
-      statusName: updated.status_name,
-      createdByEmail: updated.email,
-      department: updated.department,
-      isMine: updated.created_by === user.userId,
-    };
+    await insertBudgetActionLog(query, {
+      budgetId: data.budgetId,
+      budgetYear: Number(row.budget_year),
+      budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+      action: "transfer",
+      actorUserId: user.userId,
+      ownerUserId: row.created_by,
+      ownerDepartmentId: row.department_id ?? null,
+      remarks: data.remarks,
+      oldValues: budgetSnapshot(row),
+      newValues: budgetSnapshot(updated),
+    });
+
+    return toBudgetDetail(updated, user.userId);
+  });
+
+export const updateApprovedYearlyBudget = createServerFn({ method: "POST" })
+  .validator(
+    z.discriminatedUnion("budgetType", [
+      z.object({
+        budgetId: z.number().int().positive(),
+        budgetType: z.literal("OPEX"),
+        budgetAmount: z.number().positive(),
+        remarks: z.string().trim().min(1),
+      }),
+      z.object({
+        budgetId: z.number().int().positive(),
+        budgetType: z.literal("CAPEX"),
+        quantity: z.number().int().positive(),
+        costPerUnit: z.number().positive(),
+        budgetAmount: z.number().positive(),
+        remarks: z.string().trim().min(1),
+      }),
+    ]),
+  )
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }): Promise<BudgetDetail> => {
+    const { user } = context;
+    const { query } = await import("@backend/core/db");
+    const rows = await query<BudgetRow[]>(
+      `SELECT
+         ${budgetDetailSelect}
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
+       WHERE yb.budget_id = ?
+         AND yb.created_by = ?
+       LIMIT 1`,
+      [data.budgetId, user.userId],
+    );
+
+    const row = rows[0];
+    if (!row) {
+      throw new Error("Budget not found. Refresh the page and try again.");
+    }
+
+    if (mapBudgetStatus(row.status_name) !== "Approved") {
+      throw new Error("Only approved budgets can change amount. Refresh and try again.");
+    }
+
+    if (
+      (data.budgetType === "OPEX" && row.budget_type !== "OPEX") ||
+      (data.budgetType === "CAPEX" && row.budget_type !== "CAPEX")
+    ) {
+      throw new Error("Budget type cannot be changed. Refresh and try again.");
+    }
+
+    const oldValues = budgetSnapshot(row);
+
+    if (data.budgetType === "OPEX") {
+      await query(
+        `UPDATE yearly_budgets SET budget_amount = ? WHERE budget_id = ? AND created_by = ?`,
+        [data.budgetAmount, data.budgetId, user.userId],
+      );
+    } else {
+      await query(
+        `UPDATE yearly_budgets SET budget_amount = ? WHERE budget_id = ? AND created_by = ?`,
+        [data.budgetAmount, data.budgetId, user.userId],
+      );
+      await query(
+        `UPDATE budget_items
+         SET quantity = ?, cost_per_unit = ?, budget_amount = ?
+         WHERE budget_id = ?
+         ORDER BY budget_item_id ASC
+         LIMIT 1`,
+        [data.quantity, data.costPerUnit, data.budgetAmount, data.budgetId],
+      );
+    }
+
+    const updatedRows = await query<BudgetRow[]>(
+      `SELECT
+         ${budgetDetailSelect}
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
+       WHERE yb.budget_id = ?
+       LIMIT 1`,
+      [data.budgetId],
+    );
+
+    const updated = updatedRows[0];
+    if (!updated) {
+      throw new Error("Budget was updated, but could not reload. Refresh the page.");
+    }
+
+    await insertBudgetActionLog(query, {
+      budgetId: data.budgetId,
+      budgetYear: Number(row.budget_year),
+      budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+      action: "update_budget",
+      actorUserId: user.userId,
+      ownerUserId: row.created_by,
+      ownerDepartmentId: row.department_id ?? null,
+      remarks: data.remarks,
+      oldValues,
+      newValues: budgetSnapshot(updated),
+    });
+
+    return toBudgetDetail(updated, user.userId);
   });

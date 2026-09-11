@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  Clock,
   FileDown,
   Maximize2,
   Minimize2,
@@ -244,6 +246,26 @@ export function DepartmentPage() {
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[1.5rem] bg-background px-5 py-4 shadow-card">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-lime text-lime-foreground">
+              <Clock className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Need to update a budget?</p>
+              <p className="mt-0.5 text-xs text-foreground/50">
+                Change amounts from History. This page is for viewing only.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/user/history"
+            className="inline-flex shrink-0 items-center rounded-full bg-lime px-4 py-2 text-sm font-medium text-lime-foreground transition hover:opacity-90"
+          >
+            Open History
+          </Link>
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">

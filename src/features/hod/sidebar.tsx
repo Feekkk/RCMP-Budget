@@ -6,6 +6,7 @@ import {
   LogOut,
   Menu,
   FileChartColumn,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ import {
 const items: { label: string; icon: LucideIcon; to?: LinkProps["to"] }[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/hod" },
   { label: "Reports", icon: FileChartColumn, to: "/hod/reports" },
+  { label: "Logs", icon: ScrollText, to: "/hod/logs" },
   { label: "Settings", icon: Settings, to: "/hod/settings" },
 ];
 

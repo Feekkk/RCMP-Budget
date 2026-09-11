@@ -47,9 +47,11 @@ import {
   resubmitYearlyBudget,
   deleteYearlyBudget,
   transferYearlyBudget,
+  updateApprovedYearlyBudget,
   type BudgetDetail,
   type BudgetListItem,
 } from "@backend/server-functions/budget-fns";
+import { listMyBudgetLogs, type BudgetActionLog } from "@backend/server-functions/budget-log-fns";
 import { isYearlyBudgetFormEnabled } from "@backend/server-functions/settings-fns";
 import {
   generatePurchaseRequisition,
@@ -62,6 +64,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  BudgetLogList,
+  UpdateApprovedBudgetForm,
+  filterBudgetLogs,
+  type UpdateApprovedBudgetPayload,
+} from "@/features/budget-action-log-list";
 
 function downloadPurchaseRequisitionFile(result: {
   fileName: string;
@@ -117,11 +125,12 @@ function StatusPill({ status }: { status: Status }) {
 
 export function HistoryPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"quotations" | "budgets">("quotations");
+  const [tab, setTab] = useState<"quotations" | "budgets" | "logs">("quotations");
   const [filter, setFilter] = useState<(typeof filters)[number]>("All");
   const [query, setQuery] = useState("");
   const [quotations, setQuotations] = useState<QuotationListItem[]>([]);
   const [budgets, setBudgets] = useState<BudgetListItem[]>([]);
+  const [logs, setLogs] = useState<BudgetActionLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedQuotationId, setSelectedQuotationId] = useState<number | null>(
     null,
@@ -136,11 +145,12 @@ export function HistoryPage() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([listMyQuotations(), listMyBudgets()])
-      .then(([quotationRows, budgetRows]) => {
+    Promise.all([listMyQuotations(), listMyBudgets(), listMyBudgetLogs()])
+      .then(([quotationRows, budgetRows, logRows]) => {
         if (!active) return;
         setQuotations(quotationRows);
         setBudgets(budgetRows);
+        setLogs(logRows);
       })
       .catch((error) => {
         if (!active) return;
@@ -249,11 +259,16 @@ export function HistoryPage() {
       budgets.filter(
         (row) =>
           (filter === "All" || row.status === filter) &&
-          `YB-${row.id} ${row.title} ${row.code} ${row.budgetType} ${row.budgetYear} ${row.createdByEmail}`
+          `${row.budgetRef} ${row.title} ${row.code} ${row.budgetType} ${row.budgetYear} ${row.createdByEmail}`
             .toLowerCase()
             .includes(query.toLowerCase().trim()),
       ),
     [budgets, filter, query],
+  );
+
+  const visibleLogs = useMemo(
+    () => filterBudgetLogs(logs, query),
+    [logs, query],
   );
 
   const currentYear = new Date().getFullYear();
@@ -315,6 +330,12 @@ export function HistoryPage() {
     setSelectedBudgetId(null);
     setQuotationDetail(null);
     setBudgetDetail(null);
+  };
+
+  const refreshLogs = () => {
+    void listMyBudgetLogs()
+      .then(setLogs)
+      .catch(() => {});
   };
 
   return (
@@ -394,7 +415,7 @@ export function HistoryPage() {
           <Tabs
             value={tab}
             onValueChange={(value) => {
-              setTab(value as "quotations" | "budgets");
+              setTab(value as "quotations" | "budgets" | "logs");
               setFilter("All");
               setQuery("");
             }}
@@ -419,6 +440,15 @@ export function HistoryPage() {
                     {budgets.length}
                   </span>
                 </TabsTrigger>
+                <TabsTrigger
+                  value="logs"
+                  className="rounded-full px-4 py-2 data-[state=active]:bg-background"
+                >
+                  Log
+                  <span className="ml-2 rounded-full bg-foreground/5 px-2 py-0.5 text-xs tabular-nums">
+                    {logs.length}
+                  </span>
+                </TabsTrigger>
               </TabsList>
 
               <div className="relative w-full sm:w-64">
@@ -429,13 +459,16 @@ export function HistoryPage() {
                   placeholder={
                     tab === "quotations"
                       ? "Search quotations"
-                      : "Search budgets"
+                      : tab === "logs"
+                        ? "Search logs"
+                        : "Search budgets"
                   }
                   className="h-11 rounded-full pl-11"
                 />
               </div>
             </div>
 
+            {tab !== "logs" && (
             <div className="mt-4 flex items-center gap-1 rounded-full border border-foreground/10 p-1 w-fit">
               {filters.map((option) => (
                 <button
@@ -453,6 +486,7 @@ export function HistoryPage() {
                 </button>
               ))}
             </div>
+            )}
 
             <TabsContent value="quotations" className="mt-4">
               {loading ? (
@@ -539,7 +573,7 @@ export function HistoryPage() {
                             </p>
                           </div>
                           <p className="mt-1 text-xs text-foreground/50">
-                            YB-{row.id} · FY {row.budgetYear} · {row.code}
+                            {row.budgetRef} · FY {row.budgetYear} · {row.code}
                             {" · "}
                             {row.isMine ? "You" : row.createdByEmail}
                             {" · "}
@@ -557,6 +591,18 @@ export function HistoryPage() {
                   ))}
                 </ul>
               )}
+            </TabsContent>
+
+            <TabsContent value="logs" className="mt-4">
+              <BudgetLogList
+                logs={visibleLogs}
+                loading={loading}
+                emptyMessage={
+                  logs.length === 0
+                    ? "No budget logs yet. Edit, transfer, delete, or update a budget to see them here."
+                    : "No logs match your search."
+                }
+              />
             </TabsContent>
           </Tabs>
         </div>
@@ -617,9 +663,11 @@ export function HistoryPage() {
                         : row,
                     ),
                   );
+                  refreshLogs();
                 }}
                 onDeleted={(budgetId) => {
                   setBudgets((prev) => prev.filter((row) => row.id !== budgetId));
+                  refreshLogs();
                   closeDetail();
                 }}
               />
@@ -904,12 +952,15 @@ function BudgetDetailCard({
     detail.isMine;
   const canTransfer =
     detail.status === "Pending" && detail.isMine && formEnabled;
+  const canUpdateBudget = detail.isMine && detail.status === "Approved";
   const isResubmit = detail.status === "Rejected";
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [code, setCode] = useState(detail.code);
   const [activity, setActivity] = useState(detail.activity ?? "");
@@ -929,7 +980,6 @@ function BudgetDetailCard({
   const [remarks, setRemarks] = useState(detail.remarks ?? "");
 
   const unitValue = Number(costPerUnit) || 0;
-  const capexEstimated = unitValue * quantity;
   const codeOptions = isCapex ? CAPEX_CODES : OPEX_CODES;
 
   useEffect(() => {
@@ -970,11 +1020,42 @@ function BudgetDetailCard({
     setTransferOpen(false);
   };
 
+  const closeUpdate = () => {
+    if (updating) return;
+    setUpdateOpen(false);
+  };
+
+  const handleUpdateBudget = async (payload: UpdateApprovedBudgetPayload) => {
+    if (updating || !canUpdateBudget) return;
+    setUpdating(true);
+    const toastId = toast.loading(`Updating ${detail.budgetRef}…`);
+    try {
+      const updated = await updateApprovedYearlyBudget({
+        data: { budgetId: detail.id, ...payload },
+      });
+      onResubmitted(updated);
+      setUpdateOpen(false);
+      toast.success(`${detail.budgetRef} amount updated`, {
+        id: toastId,
+        description: "The approved amount was saved.",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not update this budget. Try again.",
+        { id: toastId },
+      );
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const handleTransfer = async (payload: TransferBudgetInput) => {
     if (transferring || !canTransfer) return;
     setTransferring(true);
     const toastId = toast.loading(
-      `Transferring YB-${detail.id} to ${payload.targetType}…`,
+      `Transferring ${detail.budgetRef} to ${payload.targetType}…`,
     );
     try {
       const updated = await transferYearlyBudget({
@@ -982,7 +1063,7 @@ function BudgetDetailCard({
       });
       onResubmitted(updated);
       setTransferOpen(false);
-      toast.success(`YB-${detail.id} transferred to ${payload.targetType}`, {
+      toast.success(`${detail.budgetRef} transferred to ${payload.targetType}`, {
         id: toastId,
         description: "Still waiting for HOD review.",
       });
@@ -1002,29 +1083,25 @@ function BudgetDetailCard({
     if (saving) return;
 
     if (isCapex) {
-      if (!code || !itemName.trim() || !justification.trim() || unitValue <= 0) {
-        toast.error("Fill in item, justification, and cost, then try again.");
+      if (!code || !itemName.trim() || !justification.trim()) {
+        toast.error("Fill in item and justification, then try again.");
         return;
       }
-    } else {
-      const amount = Number(budgetAmount) || 0;
-      if (
-        !code ||
-        !activity.trim() ||
-        !objective.trim() ||
-        !justification.trim() ||
-        amount <= 0
-      ) {
-        toast.error("Fill in the required fields, then try again.");
-        return;
-      }
+    } else if (
+      !code ||
+      !activity.trim() ||
+      !objective.trim() ||
+      !justification.trim()
+    ) {
+      toast.error("Fill in the required fields, then try again.");
+      return;
     }
 
     setSaving(true);
     const toastId = toast.loading(
       isResubmit
-        ? `Resubmitting YB-${detail.id}…`
-        : `Saving YB-${detail.id}…`,
+        ? `Resubmitting ${detail.budgetRef}…`
+        : `Saving ${detail.budgetRef}…`,
     );
     try {
       const updated = isCapex
@@ -1036,9 +1113,6 @@ function BudgetDetailCard({
               itemName: itemName.trim(),
               justification: justification.trim(),
               targetMonths: targetMonths || undefined,
-              quantity,
-              costPerUnit: unitValue,
-              budgetAmount: capexEstimated,
               effectIfNotApproved: effectIfNotApproved.trim() || undefined,
               alternative: alternative.trim() || undefined,
               remarks: remarks.trim() || undefined,
@@ -1053,7 +1127,6 @@ function BudgetDetailCard({
               targetMonths: targetMonths || undefined,
               objective: objective.trim(),
               justification: justification.trim(),
-              budgetAmount: Number(budgetAmount),
               remarks: remarks.trim() || undefined,
             },
           });
@@ -1061,8 +1134,8 @@ function BudgetDetailCard({
       setEditing(false);
       toast.success(
         isResubmit
-          ? `YB-${detail.id} resubmitted`
-          : `YB-${detail.id} updated`,
+          ? `${detail.budgetRef} resubmitted`
+          : `${detail.budgetRef} updated`,
         {
           id: toastId,
           description: isResubmit
@@ -1093,12 +1166,12 @@ function BudgetDetailCard({
 
     setDeleting(true);
     const toastId = toast.loading(
-      isResubmit ? `Removing YB-${detail.id}…` : `Deleting YB-${detail.id}…`,
+      isResubmit ? `Removing ${detail.budgetRef}…` : `Deleting ${detail.budgetRef}…`,
     );
     try {
       await deleteYearlyBudget({ data: { budgetId: detail.id } });
       toast.success(
-        isResubmit ? `YB-${detail.id} removed` : `YB-${detail.id} deleted`,
+        isResubmit ? `${detail.budgetRef} removed` : `${detail.budgetRef} deleted`,
         {
           id: toastId,
           description: "This budget request has been removed.",
@@ -1125,7 +1198,7 @@ function BudgetDetailCard({
           <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
             Yearly budget · {detail.budgetType}
           </p>
-          <h2 className="mt-1 font-display text-3xl">YB-{detail.id}</h2>
+          <h2 className="mt-1 font-display text-3xl">{detail.budgetRef}</h2>
           <p className="mt-1 text-sm text-foreground/60">
             FY {detail.budgetYear} · Submitted {detail.date}
           </p>
@@ -1209,40 +1282,27 @@ function BudgetDetailCard({
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-quantity">Quantity</Label>
-                  <Input
-                    id="edit-quantity"
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={quantity}
-                    onChange={(e) =>
-                      setQuantity(Math.max(1, Number(e.target.value) || 1))
-                    }
-                    disabled={saving}
-                    className="h-11 rounded-xl tabular-nums"
-                  />
+                <div className="flex flex-col gap-2">
+                  <Label>Quantity</Label>
+                  <div className="flex h-11 items-center rounded-xl border border-foreground/10 bg-ivory px-4 tabular-nums">
+                    {quantity}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-unit">Estimated cost per unit (RM)</Label>
-                  <Input
-                    id="edit-unit"
-                    inputMode="decimal"
-                    value={costPerUnit}
-                    onChange={(e) =>
-                      setCostPerUnit(e.target.value.replace(/[^\d.]/g, ""))
-                    }
-                    disabled={saving}
-                    className="h-11 rounded-xl tabular-nums"
-                  />
+                <div className="flex flex-col gap-2">
+                  <Label>Estimated cost per unit (RM)</Label>
+                  <div className="flex h-11 items-center rounded-xl border border-foreground/10 bg-ivory px-4 tabular-nums">
+                    {formatRm(unitValue)}
+                  </div>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label>Estimated price</Label>
                 <div className="flex h-11 items-center rounded-xl border border-foreground/10 bg-ivory px-4 font-display text-xl tabular-nums">
-                  {formatRm(capexEstimated)}
+                  {formatRm(detail.amount)}
                 </div>
+                <p className="text-xs text-foreground/50">
+                  Use Update budget to change quantity, unit cost, or amount.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-effect">
@@ -1314,18 +1374,14 @@ function BudgetDetailCard({
                   className="min-h-20 rounded-xl"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-budget">OPEX budget (RM)</Label>
-                <Input
-                  id="edit-budget"
-                  inputMode="decimal"
-                  value={budgetAmount}
-                  onChange={(e) =>
-                    setBudgetAmount(e.target.value.replace(/[^\d.]/g, ""))
-                  }
-                  disabled={saving}
-                  className="h-11 rounded-xl tabular-nums"
-                />
+              <div className="flex flex-col gap-2">
+                <Label>OPEX budget (RM)</Label>
+                <div className="flex h-11 items-center rounded-xl border border-foreground/10 bg-ivory px-4 font-display text-xl tabular-nums">
+                  {formatRm(detail.amount)}
+                </div>
+                <p className="text-xs text-foreground/50">
+                  Use Update budget to change the amount on an approved line.
+                </p>
               </div>
             </>
           )}
@@ -1458,17 +1514,28 @@ function BudgetDetailCard({
             </div>
           )}
 
-          {canEdit || canDelete || canTransfer ? (
+          {canEdit || canDelete || canTransfer || canUpdateBudget ? (
             <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
               {canEdit && (
                 <button
                   type="button"
                   onClick={startEdit}
-                  disabled={deleting || transferring}
+                  disabled={deleting || transferring || updating}
                   className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory disabled:opacity-50"
                 >
                   <ClipboardPen className="h-4 w-4" />
                   Edit form
+                </button>
+              )}
+              {canUpdateBudget && (
+                <button
+                  type="button"
+                  onClick={() => setUpdateOpen(true)}
+                  disabled={deleting || transferring || updating}
+                  className="inline-flex items-center gap-2 rounded-full border border-foreground/15 px-5 py-2.5 text-sm font-medium transition hover:bg-ivory disabled:opacity-50"
+                >
+                  <Wallet className="h-4 w-4" />
+                  Update budget
                 </button>
               )}
               {canTransfer && (
@@ -1527,6 +1594,24 @@ function BudgetDetailCard({
               transferring={transferring}
               onClose={closeTransfer}
               onTransfer={(payload) => void handleTransfer(payload)}
+            />
+          </DetailOverlay>,
+          document.body,
+        )}
+
+      {updateOpen &&
+        createPortal(
+          <DetailOverlay onClose={closeUpdate}>
+            <UpdateApprovedBudgetForm
+              budgetId={detail.id}
+              budgetRef={detail.budgetRef}
+              budgetType={detail.budgetType}
+              amount={detail.amount}
+              quantity={detail.quantity}
+              costPerUnit={detail.costPerUnit}
+              saving={updating}
+              onClose={closeUpdate}
+              onSave={(payload) => void handleUpdateBudget(payload)}
             />
           </DetailOverlay>,
           document.body,
@@ -1673,7 +1758,7 @@ function TransferBudgetCard({
           <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
             Transfer to {targetType}
           </p>
-          <h2 className="mt-1 font-display text-3xl">YB-{detail.id}</h2>
+          <h2 className="mt-1 font-display text-3xl">{detail.budgetRef}</h2>
           <p className="mt-1 text-sm text-foreground/60">
             From {sourceType} · {formatRm(detail.amount)}
           </p>

@@ -238,7 +238,7 @@ export function UserDashboard() {
             key: `yb-${row.id}`,
             kind: "budget" as const,
             title: row.title,
-            ref: `YB-${row.id}`,
+            ref: row.budgetRef,
             amount: row.amount,
             status: row.status,
             createdAt: row.createdAt,

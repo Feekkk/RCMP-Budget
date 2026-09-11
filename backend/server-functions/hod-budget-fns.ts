@@ -2,6 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { roleMiddleware } from "@backend/core/middleware";
 import type { AuthUser } from "@/lib/auth";
+import {
+  budgetSnapshot,
+  insertBudgetActionLog,
+} from "@backend/core/budget-action-log";
+import { nextBudgetRef } from "@backend/core/budget-ref";
 
 const APPROVED_BUDGET_STATUS_ID = 12;
 const REJECTED_BUDGET_STATUS_ID = 13;
@@ -12,6 +17,7 @@ export type HodBudgetStatus = "Pending" | "Approved" | "Rejected";
 
 export type HodBudgetListItem = {
   id: number;
+  budgetRef: string;
   budgetYear: number;
   budgetType: "OPEX" | "CAPEX";
   title: string;
@@ -34,6 +40,7 @@ export type HodBudgetItem = {
 
 export type HodBudgetDetail = {
   id: number;
+  budgetRef: string;
   budgetYear: number;
   budgetType: "OPEX" | "CAPEX";
   code: string;
@@ -69,6 +76,7 @@ type BudgetItemRow = {
 
 type BudgetRow = {
   budget_id: number;
+  budget_ref?: string | null;
   budget_year: number;
   budget_type: string;
   code: string;
@@ -88,6 +96,8 @@ type BudgetRow = {
   created_at: Date | string;
   requester_email: string;
   department: string | null;
+  department_id?: number | null;
+  created_by?: number;
   designation: string | null;
 };
 
@@ -167,6 +177,7 @@ function toListItem(row: BudgetRow): HodBudgetListItem {
   const { date, createdAt } = formatDate(row.created_at);
   return {
     id: row.budget_id,
+    budgetRef: row.budget_ref || `YB-${row.budget_id}`,
     budgetYear: Number(row.budget_year),
     budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
     title: budgetTitle(row),
@@ -194,6 +205,7 @@ function toDetail(row: BudgetRow, items: HodBudgetItem[] = []): HodBudgetDetail 
   const first = items[0] ?? null;
   return {
     id: row.budget_id,
+    budgetRef: row.budget_ref || `YB-${row.budget_id}`,
     budgetYear: Number(row.budget_year),
     budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
     code: row.code,
@@ -257,6 +269,7 @@ async function fetchBudgetDetail(
   const rows = await queryFn(
     `SELECT
        yb.budget_id,
+       yb.budget_ref,
        yb.budget_year,
        yb.budget_type,
        yb.code,
@@ -270,8 +283,10 @@ async function fetchBudgetDetail(
        yb.remarks,
        yb.reject_remarks,
        yb.created_at,
+       yb.created_by,
        qs.status_name,
        u.email AS requester_email,
+       u.department_id,
        d.department_name AS department,
        u.designation
      FROM yearly_budgets yb
@@ -299,6 +314,51 @@ async function fetchBudgetDetail(
   return toDetail(row, itemsByBudget.get(budgetId) ?? []);
 }
 
+function snapshotFromHodDetail(detail: HodBudgetDetail) {
+  return {
+    budgetType: detail.budgetType,
+    code: detail.code,
+    activity: detail.activity,
+    itemName: detail.itemName,
+    targetMonths: detail.targetMonths,
+    objective: detail.objective,
+    justification: detail.justification,
+    quantity: detail.quantity,
+    costPerUnit: detail.costPerUnit,
+    amount: detail.amount,
+    effectIfNotApproved: detail.effectIfNotApproved,
+    alternative: detail.alternative,
+    remarks: detail.remarks,
+    status: detail.statusName,
+  };
+}
+
+async function finishHodMutation(
+  queryFn: (sql: string, params?: unknown[]) => Promise<unknown>,
+  row: BudgetRow,
+  actorUserId: number,
+  action: "edit" | "transfer" | "update_budget",
+  remarks?: string | null,
+) {
+  const updated = await fetchBudgetDetail(
+    (sql, params) => queryFn(sql, params) as Promise<BudgetRow[]>,
+    row.budget_id,
+  );
+  await insertBudgetActionLog(queryFn, {
+    budgetId: row.budget_id,
+    budgetYear: Number(row.budget_year),
+    budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+    action,
+    actorUserId,
+    ownerUserId: row.created_by ?? actorUserId,
+    ownerDepartmentId: row.department_id ?? null,
+    remarks,
+    oldValues: budgetSnapshot(row),
+    newValues: snapshotFromHodDetail(updated),
+  });
+  return updated;
+}
+
 export const listHodBudgets = createServerFn({ method: "GET" })
   .middleware([hodOnly])
   .handler(async ({ context }): Promise<HodBudgetListItem[]> => {
@@ -310,6 +370,7 @@ export const listHodBudgets = createServerFn({ method: "GET" })
     const rows = await query<BudgetRow[]>(
       `SELECT
          yb.budget_id,
+         yb.budget_ref,
          yb.budget_year,
          yb.budget_type,
          yb.code,
@@ -355,6 +416,7 @@ export const getHodBudget = createServerFn({ method: "GET" })
     const rows = await query<BudgetRow[]>(
       `SELECT
          yb.budget_id,
+         yb.budget_ref,
          yb.budget_year,
          yb.budget_type,
          yb.code,
@@ -369,8 +431,10 @@ export const getHodBudget = createServerFn({ method: "GET" })
          yb.remarks,
          yb.reject_remarks,
          yb.created_at,
+         yb.created_by,
          qs.status_name,
          u.email AS requester_email,
+         u.department_id,
          d.department_name AS department,
          u.designation
        FROM yearly_budgets yb
@@ -441,6 +505,7 @@ export const listHodBudgetReport = createServerFn({ method: "GET" })
     const rows = await query<BudgetRow[]>(
       `SELECT
          yb.budget_id,
+         yb.budget_ref,
          yb.budget_year,
          yb.budget_type,
          yb.code,
@@ -454,8 +519,10 @@ export const listHodBudgetReport = createServerFn({ method: "GET" })
          yb.remarks,
          yb.reject_remarks,
          yb.created_at,
+         yb.created_by,
          qs.status_name,
          u.email AS requester_email,
+         u.department_id,
          d.department_name AS department,
          u.designation
        FROM yearly_budgets yb
@@ -512,6 +579,7 @@ export const reviewHodBudget = createServerFn({ method: "POST" })
     const rows = await query<BudgetRow[]>(
       `SELECT
          yb.budget_id,
+         yb.budget_ref,
          yb.budget_year,
          yb.budget_type,
          yb.code,
@@ -636,19 +704,25 @@ export const transferHodBudget = createServerFn({ method: "POST" })
     const rows = await query<BudgetRow[]>(
       `SELECT
          yb.budget_id,
+         yb.budget_ref,
          yb.budget_year,
          yb.budget_type,
          yb.code,
          yb.activity,
-         (SELECT bi.item_name
-          FROM budget_items bi
-          WHERE bi.budget_id = yb.budget_id
-          ORDER BY bi.budget_item_id ASC
-          LIMIT 1) AS item_name,
+         ${budgetItemSelect}
+         yb.target_months,
+         yb.objective,
+         yb.justification,
          yb.budget_amount,
+         yb.effect_if_not_approved,
+         yb.alternative,
+         yb.remarks,
+         yb.reject_remarks,
          yb.created_at,
+         yb.created_by,
          qs.status_name,
          u.email AS requester_email,
+         u.department_id,
          d.department_name AS department,
          u.designation
        FROM yearly_budgets yb
@@ -679,6 +753,7 @@ export const transferHodBudget = createServerFn({ method: "POST" })
         `UPDATE yearly_budgets
          SET status_id = ?,
              budget_type = 'CAPEX',
+             budget_ref = ?,
              code = ?,
              activity = NULL,
              target_months = ?,
@@ -692,6 +767,7 @@ export const transferHodBudget = createServerFn({ method: "POST" })
          WHERE budget_id = ?`,
         [
           APPROVED_BUDGET_STATUS_ID,
+          await nextBudgetRef(query, Number(row.budget_year), "CAPEX"),
           data.code,
           data.targetMonths || null,
           data.justification,
@@ -711,7 +787,7 @@ export const transferHodBudget = createServerFn({ method: "POST" })
         },
       ]);
 
-      return fetchBudgetDetail(query, data.budgetId);
+      return finishHodMutation(query, row, user.userId, "transfer", data.remarks);
     }
 
     if (row.budget_type !== "CAPEX") {
@@ -724,6 +800,7 @@ export const transferHodBudget = createServerFn({ method: "POST" })
       `UPDATE yearly_budgets
        SET status_id = ?,
            budget_type = 'OPEX',
+           budget_ref = ?,
            code = ?,
            activity = ?,
            target_months = ?,
@@ -737,6 +814,7 @@ export const transferHodBudget = createServerFn({ method: "POST" })
        WHERE budget_id = ?`,
       [
         APPROVED_BUDGET_STATUS_ID,
+        await nextBudgetRef(query, Number(row.budget_year), "OPEX"),
         data.code,
         data.activity,
         data.targetMonths || null,
@@ -758,7 +836,7 @@ export const transferHodBudget = createServerFn({ method: "POST" })
       })),
     );
 
-    return fetchBudgetDetail(query, data.budgetId);
+    return finishHodMutation(query, row, user.userId, "transfer", data.remarks);
   });
 
 export const updateHodBudget = createServerFn({ method: "POST" })
@@ -806,6 +884,7 @@ export const updateHodBudget = createServerFn({ method: "POST" })
     const rows = await query<BudgetRow[]>(
       `SELECT
          yb.budget_id,
+         yb.budget_ref,
          yb.budget_year,
          yb.budget_type,
          yb.code,
@@ -820,8 +899,10 @@ export const updateHodBudget = createServerFn({ method: "POST" })
          yb.remarks,
          yb.reject_remarks,
          yb.created_at,
+         yb.created_by,
          qs.status_name,
          u.email AS requester_email,
+         u.department_id,
          d.department_name AS department,
          u.designation
        FROM yearly_budgets yb
@@ -843,6 +924,8 @@ export const updateHodBudget = createServerFn({ method: "POST" })
       throw new Error("Rejected budgets cannot be edited.");
     }
 
+    const isApproved = mapStatus(row.status_name) === "Approved";
+
     if (
       (data.budgetType === "OPEX" && row.budget_type !== "OPEX") ||
       (data.budgetType === "CAPEX" && row.budget_type !== "CAPEX")
@@ -851,6 +934,12 @@ export const updateHodBudget = createServerFn({ method: "POST" })
     }
 
     if (data.budgetType === "CAPEX") {
+      const quantity = isApproved ? Number(row.quantity) || 1 : data.quantity;
+      const costPerUnit = isApproved
+        ? Number(row.cost_per_unit) || 0
+        : data.costPerUnit;
+      const budgetAmount = isApproved ? Number(row.budget_amount) : data.budgetAmount;
+
       await query(
         `UPDATE yearly_budgets
          SET code = ?,
@@ -865,7 +954,7 @@ export const updateHodBudget = createServerFn({ method: "POST" })
           data.code,
           data.targetMonths || null,
           data.justification,
-          data.budgetAmount,
+          budgetAmount,
           data.effectIfNotApproved || null,
           data.alternative || null,
           data.remarks || null,
@@ -875,13 +964,37 @@ export const updateHodBudget = createServerFn({ method: "POST" })
       await replaceBudgetItems(query, data.budgetId, [
         {
           itemName: data.itemName,
-          quantity: data.quantity,
-          costPerUnit: data.costPerUnit,
-          budgetAmount: data.budgetAmount,
+          quantity,
+          costPerUnit,
+          budgetAmount,
         },
       ]);
     } else {
-      const opexTotal = data.items.reduce((sum, item) => sum + item.budgetAmount, 0);
+      const existingItems = isApproved
+        ? (
+            await loadBudgetItems(
+              async (sql, params) =>
+                (await query(sql, params)) as unknown as BudgetItemRow[],
+              [data.budgetId],
+            )
+          ).get(data.budgetId) ?? []
+        : [];
+      const items = isApproved
+        ? existingItems.map((item, index) => ({
+            itemName: data.items[index]?.itemName ?? item.itemName,
+            quantity: item.quantity,
+            costPerUnit: item.costPerUnit,
+            budgetAmount: item.amount,
+          }))
+        : data.items.map((item) => ({
+            itemName: item.itemName,
+            quantity: item.quantity,
+            costPerUnit: item.costPerUnit,
+            budgetAmount: item.budgetAmount,
+          }));
+      const opexTotal = isApproved
+        ? Number(row.budget_amount)
+        : items.reduce((sum, item) => sum + item.budgetAmount, 0);
 
       await query(
         `UPDATE yearly_budgets
@@ -904,19 +1017,10 @@ export const updateHodBudget = createServerFn({ method: "POST" })
           data.budgetId,
         ],
       );
-      await replaceBudgetItems(
-        query,
-        data.budgetId,
-        data.items.map((item) => ({
-          itemName: item.itemName,
-          quantity: item.quantity,
-          costPerUnit: item.costPerUnit,
-          budgetAmount: item.budgetAmount,
-        })),
-      );
+      await replaceBudgetItems(query, data.budgetId, items);
     }
 
-    return fetchBudgetDetail(query, data.budgetId);
+    return finishHodMutation(query, row, user.userId, "edit", data.remarks);
   });
 
 export const createHodBudget = createServerFn({ method: "POST" })
@@ -957,13 +1061,15 @@ export const createHodBudget = createServerFn({ method: "POST" })
     let insertId: number;
 
     if (data.budgetType === "CAPEX") {
+      const budgetRef = await nextBudgetRef(query, data.budgetYear, "CAPEX");
       const result = await query<{ insertId: number }>(
         `INSERT INTO yearly_budgets
-           (created_by, budget_year, status_id, budget_type, code,
+           (budget_ref, created_by, budget_year, status_id, budget_type, code,
             target_months, justification, budget_amount,
             effect_if_not_approved, alternative, remarks)
-         VALUES (?, ?, ?, 'CAPEX', ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, 'CAPEX', ?, ?, ?, ?, ?, ?, ?)`,
         [
+          budgetRef,
           user.userId,
           data.budgetYear,
           APPROVED_BUDGET_STATUS_ID,
@@ -987,12 +1093,14 @@ export const createHodBudget = createServerFn({ method: "POST" })
       ]);
     } else {
       const opexTotal = data.items.reduce((sum, item) => sum + item.budgetAmount, 0);
+      const budgetRef = await nextBudgetRef(query, data.budgetYear, "OPEX");
       const result = await query<{ insertId: number }>(
         `INSERT INTO yearly_budgets
-           (created_by, budget_year, status_id, budget_type, code, activity,
+           (budget_ref, created_by, budget_year, status_id, budget_type, code, activity,
             target_months, objective, justification, budget_amount, remarks)
-         VALUES (?, ?, ?, 'OPEX', ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, 'OPEX', ?, ?, ?, ?, ?, ?, ?)`,
         [
+          budgetRef,
           user.userId,
           data.budgetYear,
           APPROVED_BUDGET_STATUS_ID,
@@ -1023,4 +1131,107 @@ export const createHodBudget = createServerFn({ method: "POST" })
     }
 
     return fetchBudgetDetail(query, insertId);
+  });
+
+export const updateHodApprovedBudget = createServerFn({ method: "POST" })
+  .validator(
+    z.discriminatedUnion("budgetType", [
+      z.object({
+        budgetId: z.number().int().positive(),
+        budgetType: z.literal("OPEX"),
+        budgetAmount: z.number().positive(),
+        remarks: z.string().trim().min(1),
+      }),
+      z.object({
+        budgetId: z.number().int().positive(),
+        budgetType: z.literal("CAPEX"),
+        quantity: z.number().int().positive(),
+        costPerUnit: z.number().positive(),
+        budgetAmount: z.number().positive(),
+        remarks: z.string().trim().min(1),
+      }),
+    ]),
+  )
+  .middleware([hodOnly])
+  .handler(async ({ data, context }): Promise<HodBudgetDetail> => {
+    const { user } = context;
+    const { query } = await import("@backend/core/db");
+    const params: unknown[] = [data.budgetId];
+    let departmentFilter = "";
+    if (user.departmentId != null) {
+      departmentFilter = "AND u.department_id = ?";
+      params.push(user.departmentId);
+    }
+
+    const rows = await query<BudgetRow[]>(
+      `SELECT
+         yb.budget_id,
+         yb.budget_ref,
+         yb.budget_year,
+         yb.budget_type,
+         yb.code,
+         yb.activity,
+         ${budgetItemSelect}
+         yb.target_months,
+         yb.objective,
+         yb.justification,
+         yb.budget_amount,
+         yb.effect_if_not_approved,
+         yb.alternative,
+         yb.remarks,
+         yb.reject_remarks,
+         yb.created_at,
+         yb.created_by,
+         qs.status_name,
+         u.email AS requester_email,
+         u.department_id,
+         d.department_name AS department,
+         u.designation
+       FROM yearly_budgets yb
+       INNER JOIN quotation_statuses qs ON qs.status_id = yb.status_id
+       INNER JOIN users u ON u.user_id = yb.created_by
+       LEFT JOIN departments d ON d.department_id = u.department_id
+       WHERE yb.budget_id = ?
+       ${departmentFilter}
+       LIMIT 1`,
+      params,
+    );
+
+    const row = rows[0];
+    if (!row) {
+      throw new Error("Budget not found. Refresh the list and try again.");
+    }
+
+    if (mapStatus(row.status_name) !== "Approved") {
+      throw new Error("Only approved budgets can change amount. Refresh and try again.");
+    }
+
+    if (
+      (data.budgetType === "OPEX" && row.budget_type !== "OPEX") ||
+      (data.budgetType === "CAPEX" && row.budget_type !== "CAPEX")
+    ) {
+      throw new Error("Budget type cannot be changed. Refresh and try again.");
+    }
+
+    if (data.budgetType === "OPEX") {
+      await query(`UPDATE yearly_budgets SET budget_amount = ? WHERE budget_id = ?`, [
+        data.budgetAmount,
+        data.budgetId,
+      ]);
+    } else {
+      await query(`UPDATE yearly_budgets SET budget_amount = ? WHERE budget_id = ?`, [
+        data.budgetAmount,
+        data.budgetId,
+      ]);
+      await query(
+        `UPDATE budget_items
+         SET quantity = ?, cost_per_unit = ?, budget_amount = ?
+         WHERE budget_id = ?
+         ORDER BY budget_item_id ASC
+         LIMIT 1`,
+        [data.quantity, data.costPerUnit, data.budgetAmount, data.budgetId],
+      );
+    }
+
+    return finishHodMutation(query, row, user.userId, "update_budget", data.remarks);
   });

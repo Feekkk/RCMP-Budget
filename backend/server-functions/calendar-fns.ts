@@ -29,6 +29,7 @@ type QuotationRow = {
 
 type BudgetRow = {
   budget_id: number;
+  budget_ref?: string | null;
   budget_year: number;
   budget_type: string;
   code: string;
@@ -130,6 +131,7 @@ export const listDepartmentCalendarEvents = createServerFn({
     const budgetRows = await query<BudgetRow[]>(
       `SELECT
          yb.budget_id,
+         yb.budget_ref,
          yb.budget_year,
          yb.budget_type,
          yb.code,
@@ -178,7 +180,7 @@ export const listDepartmentCalendarEvents = createServerFn({
       return {
         id: `yb-${row.budget_id}`,
         kind: "budget",
-        title: `YB-${row.budget_id} · ${row.budget_type} · ${title}`,
+        title: `${row.budget_ref || `YB-${row.budget_id}`} · ${row.budget_type} · ${title}`,
         detail: `${status} · ${formatRm(amount)} · ${row.requester_email}${targetHint}`,
         requester: row.requester_email,
         amount,

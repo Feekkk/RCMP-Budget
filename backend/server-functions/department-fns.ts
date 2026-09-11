@@ -17,6 +17,7 @@ export type DepartmentBudgetItem = {
 
 export type DepartmentBudgetDetail = {
   id: number;
+  budgetRef: string;
   budgetYear: number;
   budgetType: "OPEX" | "CAPEX";
   code: string;
@@ -53,6 +54,7 @@ export type DepartmentQuotationListItem = {
 
 type BudgetRow = {
   budget_id: number;
+  budget_ref?: string | null;
   budget_year: number;
   budget_type: string;
   code: string;
@@ -140,6 +142,7 @@ function toBudgetDetail(row: BudgetRow, items: DepartmentBudgetItem[]): Departme
   const first = items[0] ?? null;
   return {
     id: row.budget_id,
+    budgetRef: row.budget_ref || `YB-${row.budget_id}`,
     budgetYear: Number(row.budget_year),
     budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
     code: row.code,
@@ -228,6 +231,7 @@ export const listDepartmentBudgetReport = createServerFn({ method: "GET" })
     const rows = await query<BudgetRow[]>(
       `SELECT
          yb.budget_id,
+         yb.budget_ref,
          yb.budget_year,
          yb.budget_type,
          yb.code,

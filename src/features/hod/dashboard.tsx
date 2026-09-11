@@ -336,7 +336,7 @@ export function HodDashboard() {
             kind: "budget" as const,
             title: row.title,
             requester: row.requester,
-            ref: `YB-${row.id}`,
+            ref: row.budgetRef,
             amount: row.amount,
             status: row.status,
             createdAt: row.createdAt,

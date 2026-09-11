@@ -12,6 +12,7 @@ import {
   Pencil,
   Plus,
   Receipt,
+  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -36,6 +37,7 @@ import {
   reviewHodBudget,
   transferHodBudget,
   updateHodBudget,
+  updateHodApprovedBudget,
   type HodBudgetDetail,
   type HodBudgetItem,
 } from "@backend/server-functions/hod-budget-fns";
@@ -44,6 +46,10 @@ import {
   reviewHodQuotation,
   type HodQuotationListItem,
 } from "@backend/server-functions/hod-quotation-fns";
+import {
+  UpdateApprovedBudgetForm,
+  type UpdateApprovedBudgetPayload,
+} from "@/features/budget-action-log-list";
 
 const CAPEX_CATEGORIES: Record<string, string> = {
   "200-1100": "Renovation",
@@ -235,10 +241,12 @@ function HodOpexItemsEditor({
   rows,
   onChange,
   disabled,
+  lockAmounts,
 }: {
   rows: OpexCostRow[];
   onChange: (rows: OpexCostRow[]) => void;
   disabled?: boolean;
+  lockAmounts?: boolean;
 }) {
   const updateRow = (id: number, patch: Partial<OpexCostRow>) => {
     onChange(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -277,7 +285,7 @@ function HodOpexItemsEditor({
                 <div className="flex items-center gap-0.5 rounded-full border border-foreground/10 p-0.5">
                   <button
                     type="button"
-                    disabled={disabled}
+                    disabled={disabled || lockAmounts}
                     onClick={() =>
                       updateRow(row.id, {
                         quantity: Math.max(1, row.quantity - 1),
@@ -293,7 +301,7 @@ function HodOpexItemsEditor({
                   </span>
                   <button
                     type="button"
-                    disabled={disabled}
+                    disabled={disabled || lockAmounts}
                     onClick={() =>
                       updateRow(row.id, { quantity: row.quantity + 1 })
                     }
@@ -317,7 +325,7 @@ function HodOpexItemsEditor({
                     })
                   }
                   placeholder="0.00"
-                  disabled={disabled}
+                  disabled={disabled || lockAmounts}
                   className="h-10 rounded-lg tabular-nums"
                 />
               </div>
@@ -328,7 +336,7 @@ function HodOpexItemsEditor({
                 </span>
               </div>
               <div className="flex justify-end sm:justify-center">
-                {rows.length > 1 && (
+                {rows.length > 1 && !lockAmounts && (
                   <button
                     type="button"
                     disabled={disabled}
@@ -344,6 +352,7 @@ function HodOpexItemsEditor({
           ))}
         </div>
       </div>
+      {!lockAmounts && (
       <button
         type="button"
         disabled={disabled}
@@ -353,6 +362,7 @@ function HodOpexItemsEditor({
         <Plus className="h-4 w-4" />
         Add item
       </button>
+      )}
       <div className="rounded-2xl bg-ivory px-4 py-3">
         <p className="text-xs text-foreground/50">Total OPEX budget</p>
         <p className="mt-1 font-display text-2xl tabular-nums">
@@ -382,6 +392,8 @@ export function HodReportPage() {
   const [editBudgetRow, setEditBudgetRow] = useState<HodBudgetDetail | null>(
     null,
   );
+  const [updateBudgetRow, setUpdateBudgetRow] =
+    useState<HodBudgetDetail | null>(null);
   const [addBudgetType, setAddBudgetType] = useState<"OPEX" | "CAPEX" | null>(
     null,
   );
@@ -496,6 +508,9 @@ export function HodReportPage() {
     }
   };
 
+  const budgetLabel = (id: number) =>
+    budgets.find((row) => row.id === id)?.budgetRef ?? "this budget";
+
   const reviewBudget = async (
     id: number,
     decision: "Approved" | "Rejected",
@@ -505,7 +520,9 @@ export function HodReportPage() {
     if (reviewingKey != null) return;
     setReviewingKey(key);
     const toastId = toast.loading(
-      decision === "Approved" ? `Approving YB-${id}…` : `Rejecting YB-${id}…`,
+      decision === "Approved"
+        ? `Approving ${budgetLabel(id)}…`
+        : `Rejecting ${budgetLabel(id)}…`,
     );
     try {
       const updated = await reviewHodBudget({
@@ -527,7 +544,7 @@ export function HodReportPage() {
         ),
       );
       setRejectBudget(null);
-      toast.success(`YB-${id} ${decision.toLowerCase()}`, {
+      toast.success(`${budgetLabel(id)} ${decision.toLowerCase()}`, {
         id: toastId,
         description:
           decision === "Approved"
@@ -538,7 +555,7 @@ export function HodReportPage() {
       toast.error(
         error instanceof Error
           ? error.message
-          : `Could not update YB-${id}. Try again.`,
+          : `Could not update ${budgetLabel(id)}. Try again.`,
         { id: toastId },
       );
     } finally {
@@ -551,7 +568,7 @@ export function HodReportPage() {
     if (reviewingKey != null) return;
     setReviewingKey(key);
     const toastId = toast.loading(
-      `Transferring YB-${id} to ${payload.targetType}…`,
+      `Transferring ${budgetLabel(id)} to ${payload.targetType}…`,
     );
     try {
       const updated = await transferHodBudget({
@@ -561,7 +578,7 @@ export function HodReportPage() {
         prev.map((row) => (row.id === id ? updated : row)),
       );
       setTransferBudgetRow(null);
-      toast.success(`YB-${id} transferred to ${payload.targetType}`, {
+      toast.success(`${budgetLabel(id)} transferred to ${payload.targetType}`, {
         id: toastId,
         description: `This budget is now approved under ${payload.targetType}.`,
       });
@@ -569,7 +586,7 @@ export function HodReportPage() {
       toast.error(
         error instanceof Error
           ? error.message
-          : `Could not transfer YB-${id}. Try again.`,
+          : `Could not transfer ${budgetLabel(id)}. Try again.`,
         { id: toastId },
       );
     } finally {
@@ -581,7 +598,7 @@ export function HodReportPage() {
     const key = `yb-${id}`;
     if (reviewingKey != null) return;
     setReviewingKey(key);
-    const toastId = toast.loading(`Saving YB-${id}…`);
+    const toastId = toast.loading(`Saving ${budgetLabel(id)}…`);
     try {
       const updated = await updateHodBudget({
         data: { budgetId: id, ...payload },
@@ -590,7 +607,7 @@ export function HodReportPage() {
         prev.map((row) => (row.id === id ? updated : row)),
       );
       setEditBudgetRow(null);
-      toast.success(`YB-${id} updated`, {
+      toast.success(`${budgetLabel(id)} updated`, {
         id: toastId,
         description: "Budget details were saved.",
       });
@@ -598,7 +615,39 @@ export function HodReportPage() {
       toast.error(
         error instanceof Error
           ? error.message
-          : `Could not save YB-${id}. Try again.`,
+          : `Could not save ${budgetLabel(id)}. Try again.`,
+        { id: toastId },
+      );
+    } finally {
+      setReviewingKey(null);
+    }
+  };
+
+  const updateApprovedAmount = async (
+    id: number,
+    payload: UpdateApprovedBudgetPayload,
+  ) => {
+    const key = `yb-${id}`;
+    if (reviewingKey != null) return;
+    setReviewingKey(key);
+    const toastId = toast.loading(`Updating ${budgetLabel(id)}…`);
+    try {
+      const updated = await updateHodApprovedBudget({
+        data: { budgetId: id, ...payload },
+      });
+      setBudgets((prev) =>
+        prev.map((row) => (row.id === id ? updated : row)),
+      );
+      setUpdateBudgetRow(null);
+      toast.success(`${budgetLabel(id)} amount updated`, {
+        id: toastId,
+        description: "The approved amount was saved.",
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Could not update ${budgetLabel(id)}. Try again.`,
         { id: toastId },
       );
     } finally {
@@ -618,7 +667,7 @@ export function HodReportPage() {
       setAddBudgetType(null);
       toast.success(`${payload.budgetType} line added`, {
         id: toastId,
-        description: `YB-${created.id} is now on this year's report.`,
+        description: `${created.budgetRef} is now on this year's report.`,
       });
     } catch (error) {
       toast.error(
@@ -785,6 +834,7 @@ export function HodReportPage() {
                     onReject={setRejectBudget}
                     onTransfer={setTransferBudgetRow}
                     onEdit={setEditBudgetRow}
+                    onUpdateBudget={setUpdateBudgetRow}
                   />
                 )}
               </div>
@@ -834,6 +884,7 @@ export function HodReportPage() {
                     onReject={setRejectBudget}
                     onTransfer={setTransferBudgetRow}
                     onEdit={setEditBudgetRow}
+                    onUpdateBudget={setUpdateBudgetRow}
                   />
                 )}
               </div>
@@ -929,6 +980,31 @@ export function HodReportPage() {
               reviewing={reviewingKey === `yb-${editBudgetRow.id}`}
               onClose={() => setEditBudgetRow(null)}
               onSave={(payload) => void editBudget(editBudgetRow.id, payload)}
+            />
+          </DetailOverlay>,
+          document.body,
+        )}
+
+      {updateBudgetRow &&
+        createPortal(
+          <DetailOverlay
+            onClose={() => {
+              if (reviewingKey != null) return;
+              setUpdateBudgetRow(null);
+            }}
+          >
+            <UpdateApprovedBudgetForm
+              budgetId={updateBudgetRow.id}
+              budgetRef={updateBudgetRow.budgetRef}
+              budgetType={updateBudgetRow.budgetType}
+              amount={updateBudgetRow.amount}
+              quantity={updateBudgetRow.quantity}
+              costPerUnit={updateBudgetRow.costPerUnit}
+              saving={reviewingKey === `yb-${updateBudgetRow.id}`}
+              onClose={() => setUpdateBudgetRow(null)}
+              onSave={(payload) =>
+                void updateApprovedAmount(updateBudgetRow.id, payload)
+              }
             />
           </DetailOverlay>,
           document.body,
@@ -1149,6 +1225,7 @@ function BudgetActions({
   onReject,
   onTransfer,
   onEdit,
+  onUpdateBudget,
 }: {
   row: HodBudgetDetail;
   reviewing: boolean;
@@ -1156,6 +1233,7 @@ function BudgetActions({
   onReject: () => void;
   onTransfer: () => void;
   onEdit: () => void;
+  onUpdateBudget: () => void;
 }) {
   return (
     <div className="flex items-center justify-center gap-1.5">
@@ -1192,6 +1270,18 @@ function BudgetActions({
             <ArrowRightLeft className="h-3.5 w-3.5" />
           </button>
         </>
+      )}
+      {row.status === "Approved" && (
+        <button
+          type="button"
+          onClick={onUpdateBudget}
+          disabled={reviewing}
+          aria-label="Update budget"
+          title="Update budget"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-lime/70 text-lime-foreground transition hover:brightness-95 disabled:opacity-50"
+        >
+          <Wallet className="h-3.5 w-3.5" />
+        </button>
       )}
       <button
         type="button"
@@ -1269,7 +1359,7 @@ function RejectBudgetCard({
           <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
             Reject budget
           </p>
-          <h2 className="mt-1 font-display text-3xl">YB-{detail.id}</h2>
+          <h2 className="mt-1 font-display text-3xl">{detail.budgetRef}</h2>
           <p className="mt-1 text-sm text-foreground/60">
             {detail.budgetType === "CAPEX"
               ? detail.itemName || "Capital expenditure"
@@ -1472,7 +1562,7 @@ function TransferBudgetCard({
           <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
             Transfer to {targetType}
           </p>
-          <h2 className="mt-1 font-display text-3xl">YB-{detail.id}</h2>
+          <h2 className="mt-1 font-display text-3xl">{detail.budgetRef}</h2>
           <p className="mt-1 text-sm text-foreground/60">
             From {sourceType} · RM {formatRm(detail.amount)} · {detail.requester}
           </p>
@@ -1747,6 +1837,7 @@ function EditBudgetCard({
   onSave: (payload: EditBudgetInput) => void;
 }) {
   const isCapex = detail.budgetType === "CAPEX";
+  const lockAmounts = detail.status === "Approved";
   const [capexCode, setCapexCode] = useState<
     (typeof CAPEX_CODES)[number]["value"] | ""
   >(
@@ -1796,7 +1887,7 @@ function EditBudgetCard({
         toast.error("Add a justification to continue.");
         return;
       }
-      if (unitValue <= 0) {
+      if (!lockAmounts && unitValue <= 0) {
         toast.error("Enter a cost per unit above zero.");
         return;
       }
@@ -1806,9 +1897,9 @@ function EditBudgetCard({
         itemName: itemName.trim(),
         justification: justification.trim(),
         targetMonths: targetMonths || undefined,
-        quantity,
-        costPerUnit: unitValue,
-        budgetAmount: estimatedPrice,
+        quantity: lockAmounts ? (detail.quantity ?? 1) : quantity,
+        costPerUnit: lockAmounts ? (detail.costPerUnit ?? unitValue) : unitValue,
+        budgetAmount: lockAmounts ? detail.amount : estimatedPrice,
         effectIfNotApproved: effectIfNotApproved.trim() || undefined,
         alternative: alternative.trim() || undefined,
         remarks: remarks.trim() || undefined,
@@ -1856,7 +1947,7 @@ function EditBudgetCard({
           <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
             Edit {detail.budgetType}
           </p>
-          <h2 className="mt-1 font-display text-3xl">YB-{detail.id}</h2>
+          <h2 className="mt-1 font-display text-3xl">{detail.budgetRef}</h2>
           <p className="mt-1 text-sm text-foreground/60">
             RM {formatRm(detail.amount)} · {detail.requester}
           </p>
@@ -1932,7 +2023,7 @@ function EditBudgetCard({
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor={`edit-qty-${detail.id}`}>Quantity</Label>
                 <Input
                   id={`edit-qty-${detail.id}`}
@@ -1943,11 +2034,11 @@ function EditBudgetCard({
                   onChange={(e) =>
                     setQuantity(Math.max(1, Number(e.target.value) || 1))
                   }
-                  disabled={reviewing}
+                  disabled={reviewing || lockAmounts}
                   className="h-11 rounded-xl tabular-nums"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 <Label htmlFor={`edit-unit-${detail.id}`}>
                   Cost per unit (RM)
                 </Label>
@@ -1959,7 +2050,7 @@ function EditBudgetCard({
                     setCostPerUnit(e.target.value.replace(/[^\d.]/g, ""))
                   }
                   placeholder="0.00"
-                  disabled={reviewing}
+                  disabled={reviewing || lockAmounts}
                   className="h-11 rounded-xl tabular-nums"
                 />
               </div>
@@ -1967,7 +2058,7 @@ function EditBudgetCard({
             <div className="rounded-2xl bg-ivory px-4 py-3">
               <p className="text-xs text-foreground/50">Estimated price</p>
               <p className="mt-1 font-display text-2xl tabular-nums">
-                RM {formatRm(estimatedPrice)}
+                RM {formatRm(lockAmounts ? detail.amount : estimatedPrice)}
               </p>
             </div>
             <div className="space-y-2">
@@ -2074,6 +2165,7 @@ function EditBudgetCard({
                 rows={opexCostRows}
                 onChange={setOpexCostRows}
                 disabled={reviewing}
+                lockAmounts={lockAmounts}
               />
             </div>
           </>
@@ -2481,6 +2573,7 @@ function OpexTable({
   onReject,
   onTransfer,
   onEdit,
+  onUpdateBudget,
 }: {
   rows: HodBudgetDetail[];
   total: number;
@@ -2489,6 +2582,7 @@ function OpexTable({
   onReject: (row: HodBudgetDetail) => void;
   onTransfer: (row: HodBudgetDetail) => void;
   onEdit: (row: HodBudgetDetail) => void;
+  onUpdateBudget: (row: HodBudgetDetail) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-foreground/15">
@@ -2571,6 +2665,7 @@ function OpexTable({
                     onReject={() => onReject(row)}
                     onTransfer={() => onTransfer(row)}
                     onEdit={() => onEdit(row)}
+                    onUpdateBudget={() => onUpdateBudget(row)}
                   />
                 </td>
               </tr>
@@ -2608,6 +2703,7 @@ function CapexTable({
   onReject,
   onTransfer,
   onEdit,
+  onUpdateBudget,
 }: {
   rows: HodBudgetDetail[];
   year: number;
@@ -2617,6 +2713,7 @@ function CapexTable({
   onReject: (row: HodBudgetDetail) => void;
   onTransfer: (row: HodBudgetDetail) => void;
   onEdit: (row: HodBudgetDetail) => void;
+  onUpdateBudget: (row: HodBudgetDetail) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-foreground/15">
@@ -2727,6 +2824,7 @@ function CapexTable({
                   onReject={() => onReject(row)}
                   onTransfer={() => onTransfer(row)}
                   onEdit={() => onEdit(row)}
+                  onUpdateBudget={() => onUpdateBudget(row)}
                 />
               </td>
             </tr>
