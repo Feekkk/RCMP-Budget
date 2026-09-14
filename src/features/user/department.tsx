@@ -756,12 +756,12 @@ function CapexTable({
                 </td>
                 <td className="border border-foreground/15 px-3 py-3 text-center">
                   {CAPEX_CATEGORIES[row.code] || row.code}
-                </td>
-                <td className="border border-foreground/15 px-3 py-3 font-medium">
-                  {item.itemName || "—"}
                   <p className="mt-1 text-xs font-normal text-foreground/50">
                     {row.code}
                   </p>
+                </td>
+                <td className="border border-foreground/15 px-3 py-3 font-medium">
+                  {item.itemName || "—"}
                 </td>
                 <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
                   {row.justification}
@@ -793,6 +793,9 @@ function CapexTable({
                   >
                     {row.status}
                   </span>
+                  <p className="mt-1.5 text-[11px] font-normal leading-snug text-foreground/50">
+                    {row.requester || "—"}
+                  </p>
                 </td>
               </tr>
             ))}
