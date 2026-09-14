@@ -183,11 +183,41 @@ function fallbackHodItems(row: HodBudgetDetail): HodBudgetItem[] {
   ];
 }
 
-function formatOpexItemBreakdown(items: HodBudgetItem[]) {
-  return items.map((item) => {
-    const name = item.itemName?.trim() || "Item";
-    return `${name} — ${item.quantity} × RM ${formatRm(item.costPerUnit)} = RM ${formatRm(item.amount)}`;
-  });
+function OpexCostBreakdown({ items }: { items: HodBudgetItem[] }) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mt-2 space-y-2 border-t border-foreground/10 pt-2">
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className="rounded-lg bg-ivory/80 px-2.5 py-2"
+        >
+          <p className="text-xs font-medium text-foreground">
+            {item.itemName?.trim() || "Item"}
+          </p>
+          <dl className="mt-1.5 space-y-0.5 text-[11px] leading-snug">
+            <div className="flex justify-between gap-3">
+              <dt className="text-foreground/45">Qty</dt>
+              <dd className="tabular-nums text-foreground/80">{item.quantity}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-foreground/45">Each</dt>
+              <dd className="tabular-nums text-foreground/80">
+                RM {formatRm(item.costPerUnit)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-foreground/45">Total</dt>
+              <dd className="font-medium tabular-nums">
+                RM {formatRm(item.amount)}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 let hodOpexRowId = 1;
@@ -2621,7 +2651,6 @@ function OpexTable({
         <tbody>
           {rows.map((row, index) => {
             const items = fallbackHodItems(row);
-            const itemLines = formatOpexItemBreakdown(items);
 
             return (
               <tr key={row.id} className="align-top odd:bg-background even:bg-ivory/40">
@@ -2640,15 +2669,9 @@ function OpexTable({
                 <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
                   {row.objective || "—"}
                 </td>
-                <td className="border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
+                <td className="min-w-[220px] border border-foreground/15 px-3 py-3 whitespace-pre-wrap">
                   <p>{row.justification}</p>
-                  {itemLines.length > 0 && (
-                    <ul className="mt-2 space-y-1 border-t border-foreground/10 pt-2 text-xs text-foreground/75">
-                      {itemLines.map((line, itemIndex) => (
-                        <li key={`${row.id}-item-${itemIndex}`}>{line}</li>
-                      ))}
-                    </ul>
-                  )}
+                  <OpexCostBreakdown items={items} />
                 </td>
                 <td className="border border-foreground/15 px-3 py-3 text-right font-medium tabular-nums">
                   {formatRm(row.amount)}
@@ -2662,6 +2685,9 @@ function OpexTable({
                   >
                     {row.status}
                   </span>
+                  <p className="mt-1.5 text-[11px] font-normal leading-snug text-foreground/50">
+                    {row.requester || "—"}
+                  </p>
                 </td>
                 <td className="border border-foreground/15 px-3 py-3 text-center">
                   <BudgetActions
