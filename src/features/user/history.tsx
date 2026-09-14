@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   CalendarDays,
   Building2,
+  Info,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -1305,9 +1306,24 @@ function BudgetDetailCard({
                 <div className="flex h-11 items-center rounded-xl border border-foreground/10 bg-ivory px-4 font-display text-xl tabular-nums">
                   {formatRm(detail.amount)}
                 </div>
-                <p className="text-xs text-foreground/50">
-                  Use Update budget to change quantity, unit cost, or amount.
-                </p>
+                <div className="flex flex-col gap-2 rounded-xl bg-amber-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-800" />
+                    <p className="text-xs leading-relaxed text-amber-900/75">
+                      Quantity and unit cost stay as they are here. To change
+                      the amount, update the budget.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUpdateOpen(true)}
+                    disabled={saving || updating || !canUpdateBudget}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-amber-400 px-4 py-2 text-xs font-medium text-amber-950 transition hover:brightness-95 disabled:opacity-50"
+                  >
+                    <Wallet className="h-3.5 w-3.5" />
+                    Update amount
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-effect">
@@ -1413,19 +1429,30 @@ function BudgetDetailCard({
                     No items on this request
                   </div>
                 )}
-                <p className="text-xs text-foreground/50">
-                  Item names can be edited here. Use Update budget to change
-                  quantity or cost.
-                </p>
+                <div className="flex flex-col gap-2 rounded-xl bg-amber-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-800" />
+                    <p className="text-xs leading-relaxed text-amber-900/75">
+                      You can rename items here. To change quantity or amount,
+                      update the budget.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUpdateOpen(true)}
+                    disabled={saving || updating || !canUpdateBudget}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-amber-400 px-4 py-2 text-xs font-medium text-amber-950 transition hover:brightness-95 disabled:opacity-50"
+                  >
+                    <Wallet className="h-3.5 w-3.5" />
+                    Update amount
+                  </button>
+                </div>
               </div>
               <div className="flex flex-col gap-2">
                 <Label>OPEX budget (RM)</Label>
                 <div className="flex h-11 items-center rounded-xl border border-foreground/10 bg-ivory px-4 font-display text-xl tabular-nums">
                   {formatRm(detail.amount)}
                 </div>
-                <p className="text-xs text-foreground/50">
-                  Use Update budget to change quantity, unit cost, or amount.
-                </p>
               </div>
             </>
           )}
@@ -1446,7 +1473,7 @@ function BudgetDetailCard({
               type="button"
               onClick={() => void handleResubmit()}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full bg-lime px-5 py-2.5 text-sm font-medium text-lime-foreground transition hover:brightness-95 disabled:opacity-50"
             >
               {saving
                 ? isResubmit
