@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Plus,
   Clock,
@@ -19,6 +19,9 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   ArrowRightLeft,
+  ArrowLeft,
+  CalendarDays,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -51,7 +54,7 @@ import {
   type BudgetDetail,
   type BudgetListItem,
 } from "@backend/server-functions/budget-fns";
-import { listMyBudgetLogs, type BudgetActionLog } from "@backend/server-functions/budget-log-fns";
+import { listMyBudgetLogsForBudget, type BudgetActionLog } from "@backend/server-functions/budget-log-fns";
 import { isYearlyBudgetFormEnabled } from "@backend/server-functions/settings-fns";
 import {
   generatePurchaseRequisition,
@@ -67,7 +70,6 @@ import {
 import {
   BudgetLogList,
   UpdateApprovedBudgetForm,
-  filterBudgetLogs,
   type UpdateApprovedBudgetPayload,
 } from "@/features/budget-action-log-list";
 
@@ -125,32 +127,28 @@ function StatusPill({ status }: { status: Status }) {
 
 export function HistoryPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"quotations" | "budgets" | "logs">("quotations");
+  const [tab, setTab] = useState<"quotations" | "budgets">("quotations");
   const [filter, setFilter] = useState<(typeof filters)[number]>("All");
   const [query, setQuery] = useState("");
   const [quotations, setQuotations] = useState<QuotationListItem[]>([]);
   const [budgets, setBudgets] = useState<BudgetListItem[]>([]);
-  const [logs, setLogs] = useState<BudgetActionLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedQuotationId, setSelectedQuotationId] = useState<number | null>(
     null,
   );
-  const [selectedBudgetId, setSelectedBudgetId] = useState<number | null>(null);
   const [quotationDetail, setQuotationDetail] =
     useState<QuotationDetail | null>(null);
-  const [budgetDetail, setBudgetDetail] = useState<BudgetDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [generatingPrfId, setGeneratingPrfId] = useState<number | null>(null);
   const [budgetFormEnabled, setBudgetFormEnabled] = useState(true);
 
   useEffect(() => {
     let active = true;
-    Promise.all([listMyQuotations(), listMyBudgets(), listMyBudgetLogs()])
-      .then(([quotationRows, budgetRows, logRows]) => {
+    Promise.all([listMyQuotations(), listMyBudgets()])
+      .then(([quotationRows, budgetRows]) => {
         if (!active) return;
         setQuotations(quotationRows);
         setBudgets(budgetRows);
-        setLogs(logRows);
       })
       .catch((error) => {
         if (!active) return;
@@ -212,36 +210,6 @@ export function HistoryPage() {
     };
   }, [selectedQuotationId]);
 
-  useEffect(() => {
-    if (selectedBudgetId == null) {
-      setBudgetDetail(null);
-      return;
-    }
-
-    let active = true;
-    setDetailLoading(true);
-    getMyBudget({ data: { budgetId: selectedBudgetId } })
-      .then((row) => {
-        if (active) setBudgetDetail(row);
-      })
-      .catch((error) => {
-        if (!active) return;
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Could not open this budget. Try again.",
-        );
-        setSelectedBudgetId(null);
-      })
-      .finally(() => {
-        if (active) setDetailLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [selectedBudgetId]);
-
   const visibleQuotations = useMemo(
     () =>
       quotations.filter(
@@ -264,11 +232,6 @@ export function HistoryPage() {
             .includes(query.toLowerCase().trim()),
       ),
     [budgets, filter, query],
-  );
-
-  const visibleLogs = useMemo(
-    () => filterBudgetLogs(logs, query),
-    [logs, query],
   );
 
   const currentYear = new Date().getFullYear();
@@ -327,15 +290,7 @@ export function HistoryPage() {
 
   const closeDetail = () => {
     setSelectedQuotationId(null);
-    setSelectedBudgetId(null);
     setQuotationDetail(null);
-    setBudgetDetail(null);
-  };
-
-  const refreshLogs = () => {
-    void listMyBudgetLogs()
-      .then(setLogs)
-      .catch(() => {});
   };
 
   return (
@@ -415,7 +370,7 @@ export function HistoryPage() {
           <Tabs
             value={tab}
             onValueChange={(value) => {
-              setTab(value as "quotations" | "budgets" | "logs");
+              setTab(value as "quotations" | "budgets");
               setFilter("All");
               setQuery("");
             }}
@@ -440,15 +395,6 @@ export function HistoryPage() {
                     {budgets.length}
                   </span>
                 </TabsTrigger>
-                <TabsTrigger
-                  value="logs"
-                  className="rounded-full px-4 py-2 data-[state=active]:bg-background"
-                >
-                  Log
-                  <span className="ml-2 rounded-full bg-foreground/5 px-2 py-0.5 text-xs tabular-nums">
-                    {logs.length}
-                  </span>
-                </TabsTrigger>
               </TabsList>
 
               <div className="relative w-full sm:w-64">
@@ -457,18 +403,13 @@ export function HistoryPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={
-                    tab === "quotations"
-                      ? "Search quotations"
-                      : tab === "logs"
-                        ? "Search logs"
-                        : "Search budgets"
+                    tab === "quotations" ? "Search quotations" : "Search budgets"
                   }
                   className="h-11 rounded-full pl-11"
                 />
               </div>
             </div>
 
-            {tab !== "logs" && (
             <div className="mt-4 flex items-center gap-1 rounded-full border border-foreground/10 p-1 w-fit">
               {filters.map((option) => (
                 <button
@@ -486,7 +427,6 @@ export function HistoryPage() {
                 </button>
               ))}
             </div>
-            )}
 
             <TabsContent value="quotations" className="mt-4">
               {loading ? (
@@ -551,9 +491,9 @@ export function HistoryPage() {
                 <ul className="divide-y divide-foreground/10">
                   {visibleBudgets.map((row) => (
                     <li key={row.id}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedBudgetId(row.id)}
+                      <Link
+                        to="/user/history/$budgetId"
+                        params={{ budgetId: String(row.id) }}
                         className="flex w-full flex-wrap items-center justify-between gap-4 py-4 text-left transition hover:bg-ivory/60"
                       >
                         <div className="min-w-0">
@@ -586,23 +526,11 @@ export function HistoryPage() {
                           </span>
                           <StatusPill status={row.status} />
                         </div>
-                      </button>
+                      </Link>
                     </li>
                   ))}
                 </ul>
               )}
-            </TabsContent>
-
-            <TabsContent value="logs" className="mt-4">
-              <BudgetLogList
-                logs={visibleLogs}
-                loading={loading}
-                emptyMessage={
-                  logs.length === 0
-                    ? "No budget logs yet. Edit, transfer, delete, or update a budget to see them here."
-                    : "No logs match your search."
-                }
-              />
             </TabsContent>
           </Tabs>
         </div>
@@ -630,51 +558,123 @@ export function HistoryPage() {
           document.body,
         )}
 
-      {selectedBudgetId != null &&
-        createPortal(
-          <DetailOverlay onClose={closeDetail}>
-            {detailLoading || !budgetDetail ? (
-              <p className="py-12 text-center text-sm text-foreground/50">
-                Loading budget details
-              </p>
-            ) : (
-              <BudgetDetailCard
-                key={`${budgetDetail.id}-${budgetDetail.budgetType}`}
-                detail={budgetDetail}
-                formEnabled={budgetFormEnabled}
-                onClose={closeDetail}
-                onResubmitted={(updated) => {
-                  setBudgetDetail(updated);
-                  setBudgets((prev) =>
-                    prev.map((row) =>
-                      row.id === updated.id
-                        ? {
-                            ...row,
-                            budgetType: updated.budgetType,
-                            title:
-                              updated.budgetType === "CAPEX"
-                                ? updated.itemName || row.title
-                                : updated.activity || row.title,
-                            code: updated.code,
-                            amount: updated.amount,
-                            status: updated.status,
-                            statusName: updated.statusName,
-                          }
-                        : row,
-                    ),
-                  );
-                  refreshLogs();
-                }}
-                onDeleted={(budgetId) => {
-                  setBudgets((prev) => prev.filter((row) => row.id !== budgetId));
-                  refreshLogs();
-                  closeDetail();
-                }}
-              />
-            )}
-          </DetailOverlay>,
-          document.body,
-        )}
+    </div>
+  );
+}
+
+export function HistoryBudgetDetailPage({ budgetId }: { budgetId: number }) {
+  const navigate = useNavigate();
+  const [detail, setDetail] = useState<BudgetDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [budgetFormEnabled, setBudgetFormEnabled] = useState(true);
+  const [logs, setLogs] = useState<BudgetActionLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    isYearlyBudgetFormEnabled()
+      .then((enabled) => {
+        if (active) setBudgetFormEnabled(enabled);
+      })
+      .catch(() => {
+        if (active) setBudgetFormEnabled(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!Number.isFinite(budgetId) || budgetId <= 0) {
+      toast.error("This budget could not be found. Open it from History.");
+      void navigate({ to: "/user/history" });
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+    getMyBudget({ data: { budgetId } })
+      .then((row) => {
+        if (active) setDetail(row);
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not open this budget. Try again.",
+        );
+        void navigate({ to: "/user/history" });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [budgetId, navigate]);
+
+  useEffect(() => {
+    if (!Number.isFinite(budgetId) || budgetId <= 0) return;
+
+    let active = true;
+    setLogsLoading(true);
+    listMyBudgetLogsForBudget({ data: { budgetId } })
+      .then((rows) => {
+        if (active) setLogs(rows);
+      })
+      .catch(() => {
+        if (active) setLogs([]);
+      })
+      .finally(() => {
+        if (active) setLogsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [budgetId]);
+
+  const goBack = () => {
+    void navigate({ to: "/user/history" });
+  };
+
+  return (
+    <div className="flex h-screen flex-col overflow-hidden bg-ivory text-foreground md:flex-row">
+      <Sidebar />
+      <main className="flex-1 overflow-y-auto p-6 md:p-12">
+        <Link
+          to="/user/history"
+          activeOptions={{ exact: true }}
+          className="inline-flex items-center gap-2 text-sm text-foreground/55 transition hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to History
+        </Link>
+        <div className="mt-6">
+          {loading || !detail ? (
+            <p className="py-16 text-center text-sm text-foreground/50">
+              Loading budget details
+            </p>
+          ) : (
+            <BudgetDetailCard
+              key={`${detail.id}-${detail.budgetType}`}
+              detail={detail}
+              formEnabled={budgetFormEnabled}
+              logs={logs}
+              logsLoading={logsLoading}
+              onResubmitted={(updated) => {
+                setDetail(updated);
+                void listMyBudgetLogsForBudget({ data: { budgetId: updated.id } })
+                  .then(setLogs)
+                  .catch(() => {});
+              }}
+              onDeleted={goBack}
+            />
+          )}
+        </div>
+      </main>
     </div>
   );
 }
@@ -934,13 +934,15 @@ function QuotationDetailCard({
 function BudgetDetailCard({
   detail,
   formEnabled,
-  onClose,
+  logs,
+  logsLoading,
   onResubmitted,
   onDeleted,
 }: {
   detail: BudgetDetail;
   formEnabled: boolean;
-  onClose: () => void;
+  logs: BudgetActionLog[];
+  logsLoading: boolean;
   onResubmitted: (detail: BudgetDetail) => void;
   onDeleted: (budgetId: number) => void;
 }) {
@@ -1201,37 +1203,30 @@ function BudgetDetailCard({
     }
   };
 
-  return (
-    <div>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
-            Yearly budget · {detail.budgetType}
-          </p>
-          <h2 className="mt-1 font-display text-3xl">{detail.budgetRef}</h2>
-          <p className="mt-1 text-sm text-foreground/60">
-            FY {detail.budgetYear} · Submitted {detail.date}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
-          >
-            <StatusIcon className="h-3.5 w-3.5" />
-            {detail.status}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close details"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-foreground/50 transition hover:bg-ivory hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+  const title =
+    (isCapex ? detail.itemName : detail.activity)?.trim() || detail.budgetRef;
 
+  return (
+    <div className="mx-auto max-w-5xl">
       {editing ? (
+        <div className="rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
+                Yearly budget · {detail.budgetType}
+              </p>
+              <h1 className="mt-1 font-display text-4xl">{detail.budgetRef}</h1>
+              <p className="mt-2 text-sm text-foreground/60">
+                FY {detail.budgetYear} · Submitted {detail.date}
+              </p>
+            </div>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+            >
+              <StatusIcon className="h-3.5 w-3.5" />
+              {detail.status}
+            </span>
+          </div>
         <div className="mt-6 space-y-4">
           <DetailField label="Submitted by" value={detail.createdByEmail} />
           <DetailField label="Department" value={detail.department || "—"} />
@@ -1471,129 +1466,226 @@ function BudgetDetailCard({
             </button>
           </div>
         </div>
+        </div>
       ) : (
         <>
-          <dl className="mt-6 space-y-4">
-            <DetailField label="Submitted by" value={detail.createdByEmail} />
-            <DetailField
-              label="Department"
-              value={detail.department || "—"}
-            />
-            <DetailField
+          <div className="overflow-hidden rounded-[1.5rem] bg-background shadow-card">
+            <div className="grid lg:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="p-6 md:p-8">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={cn(
+                      "rounded-full px-2.5 py-0.5 text-[11px] font-medium tracking-wide uppercase",
+                      isCapex
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-sky-100 text-sky-800",
+                    )}
+                  >
+                    {detail.budgetType}
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}
+                  >
+                    <StatusIcon className="h-3.5 w-3.5" />
+                    {detail.status}
+                  </span>
+                </div>
+                <h1 className="mt-4 font-display text-4xl leading-tight">
+                  {title}
+                </h1>
+                <p className="mt-2 text-sm text-foreground/55">
+                  {detail.budgetRef} · Submitted {detail.date}
+                </p>
+                <p className="mt-1 text-sm text-foreground/55">
+                  {detail.createdByEmail}
+                </p>
+              </div>
+              <div
+                className={cn(
+                  "relative flex flex-col justify-end overflow-hidden p-6 md:p-8",
+                  isCapex ? "bg-amber-100" : "bg-lime text-lime-foreground",
+                )}
+              >
+                <Wallet
+                  className={cn(
+                    "absolute -right-3 -bottom-3 h-20 w-20 -rotate-12",
+                    isCapex ? "text-amber-900/10" : "text-lime-foreground/15",
+                  )}
+                />
+                <p
+                  className={cn(
+                    "text-xs font-medium tracking-wide uppercase",
+                    isCapex ? "text-amber-800/70" : "text-lime-foreground/70",
+                  )}
+                >
+                  {isCapex ? "CAPEX total" : "OPEX total"}
+                </p>
+                <p className="mt-2 font-display text-3xl tabular-nums md:text-4xl">
+                  {formatRm(detail.amount)}
+                </p>
+                <p
+                  className={cn(
+                    "mt-1 text-xs",
+                    isCapex ? "text-amber-800/70" : "text-lime-foreground/70",
+                  )}
+                >
+                  FY {detail.budgetYear}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <MetaTile
+              icon={isCapex ? ArrowUpRight : ArrowDownLeft}
               label={isCapex ? "Category" : "Code"}
               value={budgetCodeLabel(detail.code, detail.budgetType)}
             />
-            {isCapex ? (
-              <>
-                <DetailField label="Item" value={detail.itemName || "—"} />
-                <DetailField
-                  label="Justification"
-                  value={detail.justification}
-                />
-                <DetailField
-                  label="Target months"
-                  value={formatTargetMonth(detail.targetMonths)}
-                />
-                <DetailField
-                  label="Quantity"
-                  value={
-                    detail.quantity == null ? "—" : String(detail.quantity)
-                  }
-                />
-                <DetailField
-                  label="Estimated cost per unit"
-                  value={
-                    detail.costPerUnit == null
-                      ? "—"
-                      : formatRm(detail.costPerUnit)
-                  }
-                />
-                <DetailField
-                  label="Estimated price"
-                  value={formatRm(detail.amount)}
-                />
-                <DetailField
-                  label="Effect if budget not approved"
-                  value={detail.effectIfNotApproved || "—"}
-                />
-                <DetailField
-                  label="Alternative more cost-effective"
-                  value={detail.alternative || "—"}
-                />
-              </>
-            ) : (
-              <>
-                <DetailField
-                  label="Activities / Programme / Event"
-                  value={detail.activity || "—"}
-                />
-                <DetailField
-                  label="Target months"
-                  value={formatTargetMonth(detail.targetMonths)}
-                />
-                <DetailField
-                  label="Objectives"
-                  value={detail.objective || "—"}
-                />
-                <DetailField
-                  label="Justifications"
-                  value={detail.justification}
-                />
-                {detail.items.length > 0 ? (
-                  <div>
-                    <dt className="text-xs font-medium tracking-wide text-foreground/40 uppercase">
-                      Items
-                    </dt>
-                    <dd className="mt-2 overflow-hidden rounded-xl border border-foreground/10">
-                      <ul className="divide-y divide-foreground/8">
-                        {detail.items.map((item) => (
-                          <li
-                            key={item.id}
-                            className="flex items-start justify-between gap-3 px-4 py-3"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium">
-                                {item.itemName || "Untitled item"}
-                              </p>
-                              <p className="mt-0.5 text-xs text-foreground/50">
-                                {item.quantity} × {formatRm(item.costPerUnit)}
-                              </p>
-                            </div>
-                            <p className="shrink-0 text-sm font-semibold tabular-nums">
-                              {formatRm(item.amount)}
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
+            <MetaTile
+              icon={CalendarDays}
+              label="Target months"
+              value={formatTargetMonth(detail.targetMonths)}
+            />
+            <MetaTile
+              icon={Building2}
+              label="Department"
+              value={detail.department || "—"}
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)]">
+            <section className="rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
+              <h2 className="font-display text-xl">Request</h2>
+              <div className="mt-5 space-y-5">
+                {isCapex ? (
+                  <>
+                    <DetailBlock label="Item" value={detail.itemName || "—"} />
+                    <DetailBlock
+                      label="Justification"
+                      value={detail.justification}
+                    />
+                    <DetailBlock
+                      label="Effect if budget not approved"
+                      value={detail.effectIfNotApproved || "—"}
+                    />
+                    <DetailBlock
+                      label="Alternative more cost-effective"
+                      value={detail.alternative || "—"}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <DetailBlock
+                      label="Activities / Programme / Event"
+                      value={detail.activity || "—"}
+                    />
+                    <DetailBlock
+                      label="Objectives"
+                      value={detail.objective || "—"}
+                    />
+                    <DetailBlock
+                      label="Justifications"
+                      value={detail.justification}
+                    />
+                  </>
+                )}
+                <DetailBlock label="Remarks" value={detail.remarks || "—"} />
+                {detail.status === "Rejected" && detail.rejectRemarks && (
+                  <DetailBlock
+                    label="Rejection remarks"
+                    value={detail.rejectRemarks}
+                  />
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
+              <h2 className="font-display text-xl">
+                {isCapex ? "Estimate" : "Items"}
+              </h2>
+              {isCapex ? (
+                <dl className="mt-5 space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-foreground/50">Quantity</dt>
+                    <dd className="tabular-nums">
+                      {detail.quantity == null ? "—" : detail.quantity}
                     </dd>
                   </div>
-                ) : null}
-                <DetailField
-                  label="OPEX budget"
-                  value={formatRm(detail.amount)}
-                />
-              </>
-            )}
-            <DetailField label="Remarks" value={detail.remarks || "—"} />
-            {detail.status === "Rejected" && detail.rejectRemarks && (
-              <DetailField
-                label="Rejection remarks"
-                value={detail.rejectRemarks}
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-foreground/50">Cost per unit</dt>
+                    <dd className="tabular-nums">
+                      {detail.costPerUnit == null
+                        ? "—"
+                        : formatRm(detail.costPerUnit)}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-t border-foreground/10 pt-3 font-medium">
+                    <dt>Estimated price</dt>
+                    <dd className="tabular-nums">{formatRm(detail.amount)}</dd>
+                  </div>
+                </dl>
+              ) : detail.items.length > 0 ? (
+                <ul className="mt-5 space-y-2">
+                  {detail.items.map((item) => (
+                    <li
+                      key={item.id}
+                      className="rounded-xl bg-ivory/80 px-3.5 py-3"
+                    >
+                      <p className="text-sm font-medium">
+                        {item.itemName || "Untitled item"}
+                      </p>
+                      <dl className="mt-1.5 space-y-0.5 text-[11px] leading-snug">
+                        <div className="flex justify-between gap-3">
+                          <dt className="text-foreground/45">Qty</dt>
+                          <dd className="tabular-nums text-foreground/80">
+                            {item.quantity}
+                          </dd>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                          <dt className="text-foreground/45">Each</dt>
+                          <dd className="tabular-nums text-foreground/80">
+                            {formatRm(item.costPerUnit)}
+                          </dd>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                          <dt className="text-foreground/45">Total</dt>
+                          <dd className="font-medium tabular-nums">
+                            {formatRm(item.amount)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-5 text-sm text-foreground/50">
+                  No line items on this request.
+                </p>
+              )}
+            </section>
+          </div>
+
+          <section className="mt-4 rounded-[1.5rem] bg-background p-6 shadow-card md:p-8">
+            <h2 className="font-display text-xl">Request log</h2>
+            <div className="mt-4">
+              <BudgetLogList
+                logs={logs}
+                loading={logsLoading}
+                compact
+                emptyMessage="No edits, transfers, or amount updates on this request yet."
               />
-            )}
-          </dl>
+            </div>
+          </section>
 
           {detail.isMine && !formEnabled && (
-            <div className="mt-8 border-t border-foreground/10 pt-6">
-              <p className="text-sm text-foreground/50">
-                Yearly budget submissions are closed. You can still update
-                amounts. Edit opens again when your admin reopens them.
-              </p>
+            <div className="mt-4 rounded-[1.5rem] bg-background px-6 py-5 text-sm text-foreground/55 shadow-card">
+              Yearly budget submissions are closed. You can still update
+              amounts. Edit opens again when your admin reopens them.
             </div>
           )}
 
           {canEdit || canDelete || canTransfer || canUpdateBudget ? (
-            <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-foreground/10 pt-6">
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[1.5rem] bg-background px-6 py-5 shadow-card">
               {canEdit && (
                 <button
                   type="button"
@@ -2201,6 +2293,41 @@ function budgetCodeLabel(code: string, budgetType: "OPEX" | "CAPEX") {
           "923-0000": "923-0000 IT & audio-repair & maintenance",
         };
   return labels[code] ?? code;
+}
+
+function DetailBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[11px] font-medium tracking-wide text-foreground/40 uppercase">
+        {label}
+      </p>
+      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function MetaTile({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[1.5rem] bg-background p-5 shadow-card">
+      <div className="flex items-center gap-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-lime text-lime-foreground">
+          <Icon className="h-4 w-4" />
+        </span>
+        <p className="text-xs text-foreground/50">{label}</p>
+      </div>
+      <p className="mt-3 text-sm font-medium leading-snug">{value}</p>
+    </div>
+  );
 }
 
 function DetailField({ label, value }: { label: string; value: string }) {

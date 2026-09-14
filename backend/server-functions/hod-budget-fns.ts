@@ -591,8 +591,10 @@ export const reviewHodBudget = createServerFn({ method: "POST" })
           LIMIT 1) AS item_name,
          yb.budget_amount,
          yb.created_at,
+         yb.created_by,
          qs.status_name,
          u.email AS requester_email,
+         u.department_id,
          d.department_name AS department,
          u.designation
        FROM yearly_budgets yb
@@ -629,6 +631,27 @@ export const reviewHodBudget = createServerFn({ method: "POST" })
         nextStatusId,
         data.budgetId,
       ]);
+    }
+
+    try {
+      const updated = await fetchBudgetDetail(
+        (sql, params) => query<BudgetRow[]>(sql, params),
+        data.budgetId,
+      );
+      await insertBudgetActionLog(query, {
+        budgetId: data.budgetId,
+        budgetYear: Number(row.budget_year),
+        budgetType: row.budget_type === "CAPEX" ? "CAPEX" : "OPEX",
+        action: data.decision === "Approved" ? "approve" : "reject",
+        actorUserId: user.userId,
+        ownerUserId: row.created_by ?? user.userId,
+        ownerDepartmentId: row.department_id ?? null,
+        remarks: data.rejectRemarks ?? null,
+        oldValues: snapshotFromHodDetail(updated),
+        newValues: snapshotFromHodDetail(updated),
+      });
+    } catch {
+      /* review still saved if log action is not supported */
     }
 
     return {

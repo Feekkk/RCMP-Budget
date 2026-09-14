@@ -411,6 +411,40 @@ export const submitYearlyBudget = createServerFn({ method: "POST" })
             budgetAmount: item.budgetAmount,
           })),
         );
+        try {
+          await insertBudgetActionLog(
+            async (sql, params) => {
+              await conn.query(sql, params);
+            },
+            {
+              budgetId: result.insertId,
+              budgetYear,
+              budgetType: "OPEX",
+              action: "submit",
+              actorUserId: user.userId,
+              ownerUserId: user.userId,
+              ownerDepartmentId: user.departmentId,
+              oldValues: budgetSnapshot({
+                budget_type: "OPEX",
+                code: line.code,
+                activity: line.activity,
+                item_name: first.itemName,
+                target_months: line.targetMonths || null,
+                objective: line.objective,
+                justification: line.justification,
+                quantity: first.quantity,
+                cost_per_unit: first.costPerUnit,
+                budget_amount: total,
+                effect_if_not_approved: null,
+                alternative: null,
+                remarks: line.remarks || null,
+                status_name: "pending",
+              }),
+            },
+          );
+        } catch {
+          /* request still saved if log action is not supported */
+        }
       }
 
       for (const line of data.capex) {
@@ -451,6 +485,40 @@ export const submitYearlyBudget = createServerFn({ method: "POST" })
           })),
           line.itemName,
         );
+        try {
+          await insertBudgetActionLog(
+            async (sql, params) => {
+              await conn.query(sql, params);
+            },
+            {
+              budgetId: result.insertId,
+              budgetYear,
+              budgetType: "CAPEX",
+              action: "submit",
+              actorUserId: user.userId,
+              ownerUserId: user.userId,
+              ownerDepartmentId: user.departmentId,
+              oldValues: budgetSnapshot({
+                budget_type: "CAPEX",
+                code: line.code,
+                activity: null,
+                item_name: line.itemName,
+                target_months: line.targetMonths || null,
+                objective: null,
+                justification: line.justification,
+                quantity: first.quantity,
+                cost_per_unit: first.costPerUnit,
+                budget_amount: total,
+                effect_if_not_approved: line.effectIfNotApproved || null,
+                alternative: line.alternative || null,
+                remarks: line.remarks || null,
+                status_name: "pending",
+              }),
+            },
+          );
+        } catch {
+          /* request still saved if log action is not supported */
+        }
       }
 
       await conn.commit();

@@ -73,7 +73,7 @@ function SidebarNav({
             <Link
               key={label}
               to={to}
-              activeOptions={{ exact: true }}
+              activeOptions={{ exact: to !== "/user/history" }}
               activeProps={{ className: "bg-lime text-lime-foreground" }}
               inactiveProps={{ className: inactiveClass }}
               className={itemClass}

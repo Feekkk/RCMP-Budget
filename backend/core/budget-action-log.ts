@@ -1,4 +1,11 @@
-export type BudgetAction = "edit" | "transfer" | "delete" | "update_budget";
+export type BudgetAction =
+  | "submit"
+  | "edit"
+  | "transfer"
+  | "delete"
+  | "update_budget"
+  | "approve"
+  | "reject";
 
 export type BudgetSnapshot = {
   budgetType: "OPEX" | "CAPEX";

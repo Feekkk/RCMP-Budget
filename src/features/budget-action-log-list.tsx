@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type { BudgetActionLog } from "@backend/server-functions/budget-log-fns";
 import type { BudgetSnapshot } from "@backend/core/budget-action-log";
 
@@ -15,17 +16,23 @@ function formatRm(value: number) {
 }
 
 const actionLabel: Record<BudgetActionLog["action"], string> = {
+  submit: "Submitted",
   edit: "Edited details",
   transfer: "Transferred",
   delete: "Deleted",
   update_budget: "Updated budget",
+  approve: "Approved",
+  reject: "Rejected",
 };
 
 const actionTone: Record<BudgetActionLog["action"], string> = {
+  submit: "bg-stone-100 text-stone-700",
   edit: "bg-sky-100 text-sky-800",
   transfer: "bg-amber-100 text-amber-800",
   delete: "bg-rose-100 text-rose-800",
   update_budget: "bg-emerald-100 text-emerald-800",
+  approve: "bg-lime/40 text-lime-foreground",
+  reject: "bg-rose-100 text-rose-800",
 };
 
 const fieldLabel: Record<keyof BudgetSnapshot, string> = {
@@ -75,14 +82,21 @@ export function BudgetLogList({
   logs,
   loading,
   emptyMessage,
+  compact,
 }: {
   logs: BudgetActionLog[];
   loading: boolean;
   emptyMessage: string;
+  compact?: boolean;
 }) {
   if (loading) {
     return (
-      <div className="rounded-xl border border-dashed border-foreground/15 py-14 text-center">
+      <div
+        className={cn(
+          "rounded-xl border border-dashed border-foreground/15 text-center",
+          compact ? "py-8" : "py-14",
+        )}
+      >
         <p className="text-sm text-foreground/50">Loading logs…</p>
       </div>
     );
@@ -90,7 +104,12 @@ export function BudgetLogList({
 
   if (logs.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-foreground/15 py-14 text-center">
+      <div
+        className={cn(
+          "rounded-xl border border-dashed border-foreground/15 text-center",
+          compact ? "py-8" : "py-14",
+        )}
+      >
         <p className="text-sm text-foreground/50">{emptyMessage}</p>
       </div>
     );
@@ -103,29 +122,55 @@ export function BudgetLogList({
         const changeText = changes
           .map((change) => `${fieldLabel[change.key]} ${change.from}→${change.to}`)
           .join(" · ");
-        const beforeDate = [
-          row.budgetType,
-          `FY ${row.budgetYear}`,
-          row.actorEmail,
-          row.actorEmail !== row.ownerEmail ? row.ownerEmail : null,
+        const beforeDate = compact
+          ? [row.actorEmail].filter(Boolean).join(" · ")
+          : [
+              row.budgetType,
+              `FY ${row.budgetYear}`,
+              row.actorEmail,
+              row.actorEmail !== row.ownerEmail ? row.ownerEmail : null,
+            ]
+              .filter(Boolean)
+              .join(" · ");
+        const afterDate = [
+          row.remarks,
+          row.action === "submit" ||
+          row.action === "approve" ||
+          row.action === "reject"
+            ? null
+            : changeText,
         ]
           .filter(Boolean)
           .join(" · ");
-        const afterDate = [row.remarks, changeText].filter(Boolean).join(" · ");
 
         return (
-          <li key={row.id} className="flex items-center gap-3 py-3">
+          <li
+            key={row.id}
+            className={cn(
+              "flex gap-3 py-3",
+              compact ? "items-start" : "items-center",
+            )}
+          >
             <span
               className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${actionTone[row.action]}`}
             >
               {actionLabel[row.action]}
             </span>
             <p
-              className="min-w-0 truncate text-sm"
+              className={cn(
+                "min-w-0 text-sm",
+                compact ? "whitespace-normal" : "truncate",
+              )}
               title={`${row.budgetRef} · ${beforeDate} · ${row.date}${afterDate ? ` · ${afterDate}` : ""}`}
             >
-              <span className="font-medium">{row.budgetRef}</span>
-              <span className="text-foreground/50"> · {beforeDate} · </span>
+              {!compact ? (
+                <span className="font-medium">{row.budgetRef}</span>
+              ) : null}
+              {!compact ? (
+                <span className="text-foreground/50"> · {beforeDate} · </span>
+              ) : (
+                <span className="text-foreground/50">{beforeDate} · </span>
+              )}
               <span className="font-medium">{row.date}</span>
               {afterDate ? (
                 <span className="text-foreground/50"> · {afterDate}</span>

@@ -17,7 +17,6 @@ import { Route as UserIndexRouteImport } from './routes/user/index'
 import { Route as HodIndexRouteImport } from './routes/hod/index'
 import { Route as UserQuotationRouteImport } from './routes/user/quotation'
 import { Route as UserProfileRouteImport } from './routes/user/profile'
-import { Route as UserHistoryRouteImport } from './routes/user/history'
 import { Route as UserDepartmentRouteImport } from './routes/user/department'
 import { Route as UserCalendarRouteImport } from './routes/user/calendar'
 import { Route as UserBudgetRouteImport } from './routes/user/budget'
@@ -25,6 +24,9 @@ import { Route as HodSettingsRouteImport } from './routes/hod/settings'
 import { Route as HodReportsRouteImport } from './routes/hod/reports'
 import { Route as HodLogsRouteImport } from './routes/hod/logs'
 import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
+import { Route as UserHistoryRouteRouteImport } from './routes/user/history/route'
+import { Route as UserHistoryIndexRouteImport } from './routes/user/history/index'
+import { Route as UserHistoryBudgetIdRouteImport } from './routes/user/history/$budgetId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -66,11 +68,6 @@ const UserProfileRoute = UserProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => UserRouteRoute,
 } as any)
-const UserHistoryRoute = UserHistoryRouteImport.update({
-  id: '/history',
-  path: '/history',
-  getParentRoute: () => UserRouteRoute,
-} as any)
 const UserDepartmentRoute = UserDepartmentRouteImport.update({
   id: '/department',
   path: '/department',
@@ -106,12 +103,28 @@ const HodCalendarRoute = HodCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => HodRouteRoute,
 } as any)
+const UserHistoryRouteRoute = UserHistoryRouteRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => UserRouteRoute,
+} as any)
+const UserHistoryIndexRoute = UserHistoryIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => UserHistoryRouteRoute,
+} as any)
+const UserHistoryBudgetIdRoute = UserHistoryBudgetIdRouteImport.update({
+  id: '/$budgetId',
+  path: '/$budgetId',
+  getParentRoute: () => UserHistoryRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/hod': typeof HodRouteRouteWithChildren
   '/user': typeof UserRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/user/history': typeof UserHistoryRouteRouteWithChildren
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/logs': typeof HodLogsRoute
   '/hod/reports': typeof HodReportsRoute
@@ -119,11 +132,12 @@ export interface FileRoutesByFullPath {
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/department': typeof UserDepartmentRoute
-  '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
   '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
+  '/user/history/$budgetId': typeof UserHistoryBudgetIdRoute
+  '/user/history/': typeof UserHistoryIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -135,11 +149,12 @@ export interface FileRoutesByTo {
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/department': typeof UserDepartmentRoute
-  '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
   '/hod': typeof HodIndexRoute
   '/user': typeof UserIndexRoute
+  '/user/history/$budgetId': typeof UserHistoryBudgetIdRoute
+  '/user/history': typeof UserHistoryIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -147,6 +162,7 @@ export interface FileRoutesById {
   '/hod': typeof HodRouteRouteWithChildren
   '/user': typeof UserRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/user/history': typeof UserHistoryRouteRouteWithChildren
   '/hod/calendar': typeof HodCalendarRoute
   '/hod/logs': typeof HodLogsRoute
   '/hod/reports': typeof HodReportsRoute
@@ -154,11 +170,12 @@ export interface FileRoutesById {
   '/user/budget': typeof UserBudgetRoute
   '/user/calendar': typeof UserCalendarRoute
   '/user/department': typeof UserDepartmentRoute
-  '/user/history': typeof UserHistoryRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
   '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
+  '/user/history/$budgetId': typeof UserHistoryBudgetIdRoute
+  '/user/history/': typeof UserHistoryIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -167,6 +184,7 @@ export interface FileRouteTypes {
     | '/hod'
     | '/user'
     | '/login'
+    | '/user/history'
     | '/hod/calendar'
     | '/hod/logs'
     | '/hod/reports'
@@ -174,11 +192,12 @@ export interface FileRouteTypes {
     | '/user/budget'
     | '/user/calendar'
     | '/user/department'
-    | '/user/history'
     | '/user/profile'
     | '/user/quotation'
     | '/hod/'
     | '/user/'
+    | '/user/history/$budgetId'
+    | '/user/history/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -190,17 +209,19 @@ export interface FileRouteTypes {
     | '/user/budget'
     | '/user/calendar'
     | '/user/department'
-    | '/user/history'
     | '/user/profile'
     | '/user/quotation'
     | '/hod'
     | '/user'
+    | '/user/history/$budgetId'
+    | '/user/history'
   id:
     | '__root__'
     | '/'
     | '/hod'
     | '/user'
     | '/login'
+    | '/user/history'
     | '/hod/calendar'
     | '/hod/logs'
     | '/hod/reports'
@@ -208,11 +229,12 @@ export interface FileRouteTypes {
     | '/user/budget'
     | '/user/calendar'
     | '/user/department'
-    | '/user/history'
     | '/user/profile'
     | '/user/quotation'
     | '/hod/'
     | '/user/'
+    | '/user/history/$budgetId'
+    | '/user/history/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -280,13 +302,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserProfileRouteImport
       parentRoute: typeof UserRouteRoute
     }
-    '/user/history': {
-      id: '/user/history'
-      path: '/history'
-      fullPath: '/user/history'
-      preLoaderRoute: typeof UserHistoryRouteImport
-      parentRoute: typeof UserRouteRoute
-    }
     '/user/department': {
       id: '/user/department'
       path: '/department'
@@ -336,6 +351,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HodCalendarRouteImport
       parentRoute: typeof HodRouteRoute
     }
+    '/user/history': {
+      id: '/user/history'
+      path: '/history'
+      fullPath: '/user/history'
+      preLoaderRoute: typeof UserHistoryRouteRouteImport
+      parentRoute: typeof UserRouteRoute
+    }
+    '/user/history/': {
+      id: '/user/history/'
+      path: '/'
+      fullPath: '/user/history/'
+      preLoaderRoute: typeof UserHistoryIndexRouteImport
+      parentRoute: typeof UserHistoryRouteRoute
+    }
+    '/user/history/$budgetId': {
+      id: '/user/history/$budgetId'
+      path: '/$budgetId'
+      fullPath: '/user/history/$budgetId'
+      preLoaderRoute: typeof UserHistoryBudgetIdRouteImport
+      parentRoute: typeof UserHistoryRouteRoute
+    }
   }
 }
 
@@ -359,21 +395,34 @@ const HodRouteRouteWithChildren = HodRouteRoute._addFileChildren(
   HodRouteRouteChildren,
 )
 
+interface UserHistoryRouteRouteChildren {
+  UserHistoryBudgetIdRoute: typeof UserHistoryBudgetIdRoute
+  UserHistoryIndexRoute: typeof UserHistoryIndexRoute
+}
+
+const UserHistoryRouteRouteChildren: UserHistoryRouteRouteChildren = {
+  UserHistoryBudgetIdRoute: UserHistoryBudgetIdRoute,
+  UserHistoryIndexRoute: UserHistoryIndexRoute,
+}
+
+const UserHistoryRouteRouteWithChildren =
+  UserHistoryRouteRoute._addFileChildren(UserHistoryRouteRouteChildren)
+
 interface UserRouteRouteChildren {
+  UserHistoryRouteRoute: typeof UserHistoryRouteRouteWithChildren
   UserBudgetRoute: typeof UserBudgetRoute
   UserCalendarRoute: typeof UserCalendarRoute
   UserDepartmentRoute: typeof UserDepartmentRoute
-  UserHistoryRoute: typeof UserHistoryRoute
   UserProfileRoute: typeof UserProfileRoute
   UserQuotationRoute: typeof UserQuotationRoute
   UserIndexRoute: typeof UserIndexRoute
 }
 
 const UserRouteRouteChildren: UserRouteRouteChildren = {
+  UserHistoryRouteRoute: UserHistoryRouteRouteWithChildren,
   UserBudgetRoute: UserBudgetRoute,
   UserCalendarRoute: UserCalendarRoute,
   UserDepartmentRoute: UserDepartmentRoute,
-  UserHistoryRoute: UserHistoryRoute,
   UserProfileRoute: UserProfileRoute,
   UserQuotationRoute: UserQuotationRoute,
   UserIndexRoute: UserIndexRoute,
