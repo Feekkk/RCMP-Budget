@@ -1,5 +1,17 @@
 import { useRef, useState } from "react";
-import { Minus, Plus, Trash2, X } from "lucide-react";
+import {
+  ArrowRightLeft,
+  CheckCircle2,
+  FilePlus,
+  Minus,
+  Pencil,
+  Plus,
+  Trash2,
+  Wallet,
+  X,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +37,16 @@ const actionLabel: Record<BudgetActionLog["action"], string> = {
   reject: "Rejected",
 };
 
+const actionIcon: Record<BudgetActionLog["action"], LucideIcon> = {
+  submit: FilePlus,
+  edit: Pencil,
+  transfer: ArrowRightLeft,
+  delete: Trash2,
+  update_budget: Wallet,
+  approve: CheckCircle2,
+  reject: XCircle,
+};
+
 const actionTone: Record<BudgetActionLog["action"], string> = {
   submit: "bg-stone-100 text-stone-700",
   edit: "bg-sky-100 text-sky-800",
@@ -34,6 +56,17 @@ const actionTone: Record<BudgetActionLog["action"], string> = {
   approve: "bg-lime/40 text-lime-foreground",
   reject: "bg-rose-100 text-rose-800",
 };
+
+function groupLogsByDay(logs: BudgetActionLog[]) {
+  const groups: { label: string; rows: BudgetActionLog[] }[] = [];
+  for (const row of logs) {
+    const label = row.date.split(",")[0]?.trim() || row.date;
+    const last = groups.at(-1);
+    if (last?.label === label) last.rows.push(row);
+    else groups.push({ label, rows: [row] });
+  }
+  return groups;
+}
 
 const fieldLabel: Record<keyof BudgetSnapshot, string> = {
   budgetType: "Type",
@@ -83,12 +116,16 @@ export function BudgetLogList({
   loading,
   emptyMessage,
   compact,
+  layout,
 }: {
   logs: BudgetActionLog[];
   loading: boolean;
   emptyMessage: string;
   compact?: boolean;
+  layout?: "list" | "feed";
 }) {
+  const feed = layout === "feed";
+
   if (loading) {
     return (
       <div
@@ -111,6 +148,83 @@ export function BudgetLogList({
         )}
       >
         <p className="text-sm text-foreground/50">{emptyMessage}</p>
+      </div>
+    );
+  }
+
+  if (feed) {
+    return (
+      <div className="space-y-6">
+        {groupLogsByDay(logs).map((group) => (
+          <section key={group.label}>
+            <h2 className="text-[11px] font-medium tracking-wide text-foreground/40 uppercase">
+              {group.label}
+            </h2>
+            <ul className="mt-2 divide-y divide-foreground/8">
+              {group.rows.map((row) => {
+                const Icon = actionIcon[row.action];
+                const changes = changedFields(row.oldValues, row.newValues);
+                const showChanges =
+                  row.action !== "submit" &&
+                  row.action !== "approve" &&
+                  row.action !== "reject";
+                const time = row.date.includes(",")
+                  ? row.date.split(",").slice(1).join(",").trim()
+                  : "";
+
+                return (
+                  <li key={row.id} className="py-3.5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="min-w-0 truncate text-sm">
+                        <span className="inline-flex items-center gap-1.5 font-medium">
+                          <Icon className="h-3.5 w-3.5 shrink-0 text-foreground/40" />
+                          {actionLabel[row.action]}
+                        </span>
+                        <span className="text-foreground/30"> · </span>
+                        <span className="tabular-nums">{row.budgetRef}</span>
+                      </p>
+                      {time ? (
+                        <p className="shrink-0 text-[11px] tabular-nums text-foreground/35">
+                          {time}
+                        </p>
+                      ) : null}
+                    </div>
+                    <p className="mt-0.5 truncate pl-5 text-[11px] text-foreground/40">
+                      {row.budgetType} · FY {row.budgetYear} · {row.actorEmail}
+                      {row.actorEmail !== row.ownerEmail
+                        ? ` · ${row.ownerEmail}`
+                        : ""}
+                    </p>
+                    {showChanges && changes.length > 0 ? (
+                      <ul className="mt-1.5 space-y-0.5 pl-5">
+                        {changes.map((change) => (
+                          <li
+                            key={`${row.id}-${change.key}`}
+                            className="text-xs tabular-nums"
+                          >
+                            <span className="text-foreground/40">
+                              {fieldLabel[change.key]}{" "}
+                            </span>
+                            <span className="text-foreground/35 line-through">
+                              {change.from}
+                            </span>
+                            <span className="mx-1 text-foreground/25">→</span>
+                            <span className="font-medium">{change.to}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {row.remarks ? (
+                      <p className="mt-1 truncate pl-5 text-[11px] text-foreground/45">
+                        {row.remarks}
+                      </p>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
       </div>
     );
   }
