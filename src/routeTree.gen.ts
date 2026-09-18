@@ -15,6 +15,7 @@ import { Route as HodRouteRouteImport } from './routes/hod/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UserIndexRouteImport } from './routes/user/index'
 import { Route as HodIndexRouteImport } from './routes/hod/index'
+import { Route as UserRfqRouteImport } from './routes/user/rfq'
 import { Route as UserQuotationRouteImport } from './routes/user/quotation'
 import { Route as UserProfileRouteImport } from './routes/user/profile'
 import { Route as UserDepartmentRouteImport } from './routes/user/department'
@@ -58,6 +59,11 @@ const HodIndexRoute = HodIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => HodRouteRoute,
+} as any)
+const UserRfqRoute = UserRfqRouteImport.update({
+  id: '/rfq',
+  path: '/rfq',
+  getParentRoute: () => UserRouteRoute,
 } as any)
 const UserQuotationRoute = UserQuotationRouteImport.update({
   id: '/quotation',
@@ -140,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/user/department': typeof UserDepartmentRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/user/rfq': typeof UserRfqRoute
   '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
   '/auth/microsoft/callback': typeof AuthMicrosoftCallbackRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/user/department': typeof UserDepartmentRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/user/rfq': typeof UserRfqRoute
   '/hod': typeof HodIndexRoute
   '/user': typeof UserIndexRoute
   '/auth/microsoft/callback': typeof AuthMicrosoftCallbackRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/user/department': typeof UserDepartmentRoute
   '/user/profile': typeof UserProfileRoute
   '/user/quotation': typeof UserQuotationRoute
+  '/user/rfq': typeof UserRfqRoute
   '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
   '/auth/microsoft/callback': typeof AuthMicrosoftCallbackRoute
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/user/department'
     | '/user/profile'
     | '/user/quotation'
+    | '/user/rfq'
     | '/hod/'
     | '/user/'
     | '/auth/microsoft/callback'
@@ -221,6 +231,7 @@ export interface FileRouteTypes {
     | '/user/department'
     | '/user/profile'
     | '/user/quotation'
+    | '/user/rfq'
     | '/hod'
     | '/user'
     | '/auth/microsoft/callback'
@@ -242,6 +253,7 @@ export interface FileRouteTypes {
     | '/user/department'
     | '/user/profile'
     | '/user/quotation'
+    | '/user/rfq'
     | '/hod/'
     | '/user/'
     | '/auth/microsoft/callback'
@@ -300,6 +312,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/hod/'
       preLoaderRoute: typeof HodIndexRouteImport
       parentRoute: typeof HodRouteRoute
+    }
+    '/user/rfq': {
+      id: '/user/rfq'
+      path: '/rfq'
+      fullPath: '/user/rfq'
+      preLoaderRoute: typeof UserRfqRouteImport
+      parentRoute: typeof UserRouteRoute
     }
     '/user/quotation': {
       id: '/user/quotation'
@@ -435,6 +454,7 @@ interface UserRouteRouteChildren {
   UserDepartmentRoute: typeof UserDepartmentRoute
   UserProfileRoute: typeof UserProfileRoute
   UserQuotationRoute: typeof UserQuotationRoute
+  UserRfqRoute: typeof UserRfqRoute
   UserIndexRoute: typeof UserIndexRoute
 }
 
@@ -445,6 +465,7 @@ const UserRouteRouteChildren: UserRouteRouteChildren = {
   UserDepartmentRoute: UserDepartmentRoute,
   UserProfileRoute: UserProfileRoute,
   UserQuotationRoute: UserQuotationRoute,
+  UserRfqRoute: UserRfqRoute,
   UserIndexRoute: UserIndexRoute,
 }
 

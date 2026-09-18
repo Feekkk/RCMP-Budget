@@ -123,29 +123,37 @@ async function buildRfqPdf(ctx: RfqContext) {
     y += h + 4;
   };
 
-  infoRow("TO", "", "FROM", ctx.email);
-  infoRow("COMPANY", "PCM SDN BHD", "DATE", ctx.rfqDate);
-  infoRow("PHONE NUMBER", "", "REF", ctx.rfqNumber);
+  infoRow("TO", "", "FROM", "");
+  infoRow("COMPANY", "", "DATE", "");
+  infoRow("PHONE NUMBER", "", "REF", "");
   infoRow("FAX NUMBER", "", "TOTAL NO. OF PAGES\nINCLUDING COVER", "", 24);
-  infoRow("RE: QUOTATION\nFOR", "", "SENDER'S TELEPHONE NUMBER", "", 24);
+  infoRow(
+    "RE: QUOTATION\nFOR",
+    "",
+    "SENDER'S TELEPHONE NUMBER",
+    "05-2432635 / EXT 146",
+    24,
+  );
 
   box(left + half, y, half, 16, grey);
-  write("SENDER'S FAX NUMBER:", left + half + 4, y + 4, 160, { bold: true });
-  y += 22;
+  write("SENDER'S FAX NUMBER", left + half + 4, y + 4, 130, { bold: true });
+  write(":", left + half + 138, y + 4, 10);
+  write("05-2432636", left + half + 150, y + 4, half - 156);
+  y += 20;
 
   hairline(y, 2);
   y += 6;
   const marks = [
-    "URGENT",
-    "FOR REVIEW",
-    "PLEASE COMMENT",
-    "PLEASE REPLY",
-    "PLEASE RECYCLE",
+    "√ URGENT",
+    "□ FOR REVIEW",
+    "□ PLEASE COMMENT",
+    "√ PLEASE REPLY",
+    "□ PLEASE RECYCLE",
   ] as const;
   const markWidth = width / marks.length;
   marks.forEach((label, i) => {
     const x = left + markWidth * i;
-    write(`□ ${label}`, x, y, markWidth - 4, { bold: true, size: 8 });
+    write(label, x, y, markWidth - 4, { bold: true, size: 8 });
   });
   y += 14;
   hairline(y, 2);
@@ -173,7 +181,7 @@ async function buildRfqPdf(ctx: RfqContext) {
   y += headerHeight;
 
   const bodyTop = y;
-  const bodyHeight = Math.max(320, ctx.items.length * 52 + 40);
+  const bodyHeight = Math.max(230, ctx.items.length * 40 + 24);
   itemCols.forEach((w, c) => box(colX(c), bodyTop, w, bodyHeight));
 
   const money = (value: number) =>
@@ -231,26 +239,16 @@ async function buildRfqPdf(ctx: RfqContext) {
     size: 9,
     align: "right",
   });
-  y += totalHeight + 12;
+  y += totalHeight + 10;
 
-  write("1 | P a g e", left, doc.page.height - 40, width, {
-    size: 8,
-    align: "right",
-    color: "#888",
-  });
-
-  doc.addPage();
-  y = 40;
-
-  doc.font("Helvetica").fontSize(9).fillColor("#000");
   write(
-    "Please send your quotation ON OR BEFORE: ____________ Should you need further clarification please call the under sign below OR email to proc.rcmp@unikl.edu.my. Your early reply is highly appreciated.",
+    "Please send your quotation By: _________________________. Should you need further clarification please call\nthe under sign below OR email to rosmalina@unikl.edu.my. Your early reply is highly appreciated.",
     left,
     y,
     width,
     { size: 9 },
   );
-  y += 40;
+  y += 32;
 
   write("Term & Condition:", left, y, half, { size: 9 });
   write("Confirmed & Accepted by :-", left + half + 40, y, half - 40, { size: 9 });
@@ -265,8 +263,8 @@ async function buildRfqPdf(ctx: RfqContext) {
     y += 13;
   });
 
-  y += 16;
-  write("----------------------------------------", left + half + 40, y, half - 40, {
+  y += 12;
+  write("----------------------------------------------", left + half + 40, y, half - 40, {
     size: 9,
   });
   y += 12;
@@ -274,7 +272,7 @@ async function buildRfqPdf(ctx: RfqContext) {
   y += 12;
   write("Signature) Date :", left + half + 40, y, half - 40, { size: 9 });
 
-  write("2 | P a g e", left, doc.page.height - 40, width, {
+  write("1 | Page", left, doc.page.height - 40, width, {
     size: 8,
     align: "right",
     color: "#888",
@@ -282,6 +280,16 @@ async function buildRfqPdf(ctx: RfqContext) {
 
   doc.end();
   return done;
+}
+
+const rfqItemSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  quantity: z.number().int().positive(),
+  pricePerUnit: z.number().positive(),
+});
+
+async function loadLogo() {
+  return readFile(resolve(process.cwd(), "public/unikl.png"));
 }
 
 export const generateRequestForQuotation = createServerFn({ method: "POST" })
@@ -302,7 +310,7 @@ export const generateRequestForQuotation = createServerFn({ method: "POST" })
     );
     const form = rows[0];
     if (!form) {
-      throw new Error("Quotation not found.");
+      throw new Error("Quotation not found. Open it from History and try again.");
     }
 
     const items = await query<ItemRow[]>(
@@ -316,7 +324,7 @@ export const generateRequestForQuotation = createServerFn({ method: "POST" })
     const created = form.created_at instanceof Date ? form.created_at : new Date(form.created_at);
     const rfqNumber = `RFQ-${String(form.quotation_id).padStart(5, "0")}`;
     const rfqDate = created.toLocaleDateString("en-GB");
-    const logo = await readFile(resolve(process.cwd(), "public/unikl.png"));
+    const logo = await loadLogo();
 
     const pdfBuffer = await buildRfqPdf({
       rfqNumber,
@@ -324,6 +332,42 @@ export const generateRequestForQuotation = createServerFn({ method: "POST" })
       email: form.email,
       department: form.department ?? "",
       items,
+      logo,
+    });
+
+    return {
+      fileName: `${rfqNumber}-request-for-quotation.pdf`,
+      data: pdfBuffer.toString("base64"),
+    };
+  });
+
+export const generateRfqFromForm = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      items: z.array(rfqItemSchema).min(1).max(50),
+    }),
+  )
+  .middleware([authMiddleware])
+  .handler(async ({ data, context }) => {
+    const { user } = context;
+    const now = new Date();
+    const rfqNumber = `RFQ-${String(user.userId).padStart(3, "0")}-${now
+      .toISOString()
+      .slice(0, 10)
+      .replaceAll("-", "")}`;
+    const logo = await loadLogo();
+
+    const pdfBuffer = await buildRfqPdf({
+      rfqNumber,
+      rfqDate: now.toLocaleDateString("en-GB"),
+      email: user.email,
+      department: user.department ?? "",
+      items: data.items.map((item) => ({
+        item_name: item.name,
+        item_description: "",
+        item_quantity: item.quantity,
+        item_price: item.pricePerUnit,
+      })),
       logo,
     });
 

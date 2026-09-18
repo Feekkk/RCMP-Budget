@@ -666,6 +666,7 @@ export function UserDashboard() {
 
                 <button
                   type="button"
+                  onClick={() => void navigate({ to: "/user/rfq" })}
                   className="flex flex-col items-center gap-2 text-center transition hover:opacity-90"
                 >
                   <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ivory text-foreground/70">
