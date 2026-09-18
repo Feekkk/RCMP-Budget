@@ -141,3 +141,48 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
   await session.clear();
   return { ok: true as const };
 });
+
+export const devLoginAsRole = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const parsed = z
+      .object({
+        role: z.enum(["User", "HOD"]),
+      })
+      .safeParse(input);
+    if (!parsed.success) {
+      throw new Error("Pick User or HOD and try again.");
+    }
+    return parsed.data;
+  })
+  .handler(async ({ data }): Promise<AuthUser> => {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Dev sign-in is only available in development.");
+    }
+
+    const { query } = await import("@backend/core/db");
+    const rows = await query<Omit<UserRow, "password_hash">[]>(
+      `SELECT u.user_id, u.staff_id, u.email, u.department_id,
+              d.department_name AS department, u.designation, u.role_id, r.role_name
+       FROM users u
+       INNER JOIN roles r ON r.role_id = u.role_id
+       LEFT JOIN departments d ON d.department_id = u.department_id
+       WHERE r.role_name = ?
+       ORDER BY u.user_id ASC
+       LIMIT 1`,
+      [data.role],
+    );
+
+    const row = rows[0];
+    if (!row) {
+      throw new Error(`No ${data.role} account found in the database. Add one first.`);
+    }
+
+    const user = toAuthUser(row);
+    await query("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE user_id = ?", [
+      user.userId,
+    ]);
+
+    const session = await getAuthSession();
+    await session.update({ user, msOAuth: undefined });
+    return user;
+  });
