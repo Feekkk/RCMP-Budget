@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { getAuthSession } from "@backend/core/session";
+import { loadEnvFile } from "@backend/core/env";
 import type { AuthUser, RoleName } from "@/lib/auth";
 
 type UserRow = {
@@ -41,12 +42,13 @@ function toAuthUser(row: UserRow): AuthUser {
 function requiredEnv(name: string) {
   const value = process.env[name]?.trim();
   if (!value) {
-    throw new Error("Microsoft sign-in isn't set up yet. Use your staff ID or ask an admin.");
+    throw new Error("Microsoft sign-in isn't set up yet. Ask an admin to finish setup.");
   }
   return value;
 }
 
 function getMicrosoftConfig() {
+  loadEnvFile();
   const tenant = process.env.MICROSOFT_TENANT_ID?.trim() || "organizations";
   const clientId = requiredEnv("MICROSOFT_CLIENT_ID");
   const clientSecret = requiredEnv("MICROSOFT_CLIENT_SECRET");
