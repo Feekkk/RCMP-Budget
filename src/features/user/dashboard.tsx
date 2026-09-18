@@ -18,6 +18,9 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  FileText,
+  ClipboardPen,
+  History,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -331,33 +334,6 @@ export function UserDashboard() {
       ? `You still have ${formatRm(remaining)} unspent this year`
       : `Spending is over allocation by ${formatRm(Math.abs(remaining))}`;
 
-  const budgetPlans = useMemo(() => {
-    const year = dashboardStats?.budgetYear ?? new Date().getFullYear();
-    const userBudgets = rows.filter(
-      (row) =>
-        row.kind === "budget" &&
-        row.status !== "Rejected" &&
-        (row.budgetYear == null || row.budgetYear === year),
-    );
-    return (["OPEX", "CAPEX"] as const).map((type) => {
-      const items = userBudgets.filter((row) => row.budgetType === type);
-      const requested = items.reduce((sum, row) => sum + row.amount, 0);
-      const approved = items
-        .filter((row) => row.status === "Approved")
-        .reduce((sum, row) => sum + row.amount, 0);
-      return {
-        key: type,
-        title: `Requested ${type}`,
-        type,
-        targetLabel: `FY ${year} · ${items.length} line${items.length === 1 ? "" : "s"}`,
-        collected: approved,
-        target: requested,
-        collectedLabel: "Approved",
-        targetLabelShort: "Requested",
-      };
-    });
-  }, [dashboardStats, rows]);
-
   const filteredRows = useMemo(() => {
     const needle = query.toLowerCase().trim();
     return rows.filter((row) => {
@@ -406,9 +382,9 @@ export function UserDashboard() {
     <div className="flex h-screen flex-col overflow-hidden bg-ivory text-foreground md:flex-row">
       <Sidebar />
 
-      <main className="flex-1 overflow-y-auto p-5 md:p-8">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
+      <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+          <div className="min-w-0">
             <h1 className="font-display text-3xl md:text-4xl">
               {timeGreeting()}
             </h1>
@@ -418,7 +394,7 @@ export function UserDashboard() {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-full bg-lime px-5 py-2.5 text-sm font-medium text-lime-foreground transition hover:brightness-95"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-lime px-5 py-2.5 text-sm font-medium text-lime-foreground transition hover:brightness-95 sm:w-auto"
               >
                 <Plus className="h-4 w-4" />
                 Make Request
@@ -439,22 +415,24 @@ export function UserDashboard() {
           </DropdownMenu>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)]">
-          <div className="relative overflow-hidden rounded-[1.75rem] bg-foreground p-6 text-background shadow-card">
+        <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)]">
+          <div className="relative min-w-0 overflow-hidden rounded-[1.75rem] bg-foreground p-5 text-background shadow-card sm:p-6">
             <div className="pointer-events-none absolute -top-10 -right-8 h-40 w-40 rounded-full bg-lime/25" />
             <div className="pointer-events-none absolute -bottom-12 -left-8 h-32 w-32 rounded-full bg-lime/10" />
             <div className="relative flex items-start justify-between">
-              <div className="flex items-center gap-2 text-background/70">
-                <CreditCard className="h-5 w-5" />
-                <p className="text-sm tracking-[0.18em]">•••• •••• {staffSuffix}</p>
+              <div className="flex min-w-0 items-center gap-2 text-background/70">
+                <CreditCard className="h-5 w-5 shrink-0" />
+                <p className="truncate text-sm tracking-[0.18em]">
+                  •••• •••• {staffSuffix}
+                </p>
               </div>
-              <Wifi className="h-5 w-5 rotate-90 text-lime" />
+              <Wifi className="h-5 w-5 shrink-0 rotate-90 text-lime" />
             </div>
             <p className="relative mt-8 text-xs text-background/55">
               Remaining budget
             </p>
-            <div className="relative mt-1 flex items-center gap-2">
-              <p className="font-display text-4xl">
+            <div className="relative mt-1 flex min-w-0 items-center gap-2">
+              <p className="min-w-0 break-all font-display text-3xl sm:text-4xl">
                 <MaskedAmount
                   loading={statsLoading}
                   revealed={moneyRevealed}
@@ -465,7 +443,7 @@ export function UserDashboard() {
                 type="button"
                 onClick={() => toggle("money")}
                 aria-label={moneyRevealed ? "Hide amounts" : "Show amounts"}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-background/60 transition hover:bg-background/10 hover:text-background"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-background/60 transition hover:bg-background/10 hover:text-background"
               >
                 {moneyRevealed ? (
                   <EyeOff className="h-4 w-4" />
@@ -488,8 +466,8 @@ export function UserDashboard() {
             </div>
           </div>
 
-          <div className="rounded-[1.75rem] bg-background p-5 shadow-card md:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 rounded-[1.75rem] bg-background p-4 shadow-card sm:p-5 md:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-lime text-lime-foreground">
                   <Wallet className="h-4 w-4" />
@@ -542,13 +520,13 @@ export function UserDashboard() {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)]">
-          <div className="flex flex-col gap-4">
-            <div className="rounded-[1.75rem] bg-background p-5 shadow-card">
+        <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)]">
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="min-w-0 rounded-[1.75rem] bg-background p-4 shadow-card sm:p-5">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-lg font-medium">Money Analytics</h2>
-                  <p className="mt-1 font-display text-3xl tabular-nums">
+                  <p className="mt-1 break-all font-display text-2xl tabular-nums sm:text-3xl">
                     <MaskedAmount
                       loading={statsLoading}
                       revealed={moneyRevealed}
@@ -571,10 +549,20 @@ export function UserDashboard() {
                 </Link>
               </div>
 
-              <div className="mt-5">
-                <div className="mb-2 flex justify-between text-[10px] text-foreground/35">
-                  {chartTicks.map((tick) => (
-                    <span key={tick}>{compactRm(tick)}</span>
+              <div className="mt-5 min-w-0">
+                <div className="mb-2 flex justify-between gap-1 overflow-hidden text-[10px] text-foreground/35">
+                  {chartTicks.map((tick, index) => (
+                    <span
+                      key={tick}
+                      className={cn(
+                        "shrink-0",
+                        index > 0 && index < chartTicks.length - 1
+                          ? "hidden sm:inline"
+                          : "",
+                      )}
+                    >
+                      {compactRm(tick)}
+                    </span>
                   ))}
                 </div>
                 <div className="space-y-3">
@@ -592,15 +580,15 @@ export function UserDashboard() {
                       return (
                         <div
                           key={`${item.budgetType}-${item.code}`}
-                          className="flex items-center gap-3"
+                          className="flex min-w-0 items-center gap-2 sm:gap-3"
                         >
                           <span
-                            className="w-20 shrink-0 truncate text-xs font-medium tabular-nums text-foreground/70"
+                            className="w-14 shrink-0 truncate text-xs font-medium tabular-nums text-foreground/70 sm:w-20"
                             title={item.code}
                           >
                             {item.code}
                           </span>
-                          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-ivory">
+                          <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-ivory">
                             <div
                               className={cn(
                                 "h-full rounded-full transition-all duration-500",
@@ -613,7 +601,7 @@ export function UserDashboard() {
                               }}
                             />
                           </div>
-                          <span className="w-16 shrink-0 text-right text-xs tabular-nums text-foreground/55">
+                          <span className="w-14 shrink-0 text-right text-xs tabular-nums text-foreground/55 sm:w-16">
                             {moneyRevealed ? compactRm(item.amount) : "••••"}
                           </span>
                         </div>
@@ -630,77 +618,82 @@ export function UserDashboard() {
               </div>
             </div>
 
-            <div className="rounded-[1.75rem] bg-background p-5 shadow-card">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-medium">My Requests</h2>
+            <div className="min-w-0 rounded-[1.75rem] bg-background p-4 shadow-card sm:p-5">
+              <h2 className="text-lg font-medium">Shortcuts</h2>
+              <p className="mt-1 text-xs text-foreground/50">
+                Click to navigate to the page
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex flex-col items-center gap-2 text-center transition hover:opacity-90"
+                    >
+                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-lime text-lime-foreground">
+                        <Plus className="h-5 w-5" />
+                      </span>
+                      <span className="text-[11px] font-medium leading-tight text-foreground/70">
+                        Make Request
+                      </span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem disabled>
+                      Request Quotation (Closed)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={!budgetFormEnabled}
+                      onSelect={openBudgetForm}
+                    >
+                      Yearly Budget
+                      {!budgetFormEnabled ? " (Closed)" : ""}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 <button
                   type="button"
-                  disabled={!budgetFormEnabled}
-                  onClick={openBudgetForm}
-                  className="rounded-full bg-ivory px-3 py-1.5 text-xs font-medium text-foreground/60 transition hover:text-foreground disabled:opacity-50"
+                  className="flex flex-col items-center gap-2 text-center transition hover:opacity-90"
                 >
-                  New Plan +
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ivory text-foreground/70">
+                    <ClipboardPen className="h-5 w-5" />
+                  </span>
+                  <span className="text-[11px] font-medium leading-tight text-foreground/70">
+                    Generate PRF
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className="flex flex-col items-center gap-2 text-center transition hover:opacity-90"
+                >
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ivory text-foreground/70">
+                    <FileText className="h-5 w-5" />
+                  </span>
+                  <span className="text-[11px] font-medium leading-tight text-foreground/70">
+                    Generate RFQ
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: "/user/history" })}
+                  className="flex flex-col items-center gap-2 text-center transition hover:opacity-90"
+                >
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ivory text-foreground/70">
+                    <History className="h-5 w-5" />
+                  </span>
+                  <span className="text-[11px] font-medium leading-tight text-foreground/70">
+                    History
+                  </span>
                 </button>
               </div>
-
-              {budgetPlans.every((plan) => plan.target === 0) ? (
-                <p className="mt-5 text-sm text-foreground/50">
-                  No OPEX or CAPEX requests yet. Add a yearly budget line to get started.
-                </p>
-              ) : (
-                <ul className="mt-5 space-y-4">
-                  {budgetPlans.map((plan) => {
-                    const progress =
-                      plan.target > 0
-                        ? Math.min(
-                            100,
-                            Math.round((plan.collected / plan.target) * 100),
-                          )
-                        : 0;
-                    return (
-                      <li key={plan.key} className="flex items-start gap-3">
-                        <span
-                          className={cn(
-                            "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-xs font-medium",
-                            plan.type === "CAPEX"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-sky-100 text-sky-800",
-                          )}
-                        >
-                          {plan.type}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
-                            {plan.title}
-                          </p>
-                          <p className="mt-0.5 text-xs text-foreground/45">
-                            {plan.targetLabel}
-                          </p>
-                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ivory">
-                            <div
-                              className="h-full rounded-full bg-lime"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                          <div className="mt-2 flex justify-between text-xs">
-                            <span className="text-emerald-700">
-                              {plan.collectedLabel} {formatRm(plan.collected)}
-                            </span>
-                            <span className="text-foreground/45">
-                              {plan.targetLabelShort} {formatRm(plan.target)}
-                            </span>
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
             </div>
           </div>
 
-          <div className="rounded-[1.75rem] bg-background p-5 shadow-card md:p-6">
-            <div className="flex gap-5 overflow-x-auto border-b border-foreground/10">
+          <div className="min-w-0 rounded-[1.75rem] bg-background p-4 shadow-card sm:p-5 md:p-6">
+            <div className="-mx-1 flex gap-4 overflow-x-auto border-b border-foreground/10 px-1 sm:gap-5">
               {tabs.map((item) => (
                 <button
                   key={item.id}
@@ -718,23 +711,23 @@ export function UserDashboard() {
               ))}
             </div>
 
-            <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="font-display text-3xl">
+            <div className="mt-5 flex flex-col gap-4">
+              <div className="min-w-0">
+                <h2 className="font-display text-2xl sm:text-3xl">
                   {tabs.find((item) => item.id === tab)?.label}
                 </h2>
                 <p className="mt-1 text-sm text-foreground/50">
                   All your quotations and yearly budgets are recorded
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="relative">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="relative min-w-0 flex-1 basis-40">
                   <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-foreground/35" />
                   <Input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search"
-                    className="h-10 w-36 rounded-full bg-ivory pl-9 md:w-44"
+                    className="h-10 w-full rounded-full bg-ivory pl-9"
                   />
                 </div>
                 <DropdownMenu>
@@ -742,7 +735,7 @@ export function UserDashboard() {
                     <button
                       type="button"
                       aria-label="Filter by status"
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-ivory text-foreground/60 transition hover:text-foreground"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ivory text-foreground/60 transition hover:text-foreground"
                     >
                       <SlidersHorizontal className="h-4 w-4" />
                     </button>
@@ -765,7 +758,7 @@ export function UserDashboard() {
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="inline-flex h-10 items-center gap-2 rounded-full bg-ivory px-3 text-sm text-foreground/70 transition hover:text-foreground"
+                      className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-ivory px-3 text-sm text-foreground/70 transition hover:text-foreground"
                     >
                       <CalendarDays className="h-4 w-4" />
                       {dateFilter === "month"
@@ -791,7 +784,59 @@ export function UserDashboard() {
               </div>
             </div>
 
-            <div className="mt-4 overflow-x-auto">
+            <div className="mt-4 md:hidden">
+              {loading ? (
+                <p className="py-10 text-center text-sm text-foreground/45">
+                  Loading your transactions…
+                </p>
+              ) : pagedRows.length === 0 ? (
+                <p className="py-10 text-center text-sm text-foreground/45">
+                  No transactions match these filters.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {pagedRows.map((row) => {
+                    const initial =
+                      row.title.trim().charAt(0).toUpperCase() || "?";
+                    return (
+                      <li
+                        key={row.key}
+                        className="flex flex-col gap-3 rounded-2xl bg-ivory p-4"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-background font-medium">
+                            {initial}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">{row.title}</p>
+                            <p className="mt-0.5 truncate text-xs text-foreground/45">
+                              {row.ref}
+                              {" · "}
+                              {row.kind === "quotation"
+                                ? "Quotation"
+                                : row.budgetType}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="font-medium tabular-nums">
+                              {formatRm(row.amount)}
+                            </p>
+                            <p className="mt-0.5 text-xs text-foreground/45">
+                              {row.date}
+                            </p>
+                          </div>
+                          <StatusPill status={row.status} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            <div className="mt-4 hidden overflow-x-auto md:block">
               <table className="w-full min-w-[40rem] text-sm">
                 <thead>
                   <tr className="text-left text-xs text-foreground/40">
@@ -805,19 +850,26 @@ export function UserDashboard() {
                 <tbody className="divide-y divide-foreground/10">
                   {loading ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-foreground/45">
+                      <td
+                        colSpan={5}
+                        className="py-12 text-center text-foreground/45"
+                      >
                         Loading your transactions…
                       </td>
                     </tr>
                   ) : pagedRows.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-foreground/45">
+                      <td
+                        colSpan={5}
+                        className="py-12 text-center text-foreground/45"
+                      >
                         No transactions match these filters.
                       </td>
                     </tr>
                   ) : (
                     pagedRows.map((row) => {
-                      const initial = row.title.trim().charAt(0).toUpperCase() || "?";
+                      const initial =
+                        row.title.trim().charAt(0).toUpperCase() || "?";
                       return (
                         <tr key={row.key} className="hover:bg-ivory/60">
                           <td className="py-4">
@@ -826,7 +878,9 @@ export function UserDashboard() {
                                 {initial}
                               </span>
                               <div className="min-w-0">
-                                <p className="truncate font-medium">{row.title}</p>
+                                <p className="truncate font-medium">
+                                  {row.title}
+                                </p>
                                 <p className="text-xs text-foreground/45">
                                   {row.kind === "quotation"
                                     ? "Quotation"
@@ -861,10 +915,10 @@ export function UserDashboard() {
                   type="button"
                   disabled={currentPage <= 1}
                   onClick={() => setPage((value) => Math.max(1, value - 1))}
-                  className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-foreground/60 transition hover:bg-ivory disabled:opacity-40"
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-sm text-foreground/60 transition hover:bg-ivory disabled:opacity-40 sm:px-3"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  Previous
+                  <span className="hidden sm:inline">Previous</span>
                 </button>
                 {pageItems(currentPage, pageCount).map((item, index) =>
                   item === "…" ? (
@@ -896,9 +950,9 @@ export function UserDashboard() {
                   onClick={() =>
                     setPage((value) => Math.min(pageCount, value + 1))
                   }
-                  className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-foreground/60 transition hover:bg-ivory disabled:opacity-40"
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-sm text-foreground/60 transition hover:bg-ivory disabled:opacity-40 sm:px-3"
                 >
-                  Next
+                  <span className="hidden sm:inline">Next</span>
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
@@ -932,11 +986,11 @@ function CashflowCard({
   loading: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-ivory p-4">
+    <div className="min-w-0 rounded-2xl bg-ivory p-4">
       <div className="flex items-center justify-between gap-2">
         <span
           className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-full",
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
             iconClass,
           )}
         >
@@ -944,7 +998,7 @@ function CashflowCard({
         </span>
         <ChangePill value={change ?? null} invert={invertChange} />
       </div>
-      <p className="mt-4 font-display text-2xl">
+      <p className="mt-4 break-all font-display text-xl sm:text-2xl">
         <MaskedAmount loading={loading} revealed={revealed} value={amount} />
       </p>
       <p className="mt-1 text-xs font-medium">{label}</p>
