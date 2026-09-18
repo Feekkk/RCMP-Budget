@@ -113,6 +113,29 @@ export const getCurrentUser = createServerFn({ method: "GET" }).handler(
   },
 );
 
+export const startMicrosoftLogin = createServerFn({ method: "POST" }).handler(async () => {
+  const { startMicrosoftSso } = await import("@backend/server-functions/microsoft-sso");
+  return startMicrosoftSso();
+});
+
+export const completeMicrosoftLogin = createServerFn({ method: "POST" })
+  .validator((input: unknown) => {
+    const parsed = z
+      .object({
+        code: z.string().min(1),
+        state: z.string().min(1),
+      })
+      .safeParse(input);
+    if (!parsed.success) {
+      throw new Error("Microsoft sign-in was incomplete. Start again from the login page.");
+    }
+    return parsed.data;
+  })
+  .handler(async ({ data }) => {
+    const { completeMicrosoftSso } = await import("@backend/server-functions/microsoft-sso");
+    return completeMicrosoftSso(data);
+  });
+
 export const logout = createServerFn({ method: "POST" }).handler(async () => {
   const session = await getAuthSession();
   await session.clear();

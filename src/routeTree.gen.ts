@@ -27,6 +27,7 @@ import { Route as HodCalendarRouteImport } from './routes/hod/calendar'
 import { Route as UserHistoryRouteRouteImport } from './routes/user/history/route'
 import { Route as UserHistoryIndexRouteImport } from './routes/user/history/index'
 import { Route as UserHistoryBudgetIdRouteImport } from './routes/user/history/$budgetId'
+import { Route as AuthMicrosoftCallbackRouteImport } from './routes/auth/microsoft/callback'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -118,6 +119,11 @@ const UserHistoryBudgetIdRoute = UserHistoryBudgetIdRouteImport.update({
   path: '/$budgetId',
   getParentRoute: () => UserHistoryRouteRoute,
 } as any)
+const AuthMicrosoftCallbackRoute = AuthMicrosoftCallbackRouteImport.update({
+  id: '/auth/microsoft/callback',
+  path: '/auth/microsoft/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/user/quotation': typeof UserQuotationRoute
   '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
+  '/auth/microsoft/callback': typeof AuthMicrosoftCallbackRoute
   '/user/history/$budgetId': typeof UserHistoryBudgetIdRoute
   '/user/history/': typeof UserHistoryIndexRoute
 }
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/user/quotation': typeof UserQuotationRoute
   '/hod': typeof HodIndexRoute
   '/user': typeof UserIndexRoute
+  '/auth/microsoft/callback': typeof AuthMicrosoftCallbackRoute
   '/user/history/$budgetId': typeof UserHistoryBudgetIdRoute
   '/user/history': typeof UserHistoryIndexRoute
 }
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/user/quotation': typeof UserQuotationRoute
   '/hod/': typeof HodIndexRoute
   '/user/': typeof UserIndexRoute
+  '/auth/microsoft/callback': typeof AuthMicrosoftCallbackRoute
   '/user/history/$budgetId': typeof UserHistoryBudgetIdRoute
   '/user/history/': typeof UserHistoryIndexRoute
 }
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/user/quotation'
     | '/hod/'
     | '/user/'
+    | '/auth/microsoft/callback'
     | '/user/history/$budgetId'
     | '/user/history/'
   fileRoutesByTo: FileRoutesByTo
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/user/quotation'
     | '/hod'
     | '/user'
+    | '/auth/microsoft/callback'
     | '/user/history/$budgetId'
     | '/user/history'
   id:
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
     | '/user/quotation'
     | '/hod/'
     | '/user/'
+    | '/auth/microsoft/callback'
     | '/user/history/$budgetId'
     | '/user/history/'
   fileRoutesById: FileRoutesById
@@ -242,6 +254,7 @@ export interface RootRouteChildren {
   HodRouteRoute: typeof HodRouteRouteWithChildren
   UserRouteRoute: typeof UserRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  AuthMicrosoftCallbackRoute: typeof AuthMicrosoftCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -372,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UserHistoryBudgetIdRouteImport
       parentRoute: typeof UserHistoryRouteRoute
     }
+    '/auth/microsoft/callback': {
+      id: '/auth/microsoft/callback'
+      path: '/auth/microsoft/callback'
+      fullPath: '/auth/microsoft/callback'
+      preLoaderRoute: typeof AuthMicrosoftCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -437,6 +457,7 @@ const rootRouteChildren: RootRouteChildren = {
   HodRouteRoute: HodRouteRouteWithChildren,
   UserRouteRoute: UserRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  AuthMicrosoftCallbackRoute: AuthMicrosoftCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

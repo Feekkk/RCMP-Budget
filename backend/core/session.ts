@@ -2,7 +2,11 @@ import { useSession } from "@tanstack/react-start/server";
 import type { AuthUser } from "@/lib/auth";
 
 export type SessionUser = {
-  user: AuthUser;
+  user?: AuthUser;
+  msOAuth?: {
+    state: string;
+    verifier: string;
+  };
 };
 
 const SESSION_PASSWORD = "budget_tracker-dev-session-secret-32";
